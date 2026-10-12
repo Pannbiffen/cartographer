@@ -1,0 +1,124 @@
+// Universal VTT (.dd2vtt) Exporter
+import type { MapData } from '../../types/map';
+import { extractWallSegments } from '../geometry/hatching';
+
+export interface VttPoint {
+  x: number;
+  y: number;
+}
+
+export interface VttPortal {
+  position: VttPoint;
+  bounds: [VttPoint, VttPoint];
+  closed: boolean;
+  freestanding: boolean;
+}
+
+export interface VttLight {
+  position: VttPoint;
+  range: number;
+  color: string;
+  intensity: number;
+  shadows: boolean;
+}
+
+export interface UniversalVttData {
+  format: number;
+  resolution: {
+    map_origin: VttPoint;
+    map_size: VttPoint;
+    pixels_per_grid: number;
+  };
+  line_of_sight: [VttPoint, VttPoint][];
+  portals: VttPortal[];
+  lights: VttLight[];
+  image: string; // Base64 image
+}
+
+export function exportUniversalVtt(
+  mapData: MapData,
+  imageDataBase64: string,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number
+): string {
+  const gridSize = mapData.gridSize;
+  const widthUnits = Math.max(1, maxX - minX + 1);
+  const heightUnits = Math.max(1, maxY - minY + 1);
+
+  // Extract outer wall segments
+  const rawSegments = extractWallSegments(mapData.rooms, gridSize);
+
+  // Convert wall segments to grid units relative to (minX, minY)
+  const lineOfSight: [VttPoint, VttPoint][] = rawSegments.map((seg) => [
+    {
+      x: (seg.x1 - minX * gridSize) / gridSize,
+      y: (seg.y1 - minY * gridSize) / gridSize,
+    },
+    {
+      x: (seg.x2 - minX * gridSize) / gridSize,
+      y: (seg.y2 - minY * gridSize) / gridSize,
+    },
+  ]);
+
+  // Convert doors to VTT portals
+  const portals: VttPortal[] = mapData.doors.map((door) => {
+    const dx = door.x - minX;
+    const dy = door.y - minY;
+
+    if (door.orientation === 'horizontal') {
+      return {
+        position: { x: dx + 0.5, y: dy },
+        bounds: [
+          { x: dx + 0.1, y: dy },
+          { x: dx + 0.9, y: dy },
+        ],
+        closed: true,
+        freestanding: false,
+      };
+    } else {
+      return {
+        position: { x: dx, y: dy + 0.5 },
+        bounds: [
+          { x: dx, y: dy + 0.1 },
+          { x: dx, y: dy + 0.9 },
+        ],
+        closed: true,
+        freestanding: false,
+      };
+    }
+  });
+
+  // Convert placed torches to VTT dynamic light sources
+  const lights: VttLight[] = mapData.props
+    .filter((p) => p.type === 'torch')
+    .map((torch) => ({
+      position: {
+        x: torch.x - minX + 0.5,
+        y: torch.y - minY + 0.5,
+      },
+      range: 4, // 20ft torch radius in 5ft grid squares
+      color: 'ffffaa44',
+      intensity: 1.0,
+      shadows: true,
+    }));
+
+  // Strip "data:image/png;base64," prefix if present
+  const cleanImage = imageDataBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+
+  const vttDoc: UniversalVttData = {
+    format: 0.2,
+    resolution: {
+      map_origin: { x: 0, y: 0 },
+      map_size: { x: widthUnits, y: heightUnits },
+      pixels_per_grid: gridSize,
+    },
+    line_of_sight: lineOfSight,
+    portals,
+    lights,
+    image: cleanImage,
+  };
+
+  return JSON.stringify(vttDoc, null, 2);
+}
