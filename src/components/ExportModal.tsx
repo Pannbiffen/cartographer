@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { MapData } from '../types/map';
-import { exportToPng, exportToVtt, exportToPdf, triggerDownload } from '../core/export/imageExporter';
+import { exportToImage, exportToVtt, exportToPdf, triggerDownload } from '../core/export/imageExporter';
+import type { ImageFormat, PaperSize } from '../core/export/imageExporter';
 import { X, Image, FileText, Sparkles, Save, Check } from 'lucide-react';
 
 interface ExportModalProps {
@@ -13,11 +14,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
   const [scale, setScale] = useState<number>(2);
   const [includeGrid, setIncludeGrid] = useState<boolean>(true);
   const [copiedVtt, setCopiedVtt] = useState<boolean>(false);
+  const [format, setFormat] = useState<ImageFormat>('png');
+  const [paper, setPaper] = useState<PaperSize>('a4');
 
   if (!isOpen) return null;
 
-  const handleExportPng = () => {
-    exportToPng(mapData, scale, includeGrid);
+  const handleExportImage = () => {
+    exportToImage(mapData, scale, includeGrid, format);
   };
 
   const handleExportVtt = () => {
@@ -26,8 +29,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
     setTimeout(() => setCopiedVtt(false), 2500);
   };
 
-  const handleExportPdf = () => {
-    exportToPdf(mapData, includeGrid);
+  const handleExportPdf = (layout: 'fit' | 'tiled') => {
+    exportToPdf(mapData, includeGrid, layout, paper);
   };
 
   const handleExportJson = () => {
@@ -61,22 +64,31 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-semibold text-[#f2ebd9]">
                 <Image className="w-4 h-4 text-emerald-400" />
-                <span>Raster Image (PNG)</span>
+                <span>Image (PNG / WebP)</span>
               </div>
-              <span className="text-xs text-[#bdae9c]">Lossless high-res</span>
+              <select
+                value={format}
+                onChange={(e) => setFormat(e.target.value as ImageFormat)}
+                className="bg-[#231b17] border border-[#3d3129] text-[#e8dfcf] px-2 py-1 rounded outline-none text-xs"
+              >
+                <option value="png">PNG (lossless)</option>
+                <option value="webp">WebP (smaller file)</option>
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="text-[#bdae9c] block mb-1">Resolution Quality</label>
+                <label className="text-[#bdae9c] block mb-1">Resolution</label>
                 <select
                   value={scale}
                   onChange={(e) => setScale(Number(e.target.value))}
                   className="w-full bg-[#231b17] border border-[#3d3129] text-[#e8dfcf] px-2.5 py-1.5 rounded outline-none"
                 >
-                  <option value={1}>Standard (1x - Web)</option>
-                  <option value={2}>High Definition (2x - Crisp)</option>
-                  <option value={3}>Print Master (3x - 300 DPI)</option>
+                  {[1, 2, 3, 4].map((s) => (
+                    <option key={s} value={s}>
+                      {s}x - {mapData.gridSize * s} px per square
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -94,11 +106,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
             </div>
 
             <button
-              onClick={handleExportPng}
+              onClick={handleExportImage}
               className="w-full py-2 bg-[#8b3a2b] hover:bg-[#a64634] text-white font-medium rounded-lg shadow transition flex items-center justify-center gap-2"
             >
               <Image className="w-4 h-4" />
-              <span>Download PNG Image</span>
+              <span>Download {format.toUpperCase()} Image</span>
             </button>
           </div>
 
@@ -114,7 +126,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
               </span>
             </div>
             <p className="text-xs text-[#bdae9c] leading-relaxed">
-              Export line-of-sight wall occluders, door portals, and torch dynamic lights. Works natively with Foundry VTT, Roll20, and Fantasy Grounds.
+              Export line-of-sight walls, door portals, and torch lights. Import into Foundry VTT (with the Universal Battlemap Importer module), Fantasy Grounds Unity, and other Universal VTT-compatible tables.
             </p>
             <button
               onClick={handleExportVtt}
@@ -127,20 +139,42 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
 
           {/* 3. Printable PDF & Project Save */}
           <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={handleExportPdf}
-              className="p-3 bg-[#181310] hover:bg-[#2e231e] border border-[#3d3129] rounded-xl text-left flex flex-col gap-1 transition"
-            >
-              <div className="flex items-center gap-1.5 font-semibold text-[#f2ebd9] text-xs">
-                <FileText className="w-4 h-4 text-amber-400" />
-                <span>Printable PDF</span>
+            <div className="p-3 bg-[#181310] border border-[#3d3129] rounded-xl flex flex-col gap-2 col-span-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-semibold text-[#f2ebd9] text-xs">
+                  <FileText className="w-4 h-4 text-amber-400" />
+                  <span>Printable PDF</span>
+                </div>
+                <select
+                  value={paper}
+                  onChange={(e) => setPaper(e.target.value as PaperSize)}
+                  className="bg-[#231b17] border border-[#3d3129] text-[#e8dfcf] px-2 py-1 rounded outline-none text-xs"
+                >
+                  <option value="a4">A4</option>
+                  <option value="letter">US Letter</option>
+                </select>
               </div>
-              <p className="text-[11px] text-[#bdae9c]">Scaled for home tabletop printing.</p>
-            </button>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <button
+                  onClick={() => handleExportPdf('fit')}
+                  className="py-2 px-2 bg-[#231b17] hover:bg-[#2e231e] border border-[#3d3129] rounded-lg text-left transition"
+                >
+                  <div className="font-medium text-[#f2ebd9]">Fit to one page</div>
+                  <div className="text-[11px] text-[#bdae9c]">Overview handout</div>
+                </button>
+                <button
+                  onClick={() => handleExportPdf('tiled')}
+                  className="py-2 px-2 bg-[#231b17] hover:bg-[#2e231e] border border-[#3d3129] rounded-lg text-left transition"
+                >
+                  <div className="font-medium text-[#f2ebd9]">True scale (1&quot; squares)</div>
+                  <div className="text-[11px] text-[#bdae9c]">Tiled for minis</div>
+                </button>
+              </div>
+            </div>
 
             <button
               onClick={handleExportJson}
-              className="p-3 bg-[#181310] hover:bg-[#2e231e] border border-[#3d3129] rounded-xl text-left flex flex-col gap-1 transition"
+              className="col-span-2 p-3 bg-[#181310] hover:bg-[#2e231e] border border-[#3d3129] rounded-xl text-left flex flex-col gap-1 transition"
             >
               <div className="flex items-center gap-1.5 font-semibold text-[#f2ebd9] text-xs">
                 <Save className="w-4 h-4 text-purple-400" />
