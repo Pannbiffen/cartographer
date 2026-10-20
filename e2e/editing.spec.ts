@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openApp, cellCenter, dragCells, stats, trackErrors } from './helpers';
+import { openApp, cellCenter, cellPixels, dragCells, stats, trackErrors } from './helpers';
 
 // The starter map leaves rows y >= 8 and the block x -15..-8, y -8..0 empty
 
@@ -58,14 +58,15 @@ test('foliage tool paints the chosen plant type', async ({ page }) => {
 
 test('space + drag pans instead of drawing', async ({ page }) => {
   await openApp(page);
-  const footer = page.locator('footer div').first();
+  const footer = page.getByTestId('cursor-position');
   const start = await cellCenter(page, -1, -1);
+  const shift = 3 * (await cellPixels(page));
   await page.mouse.move(start.x, start.y);
   await expect(footer).toContainText('Grid: (-1, -1)');
 
   await page.keyboard.down('Space');
   await page.mouse.down();
-  await page.mouse.move(start.x + 120, start.y, { steps: 5 });
+  await page.mouse.move(start.x + shift, start.y, { steps: 5 });
   await page.mouse.up();
   await page.keyboard.up('Space');
 

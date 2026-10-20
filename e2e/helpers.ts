@@ -6,21 +6,35 @@ export async function openApp(page: Page) {
   await page.goto('/');
   await expect(page.locator('canvas')).toBeVisible();
   // Wait until the app's keyboard listeners are attached
-  await expect(page.getByText(/Rooms: \d+/)).toBeVisible();
+  await expect(page.getByTestId('map-stats')).toBeVisible();
+  // ...and the view has been placed for the canvas size
+  await expect(page.locator('canvas')).not.toHaveAttribute('data-view', '0,0,1');
+}
+
+/** The canvas view transform: screen offset of the grid origin and zoom */
+export async function view(page: Page) {
+  const [x, y, zoom] = (await page.locator('canvas').getAttribute('data-view'))!
+    .split(',')
+    .map(Number);
+  return { x, y, zoom };
+}
+
+/** On-screen size of one grid cell at the current zoom */
+export async function cellPixels(page: Page) {
+  return 40 * (await view(page)).zoom;
 }
 
 /**
- * Screen position of a point in grid units at the default viewport (zoom 1,
- * origin centred horizontally and 20px above the window's vertical centre).
+ * Screen position of a point in grid units at the current view.
  * Pass fractional values to aim at edges, e.g. (6, 1.5) for a vertical edge.
  */
 export async function gridPoint(page: Page, gx: number, gy: number) {
   const box = await page.locator('canvas').boundingBox();
-  const size = page.viewportSize();
-  if (!box || !size) throw new Error('canvas not ready');
+  if (!box) throw new Error('canvas not ready');
+  const v = await view(page);
   return {
-    x: box.x + size.width / 2 + gx * 40,
-    y: box.y + size.height / 2 - 20 + gy * 40,
+    x: box.x + v.x + gx * 40 * v.zoom,
+    y: box.y + v.y + gy * 40 * v.zoom,
   };
 }
 
@@ -61,9 +75,9 @@ export async function saveMap(page: Page): Promise<MapData> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
-/** The sidebar's live counters, e.g. { rooms: 194, water: 16, foliage: 4 } */
+/** The status bar's live counters, e.g. { rooms: 194, water: 16, foliage: 4 } */
 export async function stats(page: Page) {
-  const text = await page.getByText(/Rooms: \d+/).locator('..').innerText();
+  const text = await page.getByTestId('map-stats').innerText();
   const num = (label: string) => Number(new RegExp(`${label}: (\\d+)`).exec(text)?.[1]);
   return { rooms: num('Rooms'), water: num('Water'), foliage: num('Foliage') };
 }

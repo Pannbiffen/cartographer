@@ -4,13 +4,13 @@ import { openApp, dragCells, stats, saveMap } from './helpers';
 test('autosave restores the map after a reload', async ({ page }) => {
   await openApp(page);
   await dragCells(page, [-15, 8], [-5, 8]);
-  await page.locator('header input').first().fill('My Test Map');
+  await page.getByLabel('Map title').fill('My Test Map');
   await expect(page.getByText('Autosaved in this browser')).toBeVisible();
 
   await page.reload();
   await openApp(page);
   expect((await stats(page)).rooms).toBe(205);
-  await expect(page.locator('header input').first()).toHaveValue('My Test Map');
+  await expect(page.getByLabel('Map title')).toHaveValue('My Test Map');
 });
 
 test('exports WebP images and tiled PDFs', async ({ page }) => {
@@ -45,6 +45,6 @@ test('project files round-trip and old files without labels still load', async (
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ ...legacy, title: 'Legacy Map' })),
   });
-  await expect(page.locator('header input').first()).toHaveValue('Legacy Map');
+  await expect(page.getByLabel('Map title')).toHaveValue('Legacy Map');
   expect((await saveMap(page)).labels).toEqual([]);
 });

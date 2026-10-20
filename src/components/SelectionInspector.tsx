@@ -5,6 +5,8 @@ import {
   LABEL_SIZES,
   PROP_TYPES,
   STAIR_DIRECTIONS,
+  BUTTON_CLASS,
+  FIELD_CLASS,
   optionButtonClass,
 } from './options';
 import type { ModifyMap } from '../App';
@@ -52,12 +54,12 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
 
   if (!selection) {
     return (
-      <p className="text-xs text-[#bdae9c] leading-relaxed mb-3">
+      <p className="text-ui-muted leading-snug">
         {hint ?? (
           <>
             Click a door, staircase, prop or label to select it. Drag to move,{' '}
-            <span className="text-[#f2ebd9]">R</span> to rotate,{' '}
-            <span className="text-[#f2ebd9]">Delete</span> to remove.
+            <kbd>R</kbd> to rotate,{' '}
+            <kbd>Delete</kbd> to remove.
           </>
         )}
       </p>
@@ -84,13 +86,13 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   };
 
   return (
-    <div className="mb-3 flex flex-col gap-3 text-xs">
-      <div className="text-[#f2ebd9] font-medium capitalize">
+    <div className="flex flex-col gap-2.5">
+      <div className="font-medium capitalize">
         Selected: {door ? `${door.type} door` : stairs ? 'stairs' : label ? 'label' : prop?.type}
       </div>
 
       {door && (
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1">
           {DOOR_TYPES.map((type) => (
             <button
               key={type}
@@ -106,8 +108,8 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
       {stairs && (
         <>
           <div>
-            <label className="text-[#bdae9c] block mb-1">Leads</label>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="mb-1">Leads</div>
+            <div className="grid grid-cols-4 gap-1">
               {STAIR_DIRECTIONS.map((direction) => (
                 <button
                   key={direction}
@@ -127,7 +129,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
                 ['steps', 'Steps', 3, 12],
               ] as const
             ).map(([field, label, min, max]) => (
-              <label key={field} className="text-[#bdae9c]">
+              <label key={field}>
                 {label}
                 <input
                   type="number"
@@ -138,7 +140,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
                     const value = Math.min(max, Math.max(min, parseInt(e.target.value, 10) || min));
                     setStairs({ [field]: value });
                   }}
-                  className="mt-1 w-full bg-[#181310] border border-[#3d3129] text-[#e8dfcf] px-2 py-1 rounded outline-none"
+                  className={`mt-0.5 w-full ${FIELD_CLASS}`}
                 />
               </label>
             ))}
@@ -147,7 +149,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
       )}
 
       {prop && (
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1">
           {PROP_TYPES.map((type) => (
             <button
               key={type}
@@ -170,9 +172,9 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
               if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur();
             }}
             placeholder="Label text"
-            className="w-full bg-[#181310] border border-[#3d3129] text-[#e8dfcf] px-2 py-1.5 rounded outline-none focus:border-[#8b3a2b]"
+            className={`w-full ${FIELD_CLASS}`}
           />
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-1">
             {LABEL_SIZES.map(([name, size]) => (
               <button
                 key={name}
@@ -186,11 +188,11 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-2 gap-1">
         {!label && (
           <button
             onClick={() => onModifyMap((draft) => rotateObject(draft, selection))}
-            className="py-1.5 px-2 rounded border bg-[#181310] border-[#3d3129] text-[#e8dfcf] hover:bg-[#281f1a] flex items-center justify-center gap-1.5 transition"
+            className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}
           >
             <RotateCw className="w-3.5 h-3.5" />
             Rotate (R)
@@ -201,7 +203,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
             onModifyMap((draft) => deleteObject(draft, selection));
             onClearSelection();
           }}
-          className="py-1.5 px-2 rounded border bg-red-950/40 border-red-800/40 text-red-200 hover:bg-red-900/60 flex items-center justify-center gap-1.5 transition"
+          className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5 text-ui-danger`}
         >
           <Trash2 className="w-3.5 h-3.5" />
           Delete

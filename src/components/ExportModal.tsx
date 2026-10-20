@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import type { MapData } from '../types/map';
 import { exportToImage, exportToVtt, exportToPdf, triggerDownload } from '../core/export/imageExporter';
 import type { ImageFormat, PaperSize } from '../core/export/imageExporter';
-import { X, Image, FileText, Sparkles, Save, Check } from 'lucide-react';
+import { X } from 'lucide-react';
+import { BUTTON_CLASS, FIELD_CLASS } from './options';
 
 interface ExportModalProps {
   mapData: MapData;
@@ -41,146 +42,108 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-[#231b17] border border-[#3d3129] rounded-2xl shadow-2xl p-6 text-[#e8dfcf] flex flex-col gap-6">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#3d3129] pb-3">
-          <div className="flex items-center gap-2 text-[#d4af37]">
-            <Sparkles className="w-5 h-5" />
-            <h2 className="text-lg font-serif font-bold">Export Battlemap</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[#bdae9c] hover:text-white hover:bg-[#342923] transition"
-          >
-            <X className="w-5 h-5" />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4"
+      onPointerDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-label="Export"
+        className="w-full max-w-md bg-ui border border-ui-border shadow-xl text-ui-text"
+      >
+        <div className="flex items-center justify-between h-7 pl-3 pr-1 bg-ui-sunken border-b border-ui-border">
+          <h2 className="font-semibold">Export</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1 rounded-sm hover:bg-ui-raised">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Export Options Grid */}
-        <div className="flex flex-col gap-4 text-sm">
-          {/* 1. Image Export (PNG) */}
-          <div className="p-4 bg-[#181310] border border-[#3d3129] rounded-xl flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-semibold text-[#f2ebd9]">
-                <Image className="w-4 h-4 text-emerald-400" />
-                <span>Image (PNG / WebP)</span>
-              </div>
+        <div className="p-3 flex flex-col gap-3">
+          <fieldset className="border border-ui-border px-3 pb-3 pt-1 flex flex-col gap-2">
+            <legend className="px-1 font-semibold">Image</legend>
+            <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+              <span>Format</span>
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value as ImageFormat)}
-                className="bg-[#231b17] border border-[#3d3129] text-[#e8dfcf] px-2 py-1 rounded outline-none text-xs"
+                className={FIELD_CLASS}
               >
                 <option value="png">PNG (lossless)</option>
                 <option value="webp">WebP (smaller file)</option>
               </select>
+              <span>Resolution</span>
+              <select
+                value={scale}
+                onChange={(e) => setScale(Number(e.target.value))}
+                className={FIELD_CLASS}
+              >
+                {[1, 2, 3, 4].map((s) => (
+                  <option key={s} value={s}>
+                    {s}x - {mapData.gridSize * s} px per square
+                  </option>
+                ))}
+              </select>
             </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <label className="text-[#bdae9c] block mb-1">Resolution</label>
-                <select
-                  value={scale}
-                  onChange={(e) => setScale(Number(e.target.value))}
-                  className="w-full bg-[#231b17] border border-[#3d3129] text-[#e8dfcf] px-2.5 py-1.5 rounded outline-none"
-                >
-                  {[1, 2, 3, 4].map((s) => (
-                    <option key={s} value={s}>
-                      {s}x - {mapData.gridSize * s} px per square
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-end pb-1.5">
-                <label className="flex items-center gap-2 text-[#bdae9c] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeGrid}
-                    onChange={(e) => setIncludeGrid(e.target.checked)}
-                    className="w-4 h-4 accent-[#8b3a2b]"
-                  />
-                  <span>Render Grid Lines</span>
-                </label>
-              </div>
-            </div>
-
-            <button
-              onClick={handleExportImage}
-              className="w-full py-2 bg-[#8b3a2b] hover:bg-[#a64634] text-white font-medium rounded-lg shadow transition flex items-center justify-center gap-2"
-            >
-              <Image className="w-4 h-4" />
-              <span>Download {format.toUpperCase()} Image</span>
-            </button>
-          </div>
-
-          {/* 2. Universal VTT (.dd2vtt) */}
-          <div className="p-4 bg-[#181310] border border-[#3d3129] rounded-xl flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-semibold text-[#f2ebd9]">
-                <Sparkles className="w-4 h-4 text-sky-400" />
-                <span>Universal VTT (.dd2vtt)</span>
-              </div>
-              <span className="text-[11px] px-2 py-0.5 bg-emerald-950/70 border border-emerald-700/60 text-emerald-300 rounded-full font-medium">
-                100% Free
-              </span>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeGrid}
+                  onChange={(e) => setIncludeGrid(e.target.checked)}
+                  className="accent-ui-accent"
+                />
+                <span>Grid lines (image and PDF)</span>
+              </label>
+              <button onClick={handleExportImage} className={BUTTON_CLASS}>
+                Download {format.toUpperCase()}
+              </button>
             </div>
-            <p className="text-xs text-[#bdae9c] leading-relaxed">
-              Export line-of-sight walls, door portals, and torch lights. Import into Foundry VTT (with the Universal Battlemap Importer module), Fantasy Grounds Unity, and other Universal VTT-compatible tables.
+          </fieldset>
+
+          <fieldset className="border border-ui-border px-3 pb-3 pt-1 flex flex-col gap-2">
+            <legend className="px-1 font-semibold">Printable PDF</legend>
+            <div className="flex items-center gap-3">
+              <span>Paper</span>
+              <select
+                value={paper}
+                onChange={(e) => setPaper(e.target.value as PaperSize)}
+                className={FIELD_CLASS}
+              >
+                <option value="a4">A4</option>
+                <option value="letter">US Letter</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => handleExportPdf('fit')} className={`${BUTTON_CLASS} text-left`}>
+                <div>Fit to one page</div>
+                <div className="text-ui-muted">Overview handout</div>
+              </button>
+              <button onClick={() => handleExportPdf('tiled')} className={`${BUTTON_CLASS} text-left`}>
+                <div>True scale (1&quot; squares)</div>
+                <div className="text-ui-muted">Tiled for minis</div>
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset className="border border-ui-border px-3 pb-3 pt-1 flex flex-col gap-2">
+            <legend className="px-1 font-semibold">Virtual tabletop</legend>
+            <p className="text-ui-muted leading-snug">
+              Universal VTT file with walls, doors and torch lights, for Foundry VTT (Universal
+              Battlemap Importer), Fantasy Grounds Unity and other compatible tables.
             </p>
-            <button
-              onClick={handleExportVtt}
-              className="w-full py-2 bg-[#2c4c5e] hover:bg-[#39637b] text-white font-medium rounded-lg shadow transition flex items-center justify-center gap-2"
-            >
-              {copiedVtt ? <Check className="w-4 h-4 text-emerald-300" /> : <Sparkles className="w-4 h-4" />}
-              <span>{copiedVtt ? 'Downloaded dd2vtt!' : 'Download Universal VTT (.dd2vtt)'}</span>
-            </button>
-          </div>
-
-          {/* 3. Printable PDF & Project Save */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 bg-[#181310] border border-[#3d3129] rounded-xl flex flex-col gap-2 col-span-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 font-semibold text-[#f2ebd9] text-xs">
-                  <FileText className="w-4 h-4 text-amber-400" />
-                  <span>Printable PDF</span>
-                </div>
-                <select
-                  value={paper}
-                  onChange={(e) => setPaper(e.target.value as PaperSize)}
-                  className="bg-[#231b17] border border-[#3d3129] text-[#e8dfcf] px-2 py-1 rounded outline-none text-xs"
-                >
-                  <option value="a4">A4</option>
-                  <option value="letter">US Letter</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <button
-                  onClick={() => handleExportPdf('fit')}
-                  className="py-2 px-2 bg-[#231b17] hover:bg-[#2e231e] border border-[#3d3129] rounded-lg text-left transition"
-                >
-                  <div className="font-medium text-[#f2ebd9]">Fit to one page</div>
-                  <div className="text-[11px] text-[#bdae9c]">Overview handout</div>
-                </button>
-                <button
-                  onClick={() => handleExportPdf('tiled')}
-                  className="py-2 px-2 bg-[#231b17] hover:bg-[#2e231e] border border-[#3d3129] rounded-lg text-left transition"
-                >
-                  <div className="font-medium text-[#f2ebd9]">True scale (1&quot; squares)</div>
-                  <div className="text-[11px] text-[#bdae9c]">Tiled for minis</div>
-                </button>
-              </div>
+            <div className="flex justify-end">
+              <button onClick={handleExportVtt} className={BUTTON_CLASS}>
+                {copiedVtt ? 'Downloaded' : 'Download .dd2vtt'}
+              </button>
             </div>
+          </fieldset>
 
-            <button
-              onClick={handleExportJson}
-              className="col-span-2 p-3 bg-[#181310] hover:bg-[#2e231e] border border-[#3d3129] rounded-xl text-left flex flex-col gap-1 transition"
-            >
-              <div className="flex items-center gap-1.5 font-semibold text-[#f2ebd9] text-xs">
-                <Save className="w-4 h-4 text-purple-400" />
-                <span>Save Project JSON</span>
-              </div>
-              <p className="text-[11px] text-[#bdae9c]">Save locally to edit anytime.</p>
+          <div className="flex justify-between">
+            <button onClick={handleExportJson} className={BUTTON_CLASS}>
+              Save project (.dndmap)
+            </button>
+            <button onClick={onClose} className={BUTTON_CLASS}>
+              Close
             </button>
           </div>
         </div>

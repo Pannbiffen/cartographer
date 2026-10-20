@@ -8,10 +8,11 @@ Inspired by Dungeon Scrawl: match its features, never copy its code, art or asse
 - `npm run dev`: dev server on :5173. If it ever serves a blank page after edits, restart it (stale transform cache).
 - `npm run build`: type-check (`tsc -b`, including e2e) and build.
 - `npm run lint`: oxlint, should report nothing.
-- `npm run test:e2e`: Playwright tests in `e2e/` (own server on :5174, ~25s). Add or extend a spec for every fix or feature. Helpers in `e2e/helpers.ts` map grid cells to screen points for the default 1440x900 view of the starter map.
+- `npm run test:e2e`: Playwright tests in `e2e/` (own server on :5174, ~25s). Add or extend a spec for every fix or feature. Helpers in `e2e/helpers.ts` map grid cells to screen points using the canvas's `data-view` attribute, so they follow the current pan and zoom.
 
 ## Code map
 - `src/App.tsx`: map state, undo history (`modifyMap` with `coalesce` keys so one stroke/drag = one undo step), shortcuts, autosave.
+- `src/components/`: app chrome: `MenuBar` (menus are defined in `App.tsx`), `Toolbar`, `Toolbox`, `DockPanel` (right-hand properties), `ExportModal`. Shared tool list, theme names and button/field classes in `options.ts`; colour tokens (`bg-ui`, `border-ui-border`, ...) in `src/index.css`.
 - `src/canvas/MapCanvas.tsx`: pointer input, tools, previews.
 - `src/core/renderers/mapRenderer.ts`: the single renderer used by canvas and all exports.
 - `src/core/objects.ts`: doors/stairs/props/labels: hit testing, selection, edits. Replace objects; never mutate them (history shares them).

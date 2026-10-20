@@ -1,127 +1,78 @@
 import React from 'react';
-import type { ToolType } from '../types/map';
+import type { LucideIcon } from 'lucide-react';
 import {
-  Paintbrush,
-  Square,
-  Milestone,
-  Waves,
-  Trees,
-  DoorOpen,
-  Footprints,
-  Sparkles,
-  Eraser,
-  MousePointer2,
-  Type,
+  Download,
+  FolderOpen,
+  Redo2,
+  Save,
+  Undo2,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 
 interface ToolbarProps {
-  activeTool: ToolType;
-  onSelectTool: (tool: ToolType) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  zoom: number;
+  onOpen: () => void;
+  onSave: () => void;
+  onExport: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onActualSize: () => void;
 }
 
-interface ToolItem {
-  id: ToolType;
+interface ToolbarButtonProps {
+  icon: LucideIcon;
   label: string;
-  icon: React.ReactNode;
-  shortcut: string;
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  showLabel?: boolean;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onSelectTool }) => {
-  const tools: ToolItem[] = [
-    {
-      id: 'select',
-      label: 'Select / Move',
-      icon: <MousePointer2 className="w-5 h-5" />,
-      shortcut: 'V',
-    },
-    {
-      id: 'room-brush',
-      label: 'Room Brush',
-      icon: <Paintbrush className="w-5 h-5" />,
-      shortcut: 'B',
-    },
-    {
-      id: 'room-rect',
-      label: 'Rectangle Room',
-      icon: <Square className="w-5 h-5" />,
-      shortcut: 'R',
-    },
-    {
-      id: 'tunnel',
-      label: 'Corridor / Tunnel',
-      icon: <Milestone className="w-5 h-5" />,
-      shortcut: 'T',
-    },
-    {
-      id: 'water',
-      label: 'Water',
-      icon: <Waves className="w-5 h-5 text-sky-400" />,
-      shortcut: 'W',
-    },
-    {
-      id: 'foliage',
-      label: 'Foliage & Terrain',
-      icon: <Trees className="w-5 h-5 text-emerald-400" />,
-      shortcut: 'F',
-    },
-    {
-      id: 'door',
-      label: 'Door / Portal',
-      icon: <DoorOpen className="w-5 h-5" />,
-      shortcut: 'D',
-    },
-    {
-      id: 'stairs',
-      label: 'Stairs',
-      icon: <Footprints className="w-5 h-5" />,
-      shortcut: 'S',
-    },
-    {
-      id: 'prop',
-      label: 'Dungeon Props',
-      icon: <Sparkles className="w-5 h-5 text-amber-400" />,
-      shortcut: 'P',
-    },
-    {
-      id: 'label',
-      label: 'Text Label',
-      icon: <Type className="w-5 h-5" />,
-      shortcut: 'L',
-    },
-    {
-      id: 'eraser',
-      label: 'Eraser',
-      icon: <Eraser className="w-5 h-5 text-red-400" />,
-      shortcut: 'E',
-    },
-  ];
+const ToolbarButton: React.FC<ToolbarButtonProps> = ({
+  icon: Icon,
+  label,
+  title,
+  onClick,
+  disabled,
+  showLabel,
+}) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    aria-label={label}
+    className="flex items-center gap-1.5 h-7 px-1.5 rounded-sm border border-transparent text-ui-text enabled:hover:border-ui-border enabled:hover:bg-ui-raised enabled:active:bg-ui-sunken disabled:opacity-40"
+  >
+    <Icon className="w-4 h-4" strokeWidth={1.75} />
+    {showLabel && <span>{label}</span>}
+  </button>
+);
 
-  return (
-    <aside className="absolute left-4 top-20 z-10 flex flex-col gap-1.5 bg-[#231b17]/95 backdrop-blur-md p-2 rounded-xl border border-[#3d3129] shadow-xl text-[#e8dfcf]">
-      {tools.map((tool) => {
-        const isActive = activeTool === tool.id;
-        return (
-          <button
-            key={tool.id}
-            onClick={() => onSelectTool(tool.id)}
-            title={`${tool.label} (${tool.shortcut})`}
-            className={`group relative p-2.5 rounded-lg transition flex items-center justify-center ${
-              isActive
-                ? 'bg-[#8b3a2b] text-white shadow-inner ring-1 ring-[#c2513d]'
-                : 'hover:bg-[#342923] text-[#bdae9c] hover:text-white'
-            }`}
-          >
-            {tool.icon}
-            {/* Tooltip */}
-            <span className="absolute left-full ml-3 px-2 py-1 bg-[#1a1411] text-[#f2ebd9] text-xs font-sans rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 border border-[#3d3129] flex items-center gap-1.5">
-              <span>{tool.label}</span>
-              <kbd className="px-1 py-0.5 bg-[#2c221e] text-[10px] text-[#d4af37] font-mono rounded">
-                {tool.shortcut}
-              </kbd>
-            </span>
-          </button>
-        );
-      })}
-    </aside>
-  );
-};
+const Separator = () => <div className="mx-1 h-5 w-px bg-ui-border" />;
+
+// Main toolbar with the most used File, Edit and View actions
+export const Toolbar: React.FC<ToolbarProps> = (props) => (
+  <div role="toolbar" aria-label="Main toolbar" className="flex h-9 items-center gap-0.5 bg-ui border-b border-ui-border px-1.5">
+    <ToolbarButton icon={FolderOpen} label="Open" title="Open project (Ctrl+O)" onClick={props.onOpen} showLabel />
+    <ToolbarButton icon={Save} label="Save" title="Save project (Ctrl+S)" onClick={props.onSave} showLabel />
+    <ToolbarButton icon={Download} label="Export" title="Export image, PDF or VTT (Ctrl+E)" onClick={props.onExport} showLabel />
+    <Separator />
+    <ToolbarButton icon={Undo2} label="Undo" title="Undo (Ctrl+Z)" onClick={props.onUndo} disabled={!props.canUndo} />
+    <ToolbarButton icon={Redo2} label="Redo" title="Redo (Ctrl+Y)" onClick={props.onRedo} disabled={!props.canRedo} />
+    <Separator />
+    <ToolbarButton icon={ZoomOut} label="Zoom out" title="Zoom out (-)" onClick={props.onZoomOut} />
+    <button
+      onClick={props.onActualSize}
+      title="Actual size (Ctrl+1)"
+      className="h-7 min-w-12 px-1 rounded-sm border border-transparent text-ui-text tabular-nums hover:border-ui-border hover:bg-ui-raised"
+    >
+      {Math.round(props.zoom * 100)}%
+    </button>
+    <ToolbarButton icon={ZoomIn} label="Zoom in" title="Zoom in (+)" onClick={props.onZoomIn} />
+  </div>
+);

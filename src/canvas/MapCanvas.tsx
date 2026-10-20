@@ -43,6 +43,8 @@ interface MapCanvasProps {
   selectedFoliageType: FoliageType;
   viewport: ViewportTransform;
   onViewportChange: React.Dispatch<React.SetStateAction<ViewportTransform>>;
+  // Reports the canvas size in CSS pixels whenever it changes
+  onResize?: (size: { width: number; height: number }) => void;
   onModifyMap: ModifyMap;
   onHoverCoord?: (coord: { gx: number; gy: number } | null) => void;
   selection: Selection | null;
@@ -75,6 +77,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedFoliageType,
   viewport,
   onViewportChange,
+  onResize,
   onModifyMap,
   onHoverCoord,
   selection,
@@ -216,6 +219,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
   // Keep the canvas backing store matched to its on-screen size
   const drawRef = useRef(drawMap);
+  const onResizeRef = useRef(onResize);
+  useEffect(() => {
+    onResizeRef.current = onResize;
+  }, [onResize]);
   useEffect(() => {
     drawRef.current = drawMap;
     drawMap();
@@ -231,6 +238,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       canvas.width = Math.round(rect.width * dpr);
       canvas.height = Math.round(rect.height * dpr);
       drawRef.current();
+      onResizeRef.current?.({ width: rect.width, height: rect.height });
     });
 
     resizeObserver.observe(canvas);
@@ -581,6 +589,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       <canvas
         ref={canvasRef}
         className="w-full h-full block touch-none"
+        // The current view, for end-to-end tests to aim at grid cells
+        data-view={`${viewport.x},${viewport.y},${viewport.zoom}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

@@ -5,14 +5,15 @@ import type {
   DoorType,
   PropType,
   FoliageType,
-  ThemeType,
   ViewportTransform,
   MapHistoryState,
   Selection,
 } from './types/map';
-import { Header } from './components/Header';
+import { MenuBar, type Menu } from './components/MenuBar';
 import { Toolbar } from './components/Toolbar';
-import { Sidebar } from './components/Sidebar';
+import { Toolbox } from './components/Toolbox';
+import { DockPanel } from './components/DockPanel';
+import { TOOLS } from './components/options';
 import { MapCanvas } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import {
@@ -116,6 +117,8 @@ function createDefaultStarterMap(): MapData {
 }
 
 const MAX_HISTORY = 100;
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 4;
 
 export interface ModifyMapOptions {
   // Consecutive edits sharing a coalesce key (one brush stroke, one slider
@@ -170,13 +173,12 @@ export function App() {
   const [selectedPropType, setSelectedPropType] = useState<PropType>('pillar');
   const [selectedFoliageType, setSelectedFoliageType] = useState<FoliageType>('tree');
 
-  const [viewport, setViewport] = useState<ViewportTransform>({
-    x: window.innerWidth ? window.innerWidth / 2 : 450,
-    y: window.innerHeight ? window.innerHeight / 2 - 20 : 350,
-    zoom: 1.0,
-  });
+  const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, zoom: 1 });
+  // Canvas size in CSS pixels, known after its first layout
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isPanelOpen, setIsPanelOpen] = useState<boolean>(true);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [hoverCoord, setHoverCoord] = useState<{ gx: number; gy: number } | null>(null);
 
@@ -247,20 +249,33 @@ export function App() {
     });
   }, []);
 
-  // Zoom helpers
-  const handleZoomIn = () => {
-    setViewport((v) => ({ ...v, zoom: Math.min(4.0, v.zoom * 1.25) }));
-  };
-  const handleZoomOut = () => {
-    setViewport((v) => ({ ...v, zoom: Math.max(0.2, v.zoom / 1.25) }));
-  };
-  const handleResetZoom = () => {
-    setViewport({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2 - 20,
-      zoom: 1.0,
-    });
-  };
+  // Zoom about the centre of the canvas
+  const zoomTo = useCallback(
+    (zoomFor: (zoom: number) => number) => {
+      const cx = (canvasSize?.width ?? 0) / 2;
+      const cy = (canvasSize?.height ?? 0) / 2;
+      setViewport((v) => {
+        const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomFor(v.zoom)));
+        return {
+          x: cx - (cx - v.x) * (zoom / v.zoom),
+          y: cy - (cy - v.y) * (zoom / v.zoom),
+          zoom,
+        };
+      });
+    },
+    [canvasSize]
+  );
+  const handleZoomIn = useCallback(() => zoomTo((z) => z * 1.25), [zoomTo]);
+  const handleZoomOut = useCallback(() => zoomTo((z) => z / 1.25), [zoomTo]);
+  const handleActualSize = useCallback(() => zoomTo(() => 1), [zoomTo]);
+
+  // Centre the map origin once the canvas has a size
+  const hasPlacedViewRef = useRef(false);
+  useEffect(() => {
+    if (!canvasSize || hasPlacedViewRef.current) return;
+    hasPlacedViewRef.current = true;
+    setViewport({ x: canvasSize.width / 2, y: canvasSize.height / 2, zoom: 1 });
+  }, [canvasSize]);
 
   // Project JSON Save/Load
   const handleSaveJson = useCallback(() => {
@@ -291,6 +306,12 @@ export function App() {
     e.target.value = '';
   };
 
+  const toggleGrid = useCallback(() => {
+    modifyMap((draft) => {
+      draft.showGrid = !draft.showGrid;
+    });
+  }, [modifyMap]);
+
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -298,7 +319,16 @@ export function App() {
 
       const key = e.key.toLowerCase();
       if (e.ctrlKey || e.metaKey) {
-        if (key === 'z') {
+        if (key === 'o') {
+          e.preventDefault();
+          fileInputRef.current?.click();
+        } else if (key === 'e') {
+          e.preventDefault();
+          setIsExportOpen(true);
+        } else if (key === '1') {
+          e.preventDefault();
+          handleActualSize();
+        } else if (key === 'z') {
           e.preventDefault();
           if (e.shiftKey) handleRedo();
           else handleUndo();
@@ -315,7 +345,16 @@ export function App() {
 
       // Selection editing with the select tool
       if (key === 'escape') {
-        setSelection(null);
+        if (isExportOpen) setIsExportOpen(false);
+        else setSelection(null);
+        return;
+      }
+      if (key === '+' || key === '=') {
+        handleZoomIn();
+        return;
+      }
+      if (key === '-') {
+        handleZoomOut();
         return;
       }
       if (activeSelection && (activeTool === 'select' || activeTool === 'label')) {
@@ -331,31 +370,30 @@ export function App() {
         }
       }
 
-      const toolKeys: Record<string, ToolType> = {
-        v: 'select',
-        b: 'room-brush',
-        r: 'room-rect',
-        t: 'tunnel',
-        w: 'water',
-        f: 'foliage',
-        d: 'door',
-        s: 'stairs',
-        p: 'prop',
-        l: 'label',
-        e: 'eraser',
-      };
-      if (toolKeys[key]) {
-        chooseTool(toolKeys[key]);
+      const tool = TOOLS.find((t) => t.shortcut.toLowerCase() === key);
+      if (tool) {
+        chooseTool(tool.id);
       } else if (key === 'g') {
-        modifyMap((draft) => {
-          draft.showGrid = !draft.showGrid;
-        });
+        toggleGrid();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo, handleSaveJson, modifyMap, chooseTool, activeSelection, activeTool]);
+  }, [
+    handleUndo,
+    handleRedo,
+    handleSaveJson,
+    handleZoomIn,
+    handleZoomOut,
+    handleActualSize,
+    toggleGrid,
+    modifyMap,
+    chooseTool,
+    activeSelection,
+    activeTool,
+    isExportOpen,
+  ]);
 
   // Procedural Generators
   const handleGenerateDungeon = () => {
@@ -405,96 +443,163 @@ export function App() {
     }
   };
 
+  const selectionEditable = activeSelection !== null && (activeTool === 'select' || activeTool === 'label');
+  const menus: Menu[] = [
+    {
+      label: 'File',
+      items: [
+        { label: 'Open…', shortcut: 'Ctrl+O', onSelect: () => fileInputRef.current?.click() },
+        { label: 'Save', shortcut: 'Ctrl+S', onSelect: handleSaveJson },
+        'separator',
+        { label: 'Export…', shortcut: 'Ctrl+E', onSelect: () => setIsExportOpen(true) },
+      ],
+    },
+    {
+      label: 'Edit',
+      items: [
+        { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: handleUndo, disabled: history.past.length === 0 },
+        { label: 'Redo', shortcut: 'Ctrl+Y', onSelect: handleRedo, disabled: history.future.length === 0 },
+        'separator',
+        {
+          label: 'Rotate Selection',
+          shortcut: 'R',
+          disabled: !selectionEditable,
+          onSelect: () => activeSelection && modifyMap((draft) => rotateObject(draft, activeSelection)),
+        },
+        {
+          label: 'Delete Selection',
+          shortcut: 'Del',
+          disabled: !selectionEditable,
+          onSelect: () => {
+            if (!activeSelection) return;
+            modifyMap((draft) => deleteObject(draft, activeSelection));
+            setSelection(null);
+          },
+        },
+        'separator',
+        { label: 'Clear Map…', onSelect: handleClearMap },
+      ],
+    },
+    {
+      label: 'View',
+      items: [
+        { label: 'Zoom In', shortcut: '+', onSelect: handleZoomIn },
+        { label: 'Zoom Out', shortcut: '-', onSelect: handleZoomOut },
+        { label: 'Actual Size', shortcut: 'Ctrl+1', onSelect: handleActualSize },
+        'separator',
+        { label: 'Show Grid', shortcut: 'G', checked: mapData.showGrid, onSelect: toggleGrid },
+        { label: 'Properties Panel', checked: isPanelOpen, onSelect: () => setIsPanelOpen((v) => !v) },
+      ],
+    },
+    {
+      label: 'Tools',
+      items: [
+        ...TOOLS.map((t) => ({
+          label: t.label,
+          shortcut: t.shortcut,
+          checked: activeTool === t.id,
+          onSelect: () => chooseTool(t.id),
+        })),
+        'separator',
+        { label: 'Generate Dungeon', onSelect: handleGenerateDungeon },
+        { label: 'Generate Cave', onSelect: handleGenerateCave },
+        { label: 'Add River', onSelect: handleGenerateRiver },
+      ],
+    },
+    {
+      label: 'Help',
+      items: [
+        {
+          label: 'Source Code on GitHub',
+          onSelect: () => window.open('https://github.com/Pannbiffen/cartographer', '_blank', 'noopener'),
+        },
+        {
+          label: 'Report a Problem',
+          onSelect: () => window.open('https://github.com/Pannbiffen/cartographer/issues', '_blank', 'noopener'),
+        },
+      ],
+    },
+  ];
+
   return (
-    <div className="w-screen h-screen flex flex-col bg-[#e8decb] text-[#2c221e] overflow-hidden select-none font-sans">
-      {/* Top Header */}
-      <Header
-        title={mapData.title}
-        onTitleChange={(title) => modifyMap((draft) => { draft.title = title; }, { coalesce: 'title' })}
-        theme={mapData.theme}
-        onThemeChange={(theme: ThemeType) => modifyMap((draft) => { draft.theme = theme; })}
+    <div className="w-screen h-screen flex flex-col bg-ui text-ui-text overflow-hidden select-none">
+      <MenuBar menus={menus} />
+      <Toolbar
         canUndo={history.past.length > 0}
         canRedo={history.future.length > 0}
+        zoom={viewport.zoom}
+        onOpen={() => fileInputRef.current?.click()}
+        onSave={handleSaveJson}
+        onExport={() => setIsExportOpen(true)}
         onUndo={handleUndo}
         onRedo={handleRedo}
-        zoom={viewport.zoom}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
-        onResetZoom={handleResetZoom}
-        onOpenExport={() => setIsExportOpen(true)}
-        onSaveJson={handleSaveJson}
-        onLoadJson={handleLoadJson}
+        onActualSize={handleActualSize}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,.dndmap"
+        onChange={handleLoadJson}
+        className="hidden"
       />
 
-      {/* Main Workspace */}
-      <main className="relative flex-1 w-full h-full overflow-hidden">
-        {/* Floating Tool Palette */}
-        <Toolbar activeTool={activeTool} onSelectTool={chooseTool} />
+      <div className="flex flex-1 min-h-0">
+        <Toolbox activeTool={activeTool} onSelectTool={chooseTool} />
 
-        {/* Floating Right Inspector */}
-        <Sidebar
-          activeTool={activeTool}
-          brushSize={brushSize}
-          onBrushSizeChange={setBrushSize}
-          selectedDoorType={selectedDoorType}
-          onDoorTypeChange={setSelectedDoorType}
-          selectedPropType={selectedPropType}
-          onPropTypeChange={setSelectedPropType}
-          selectedFoliageType={selectedFoliageType}
-          onFoliageTypeChange={setSelectedFoliageType}
-          selection={activeSelection}
-          onClearSelection={() => setSelection(null)}
-          mapData={mapData}
-          onUpdateMapSettings={modifyMap}
-          onGenerateDungeon={handleGenerateDungeon}
-          onGenerateCave={handleGenerateCave}
-          onGenerateRiver={handleGenerateRiver}
-          onClearMap={handleClearMap}
-          isOpen={isSidebarOpen}
-          onToggleOpen={() => setIsSidebarOpen((v) => !v)}
-        />
+        <main className="relative flex-1 min-w-0 overflow-hidden">
+          <MapCanvas
+            mapData={mapData}
+            activeTool={activeTool}
+            brushSize={brushSize}
+            selectedDoorType={selectedDoorType}
+            selectedPropType={selectedPropType}
+            selectedFoliageType={selectedFoliageType}
+            viewport={viewport}
+            onViewportChange={setViewport}
+            onResize={setCanvasSize}
+            onModifyMap={modifyMap}
+            onHoverCoord={setHoverCoord}
+            selection={activeSelection}
+            onSelect={setSelection}
+          />
+        </main>
 
-        {/* Multi-layer Canvas */}
-        <MapCanvas
-          mapData={mapData}
-          activeTool={activeTool}
-          brushSize={brushSize}
-          selectedDoorType={selectedDoorType}
-          selectedPropType={selectedPropType}
-          selectedFoliageType={selectedFoliageType}
-          viewport={viewport}
-          onViewportChange={setViewport}
-          onModifyMap={modifyMap}
-          onHoverCoord={setHoverCoord}
-          selection={activeSelection}
-          onSelect={setSelection}
-        />
+        {isPanelOpen && (
+          <DockPanel
+            activeTool={activeTool}
+            brushSize={brushSize}
+            onBrushSizeChange={setBrushSize}
+            selectedDoorType={selectedDoorType}
+            onDoorTypeChange={setSelectedDoorType}
+            selectedPropType={selectedPropType}
+            onPropTypeChange={setSelectedPropType}
+            selectedFoliageType={selectedFoliageType}
+            onFoliageTypeChange={setSelectedFoliageType}
+            selection={activeSelection}
+            onClearSelection={() => setSelection(null)}
+            mapData={mapData}
+            onModifyMap={modifyMap}
+          />
+        )}
+      </div>
 
-        {/* Bottom Status & Hint Bar */}
-        <footer className="absolute bottom-2 left-4 right-4 z-10 pointer-events-none flex items-center justify-between text-xs text-[#bdae9c]">
-          <div className="bg-[#231b17]/90 backdrop-blur-sm px-3 py-1 rounded-md border border-[#3d3129] font-mono pointer-events-auto shadow-md">
-            {hoverCoord ? `Grid: (${hoverCoord.gx}, ${hoverCoord.gy})` : 'Canvas Ready'}
-            {autosaveStatus === 'saved' && (
-              <span className="ml-3 text-[#8fa880]">Autosaved in this browser</span>
-            )}
-            {autosaveStatus === 'failed' && (
-              <span className="ml-3 text-red-300">Autosave failed - save a .dndmap file</span>
-            )}
-          </div>
+      <footer className="flex h-6 items-center gap-4 px-2 bg-ui border-t border-ui-border text-ui-muted">
+        <span data-testid="cursor-position" className="w-28 tabular-nums">
+          {hoverCoord ? `Grid: (${hoverCoord.gx}, ${hoverCoord.gy})` : ''}
+        </span>
+        <span data-testid="map-stats" className="tabular-nums">
+          Rooms: {Object.keys(mapData.rooms).length} · Water: {Object.keys(mapData.water).length} ·
+          Foliage: {Object.keys(mapData.foliage).length}
+        </span>
+        <span className="flex-1" />
+        {autosaveStatus === 'saved' && <span>Autosaved in this browser</span>}
+        {autosaveStatus === 'failed' && (
+          <span className="text-ui-danger">Autosave failed - save a .dndmap file</span>
+        )}
+      </footer>
 
-          <div className="bg-[#231b17]/90 backdrop-blur-sm px-3 py-1 rounded-md border border-[#3d3129] font-sans hidden md:block pointer-events-auto shadow-md">
-            <span className="text-[#d4af37] font-semibold">Shortcuts:</span>{' '}
-            <span className="text-[#e8dfcf]">Space+Drag</span>: Pan |{' '}
-            <span className="text-[#e8dfcf]">Wheel</span>: Zoom |{' '}
-            <span className="text-[#e8dfcf]">B</span>: Room |{' '}
-            <span className="text-[#e8dfcf]">W</span>: Water |{' '}
-            <span className="text-[#e8dfcf]">F</span>: Foliage |{' '}
-            <span className="text-[#e8dfcf]">Ctrl+Z</span>: Undo
-          </div>
-        </footer>
-      </main>
-
-      {/* Export Modal */}
       <ExportModal
         mapData={mapData}
         isOpen={isExportOpen}
