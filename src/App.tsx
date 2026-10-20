@@ -25,6 +25,7 @@ import { triggerDownload } from './core/export/imageExporter';
 import { isTypingInField } from './core/keyboard';
 import { loadAutosave, saveAutosave } from './core/autosave';
 import { deleteObject, findSelected, rotateObject } from './core/objects';
+import { MAX_ZOOM, MIN_ZOOM, fitViewport } from './core/viewport';
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -117,8 +118,6 @@ function createDefaultStarterMap(): MapData {
 }
 
 const MAX_HISTORY = 100;
-const MIN_ZOOM = 0.2;
-const MAX_ZOOM = 4;
 
 export interface ModifyMapOptions {
   // Consecutive edits sharing a coalesce key (one brush stroke, one slider
@@ -269,13 +268,21 @@ export function App() {
   const handleZoomOut = useCallback(() => zoomTo((z) => z / 1.25), [zoomTo]);
   const handleActualSize = useCallback(() => zoomTo(() => 1), [zoomTo]);
 
-  // Centre the map origin once the canvas has a size
-  const hasPlacedViewRef = useRef(false);
+  const handleZoomToFit = useCallback(() => {
+    if (canvasSize) setViewport(fitViewport(mapData, canvasSize.width, canvasSize.height));
+  }, [mapData, canvasSize]);
+
+  // Frame the map on open and whenever a new map replaces it (file open,
+  // generators). Waits for the canvas size and for the new map to render.
+  const fitPendingRef = useRef(true);
+  const requestFit = useCallback(() => {
+    fitPendingRef.current = true;
+  }, []);
   useEffect(() => {
-    if (!canvasSize || hasPlacedViewRef.current) return;
-    hasPlacedViewRef.current = true;
-    setViewport({ x: canvasSize.width / 2, y: canvasSize.height / 2, zoom: 1 });
-  }, [canvasSize]);
+    if (!canvasSize || !fitPendingRef.current) return;
+    fitPendingRef.current = false;
+    setViewport(fitViewport(mapData, canvasSize.width, canvasSize.height));
+  }, [mapData, canvasSize]);
 
   // Project JSON Save/Load
   const handleSaveJson = useCallback(() => {
@@ -294,6 +301,7 @@ export function App() {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed && typeof parsed.rooms === 'object') {
+          requestFit();
           resetMap(normalizeLoadedMap(parsed));
         } else {
           alert('Invalid project file format.');
@@ -328,6 +336,9 @@ export function App() {
         } else if (key === '1') {
           e.preventDefault();
           handleActualSize();
+        } else if (key === '0') {
+          e.preventDefault();
+          handleZoomToFit();
         } else if (key === 'z') {
           e.preventDefault();
           if (e.shiftKey) handleRedo();
@@ -387,6 +398,7 @@ export function App() {
     handleZoomIn,
     handleZoomOut,
     handleActualSize,
+    handleZoomToFit,
     toggleGrid,
     modifyMap,
     chooseTool,
@@ -398,6 +410,7 @@ export function App() {
   // Procedural Generators
   const handleGenerateDungeon = () => {
     const res = generateBspDungeon(28, 20, 4);
+    requestFit();
     modifyMap((draft) => {
       draft.rooms = res.rooms;
       draft.water = {};
@@ -411,6 +424,7 @@ export function App() {
 
   const handleGenerateCave = () => {
     const res = generateCaveSystem(32, 24, 0.45);
+    requestFit();
     modifyMap((draft) => {
       draft.rooms = res.rooms;
       draft.water = res.water;
@@ -485,6 +499,7 @@ export function App() {
       items: [
         { label: 'Zoom In', shortcut: '+', onSelect: handleZoomIn },
         { label: 'Zoom Out', shortcut: '-', onSelect: handleZoomOut },
+        { label: 'Zoom to Fit', shortcut: 'Ctrl+0', onSelect: handleZoomToFit },
         { label: 'Actual Size', shortcut: 'Ctrl+1', onSelect: handleActualSize },
         'separator',
         { label: 'Show Grid', shortcut: 'G', checked: mapData.showGrid, onSelect: toggleGrid },
@@ -536,6 +551,7 @@ export function App() {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onActualSize={handleActualSize}
+        onZoomToFit={handleZoomToFit}
       />
       <input
         ref={fileInputRef}

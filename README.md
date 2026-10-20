@@ -28,6 +28,7 @@
   - 🎲 **Universal VTT (`.dd2vtt`)**: Line-of-sight walls, door portals and torch lights for Foundry VTT (via the Universal Battlemap Importer module), Fantasy Grounds Unity and other UVTT-compatible tools.
   - 🖨️ **Printable PDF**: Fit the whole map on one page, or print at true scale (1 square = 1 inch) tiled across A4 or US Letter pages.
   - 💾 **Project Save/Load**: Save `.dndmap` JSON files locally and resume anytime.
+- **Zoom to Fit**: Maps open framed in the window, and `Ctrl + 0` brings the whole map back into view.
 - **Autosave**: Your current map is kept in this browser and restored when you reopen the page. Save a `.dndmap` file to back it up or move it to another device.
 - **Undo/Redo**: Up to 100 steps; each brush stroke or slider drag is a single step.
 - **100% Client-Side & Static**: Hosted on GitHub Pages with no tracking and no accounts.
@@ -73,6 +74,7 @@ npm run preview
 | :--- | :--- |
 | `Space` + Drag / `Alt` + Drag / `Middle Click` | Pan viewport |
 | `Scroll Wheel` / `+` / `-` | Zoom in / out |
+| `Ctrl + 0` | Zoom to fit the whole map |
 | `Ctrl + 1` | Actual size (100%) |
 | `V` | Select / move |
 | `R` (with a selection) | Rotate selection |

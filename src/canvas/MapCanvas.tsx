@@ -10,6 +10,7 @@ import type {
   ViewportTransform,
 } from '../types/map';
 import { THEMES } from '../core/theme';
+import { MAX_ZOOM, MIN_ZOOM } from '../core/viewport';
 import { renderMap } from '../core/renderers/mapRenderer';
 import {
   brushCells,
@@ -58,8 +59,6 @@ interface HoverState {
   worldY: number;
 }
 
-const MIN_ZOOM = 0.2;
-const MAX_ZOOM = 4.0;
 
 const PREVIEW_FILLS: Partial<Record<ToolType, string>> = {
   eraser: 'rgba(230, 80, 80, 0.2)',

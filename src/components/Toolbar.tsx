@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Download,
   FolderOpen,
+  Maximize,
   Redo2,
   Save,
   Undo2,
@@ -22,6 +23,7 @@ interface ToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onActualSize: () => void;
+  onZoomToFit: () => void;
 }
 
 interface ToolbarButtonProps {
@@ -74,5 +76,6 @@ export const Toolbar: React.FC<ToolbarProps> = (props) => (
       {Math.round(props.zoom * 100)}%
     </button>
     <ToolbarButton icon={ZoomIn} label="Zoom in" title="Zoom in (+)" onClick={props.onZoomIn} />
+    <ToolbarButton icon={Maximize} label="Zoom to fit" title="Zoom to fit (Ctrl+0)" onClick={props.onZoomToFit} />
   </div>
 );
