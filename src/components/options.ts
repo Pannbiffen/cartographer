@@ -11,6 +11,11 @@ export const PROP_TYPES: PropType[] = [
   'barrel',
   'sarcophagus',
 ];
+export const LABEL_SIZES: [string, number][] = [
+  ['small', 14],
+  ['medium', 20],
+  ['large', 30],
+];
 export const STAIR_DIRECTIONS: PlacedStairs['direction'][] = ['up', 'down', 'left', 'right'];
 
 export function optionButtonClass(active: boolean): string {

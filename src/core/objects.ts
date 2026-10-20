@@ -2,11 +2,13 @@
 import type {
   MapData,
   PlacedDoor,
+  PlacedLabel,
   PlacedProp,
   PlacedStairs,
   Selection,
 } from '../types/map';
 import { nearestDoorEdge, stairsContainCell } from './tools/toolGeometry';
+import { measureLabel } from './renderers/labelRenderer';
 
 // How close (in cells) the pointer must be to a door's wall edge to pick it
 const DOOR_HIT_DISTANCE = 0.3;
@@ -24,23 +26,44 @@ export function findStairs(map: MapData, id: string): PlacedStairs | undefined {
 export function findProp(map: MapData, id: string): PlacedProp | undefined {
   return map.props.find((p) => p.id === id);
 }
+export function findLabel(map: MapData, id: string): PlacedLabel | undefined {
+  return map.labels.find((l) => l.id === id);
+}
+
+/** Label extent in grid units */
+function labelBounds(label: PlacedLabel, gridSize: number) {
+  const { width, height } = measureLabel(label);
+  const w = Math.max(width, label.size) / gridSize;
+  const h = height / gridSize;
+  return { x: label.x - w / 2, y: label.y - h / 2, w, h };
+}
 
 /** The selected object, or undefined if it no longer exists (e.g. after undo) */
 export function findSelected(
   map: MapData,
   sel: Selection | null
-): PlacedDoor | PlacedStairs | PlacedProp | undefined {
+): PlacedDoor | PlacedStairs | PlacedProp | PlacedLabel | undefined {
   if (!sel) return undefined;
   if (sel.kind === 'door') return findDoor(map, sel.id);
   if (sel.kind === 'stairs') return findStairs(map, sel.id);
+  if (sel.kind === 'label') return findLabel(map, sel.id);
   return findProp(map, sel.id);
 }
 
-/** Topmost object under a world position: doors, then props, then stairs */
+/** Topmost object under a world position: labels, doors, props, then stairs */
 export function hitTestObject(map: MapData, worldX: number, worldY: number): Selection | null {
   const gridSize = map.gridSize;
   const gx = Math.floor(worldX / gridSize);
   const gy = Math.floor(worldY / gridSize);
+
+  for (let i = map.labels.length - 1; i >= 0; i--) {
+    const b = labelBounds(map.labels[i], gridSize);
+    const px = worldX / gridSize;
+    const py = worldY / gridSize;
+    if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) {
+      return { kind: 'label', id: map.labels[i].id };
+    }
+  }
 
   const edge = nearestDoorEdge(worldX, worldY, gridSize);
   const edgeDistance =
@@ -81,6 +104,10 @@ export function objectBounds(
     const s = findStairs(map, sel.id);
     return s ? { x: s.x, y: s.y, w: s.width, h: s.height } : null;
   }
+  if (sel.kind === 'label') {
+    const l = findLabel(map, sel.id);
+    return l ? labelBounds(l, map.gridSize) : null;
+  }
   const p = findProp(map, sel.id);
   return p ? { x: p.x, y: p.y, w: 1, h: 1 } : null;
 }
@@ -101,7 +128,7 @@ export function rotateObject(draft: MapData, sel: Selection) {
     if (!s) return;
     const next = STAIR_DIRECTIONS[(STAIR_DIRECTIONS.indexOf(s.direction) + 1) % 4];
     replaceStairs(draft, { ...s, direction: next, width: s.height, height: s.width });
-  } else {
+  } else if (sel.kind === 'prop') {
     const p = findProp(draft, sel.id);
     if (!p) return;
     replaceProp(draft, { ...p, rotation: (p.rotation + 90) % 360 });
@@ -111,6 +138,7 @@ export function rotateObject(draft: MapData, sel: Selection) {
 export function deleteObject(draft: MapData, sel: Selection) {
   if (sel.kind === 'door') draft.doors = draft.doors.filter((d) => d.id !== sel.id);
   else if (sel.kind === 'stairs') draft.stairs = draft.stairs.filter((s) => s.id !== sel.id);
+  else if (sel.kind === 'label') draft.labels = draft.labels.filter((l) => l.id !== sel.id);
   else draft.props = draft.props.filter((p) => p.id !== sel.id);
 }
 
@@ -123,4 +151,7 @@ export function replaceStairs(draft: MapData, stairs: PlacedStairs) {
 }
 export function replaceProp(draft: MapData, prop: PlacedProp) {
   draft.props = draft.props.map((p) => (p.id === prop.id ? prop : p));
+}
+export function replaceLabel(draft: MapData, label: PlacedLabel) {
+  draft.labels = draft.labels.map((l) => (l.id === label.id ? label : l));
 }

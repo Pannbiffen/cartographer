@@ -8,6 +8,7 @@ export type ToolType =
   | 'door' 
   | 'stairs' 
   | 'prop' 
+  | 'label'
   | 'eraser';
 
 export type DoorType = 'standard' | 'double' | 'secret' | 'portcullis' | 'archway';
@@ -18,7 +19,7 @@ export type FoliageType = 'tree' | 'bush' | 'rock';
 
 export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome';
 
-export type SelectableKind = 'door' | 'stairs' | 'prop';
+export type SelectableKind = 'door' | 'stairs' | 'prop' | 'label';
 
 export interface Selection {
   kind: SelectableKind;
@@ -56,6 +57,14 @@ export interface PlacedProp {
   rotation: number; // 0, 90, 180, 270
 }
 
+export interface PlacedLabel {
+  id: string;
+  x: number; // centre in grid units (fractional, free placement)
+  y: number;
+  text: string;
+  size: number; // font size in map pixels
+}
+
 export interface MapData {
   version: number;
   title: string;
@@ -71,6 +80,7 @@ export interface MapData {
   doors: PlacedDoor[];
   stairs: PlacedStairs[];
   props: PlacedProp[];
+  labels: PlacedLabel[];
 }
 
 export interface ViewportTransform {

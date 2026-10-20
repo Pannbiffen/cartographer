@@ -80,10 +80,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Tool Options</span>
             </div>
 
-            {activeTool === 'select' && (
+            {(activeTool === 'select' || activeTool === 'label') && (
               <SelectionInspector
                 mapData={mapData}
                 selection={selection}
+                focusLabelText={activeTool === 'label'}
+                hint={
+                  activeTool === 'label'
+                    ? 'Click the map to place a label, or click a label to edit or drag it.'
+                    : undefined
+                }
                 onModifyMap={onUpdateMapSettings}
                 onClearSelection={onClearSelection}
               />

@@ -108,6 +108,10 @@ function createDefaultStarterMap(): MapData {
       { id: 'p4', x: -10, y: 3, type: 'chest', rotation: 0 },
       { id: 'p5', x: -4, y: 2, type: 'torch', rotation: 0 },
     ],
+    labels: [
+      { id: 'l1', x: 0.5, y: 5.5, text: 'Grand Hall', size: 20 },
+      { id: 'l2', x: -9, y: 6.5, text: 'Hidden Vault', size: 16 },
+    ],
   };
 }
 
@@ -133,6 +137,7 @@ function normalizeLoadedMap(parsed: Partial<MapData>): MapData {
     doors: parsed.doors ?? [],
     stairs: parsed.stairs ?? [],
     props: parsed.props ?? [],
+    labels: parsed.labels ?? [],
   };
 }
 
@@ -158,7 +163,7 @@ export function App() {
 
   const chooseTool = useCallback((tool: ToolType) => {
     setActiveTool(tool);
-    if (tool !== 'select') setSelection(null);
+    if (tool !== 'select' && tool !== 'label') setSelection(null);
   }, []);
   const [brushSize, setBrushSize] = useState<number>(1);
   const [selectedDoorType, setSelectedDoorType] = useState<DoorType>('standard');
@@ -192,6 +197,7 @@ export function App() {
         doors: [...prev.doors],
         stairs: [...prev.stairs],
         props: [...prev.props],
+        labels: [...prev.labels],
       };
       mutator(next);
       return {
@@ -312,7 +318,7 @@ export function App() {
         setSelection(null);
         return;
       }
-      if (activeSelection && activeTool === 'select') {
+      if (activeSelection && (activeTool === 'select' || activeTool === 'label')) {
         if (key === 'delete' || key === 'backspace') {
           e.preventDefault();
           modifyMap((draft) => deleteObject(draft, activeSelection));
@@ -335,6 +341,7 @@ export function App() {
         d: 'door',
         s: 'stairs',
         p: 'prop',
+        l: 'label',
         e: 'eraser',
       };
       if (toolKeys[key]) {
@@ -360,6 +367,7 @@ export function App() {
       draft.doors = [];
       draft.stairs = [{ id: 's1', x: 0, y: 0, width: 1, height: 2, direction: 'down', steps: 4 }];
       draft.props = [];
+      draft.labels = [];
     });
   };
 
@@ -372,6 +380,7 @@ export function App() {
       draft.doors = [];
       draft.stairs = [];
       draft.props = [];
+      draft.labels = [];
     });
   };
 
@@ -391,6 +400,7 @@ export function App() {
         draft.doors = [];
         draft.stairs = [];
         draft.props = [];
+        draft.labels = [];
       });
     }
   };

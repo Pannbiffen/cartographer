@@ -45,6 +45,9 @@ export function computeMapBounds(mapData: MapData, margin: number = 2): Bounding
   for (const prop of mapData.props) {
     coords.push({ x: prop.x, y: prop.y });
   }
+  for (const label of mapData.labels) {
+    coords.push({ x: Math.floor(label.x), y: Math.floor(label.y) });
+  }
 
   if (coords.length === 0) {
     return { minX: -10, minY: -10, maxX: 10, maxY: 10, width: 21, height: 21 };

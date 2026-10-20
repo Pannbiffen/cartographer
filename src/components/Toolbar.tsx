@@ -11,6 +11,7 @@ import {
   Sparkles,
   Eraser,
   MousePointer2,
+  Type,
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -80,6 +81,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onSelectTool }) =>
       label: 'Dungeon Props',
       icon: <Sparkles className="w-5 h-5 text-amber-400" />,
       shortcut: 'P',
+    },
+    {
+      id: 'label',
+      label: 'Text Label',
+      icon: <Type className="w-5 h-5" />,
+      shortcut: 'L',
     },
     {
       id: 'eraser',

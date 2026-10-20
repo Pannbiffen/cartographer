@@ -10,6 +10,7 @@ import {
   renderFoliageCluster,
 } from '../geometry/hatching';
 import { renderDoor, renderStairs, renderProp } from './propsRenderer';
+import { renderLabel } from './labelRenderer';
 
 export interface GridRange {
   minX: number;
@@ -117,5 +118,10 @@ export function renderMap(
     }
     ctx.stroke();
     ctx.restore();
+  }
+
+  // 8. Labels sit above everything, including the grid
+  for (const label of mapData.labels) {
+    renderLabel(ctx, label, gridSize, theme.ink, theme.floor);
   }
 }

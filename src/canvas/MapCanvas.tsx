@@ -28,6 +28,7 @@ import {
   newObjectId,
   objectBounds,
   replaceDoor,
+  replaceLabel,
   replaceProp,
   replaceStairs,
 } from '../core/objects';
@@ -88,9 +89,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const currentHoverRef = useRef<HoverState | null>(null);
   const strokeCountRef = useRef<number>(0);
   // Object being dragged with the select tool, and where the drag began
-  const moveDragRef = useRef<{ sel: Selection; startCell: GridCoord; origin: GridCoord } | null>(
-    null
-  );
+  const moveDragRef = useRef<{
+    sel: Selection;
+    startCell: GridCoord;
+    startWorld: { x: number; y: number };
+    origin: GridCoord;
+  } | null>(null);
   const spaceHeldRef = useRef<boolean>(false);
   const [isSpaceHeld, setIsSpaceHeld] = useState<boolean>(false);
   const [isPanning, setIsPanning] = useState<boolean>(false);
@@ -140,7 +144,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
     // Live cursor & drag previews
     const hover = currentHoverRef.current;
-    if (hover && !isPanningRef.current && activeTool !== 'select') {
+    if (hover && !isPanningRef.current && activeTool !== 'select' && activeTool !== 'label') {
       ctx.save();
       ctx.strokeStyle = theme.ink;
       ctx.lineWidth = 1.5;
@@ -319,6 +323,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
               draft.doors = draft.doors.filter((d) => !doorTouchesCell(d, gx, gy));
               draft.stairs = draft.stairs.filter((s) => !stairsContainCell(s, gx, gy));
               draft.props = draft.props.filter((p) => p.x !== gx || p.y !== gy);
+              draft.labels = draft.labels.filter(
+                (l) => Math.floor(l.x) !== gx || Math.floor(l.y) !== gy
+              );
             }
           }
         },
@@ -350,6 +357,18 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       );
       if (!same && !occupied) {
         onModifyMap((draft) => replaceDoor(draft, { ...door, ...edge }), coalesce);
+      }
+      return;
+    }
+
+    if (drag.sel.kind === 'label') {
+      // Labels move freely, in 1/8-cell steps
+      const snap = (v: number) => Math.round(v * 8) / 8;
+      const x = snap(drag.origin.x + (hover.worldX - drag.startWorld.x) / mapData.gridSize);
+      const y = snap(drag.origin.y + (hover.worldY - drag.startWorld.y) / mapData.gridSize);
+      const label = mapData.labels.find((l) => l.id === drag.sel.id);
+      if (label && (label.x !== x || label.y !== y)) {
+        onModifyMap((draft) => replaceLabel(draft, { ...label, x, y }), coalesce);
       }
       return;
     }
@@ -403,9 +422,36 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         moveDragRef.current = {
           sel: hit,
           startCell: { x: gx, y: gy },
+          startWorld: { x: hover.worldX, y: hover.worldY },
           origin: { x: obj.x, y: obj.y },
         };
       }
+    } else if (activeTool === 'label') {
+      // Clicking an existing label selects it; elsewhere places a new one
+      const hit = hitTestObject(mapData, hover.worldX, hover.worldY);
+      const existing = hit?.kind === 'label' ? findSelected(mapData, hit) : undefined;
+      if (hit && existing) {
+        onSelect(hit);
+        strokeCountRef.current++;
+        moveDragRef.current = {
+          sel: hit,
+          startCell: { x: gx, y: gy },
+          startWorld: { x: hover.worldX, y: hover.worldY },
+          origin: { x: existing.x, y: existing.y },
+        };
+        return;
+      }
+      const id = newObjectId('label');
+      onModifyMap((draft) => {
+        draft.labels.push({
+          id,
+          x: hover.worldX / mapData.gridSize,
+          y: hover.worldY / mapData.gridSize,
+          text: 'New label',
+          size: 20,
+        });
+      });
+      onSelect({ kind: 'label', id });
     } else if (activeTool === 'room-rect' || activeTool === 'tunnel') {
       dragStartRef.current = { x: gx, y: gy };
       drawMap();
@@ -466,6 +512,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (activeTool === 'select') {
       const overObject = hitTestObject(mapData, hover.worldX, hover.worldY) !== null;
       e.currentTarget.style.cursor = overObject ? 'move' : '';
+    } else if (activeTool === 'label') {
+      e.currentTarget.style.cursor = 'text';
     } else {
       e.currentTarget.style.cursor = '';
     }
