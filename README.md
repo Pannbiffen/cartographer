@@ -49,6 +49,15 @@ npm run dev
 
 Visit `http://localhost:5173` to start cartographing!
 
+### Running the Tests
+```bash
+# One-time: download the headless browser
+npx playwright install chromium
+
+# Run the end-to-end tests (starts its own dev server)
+npm run test:e2e
+```
+
 ### Building for Production
 ```bash
 npm run build
