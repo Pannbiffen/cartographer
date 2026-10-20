@@ -16,6 +16,7 @@ import { DockPanel } from './components/DockPanel';
 import { TOOLS } from './components/options';
 import { MapCanvas } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
+import { PreferencesDialog } from './components/PreferencesDialog';
 import {
   generateBspDungeon,
   generateCaveSystem,
@@ -23,7 +24,9 @@ import {
 } from './core/generators/dungeonGenerator';
 import { triggerDownload } from './core/export/imageExporter';
 import { isTypingInField } from './core/keyboard';
-import { loadAutosave, saveAutosave } from './core/autosave';
+import { clearAutosave, loadAutosave, saveAutosave } from './core/autosave';
+import { applyPreferences, loadPreferences, savePreferences, type Preferences } from './core/preferences';
+import { clearLocalData } from './core/storage';
 import { deleteObject, findSelected, rotateObject } from './core/objects';
 import { MAX_ZOOM, MIN_ZOOM, fitViewport } from './core/viewport';
 
@@ -177,8 +180,21 @@ export function App() {
   const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [isPanelOpen, setIsPanelOpen] = useState<boolean>(true);
+  const [preferences, setPreferences] = useState<Preferences>(loadPreferences);
+  const changePreferences = useCallback((changes: Partial<Preferences>) => {
+    setPreferences((p) => ({ ...p, ...changes }));
+  }, []);
+  useEffect(() => {
+    savePreferences(preferences);
+    return applyPreferences(preferences);
+  }, [preferences]);
+  const handleResetLocalData = () => {
+    clearLocalData();
+    window.location.reload();
+  };
+
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState<boolean>(false);
   const [hoverCoord, setHoverCoord] = useState<{ gx: number; gy: number } | null>(null);
 
   // Modify map state with an immer-style draft mutator. The state updater
@@ -217,11 +233,15 @@ export function App() {
   // Autosave shortly after the map stops changing
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saved' | 'failed'>('idle');
   useEffect(() => {
+    if (!preferences.autosave) {
+      clearAutosave();
+      return;
+    }
     const timer = window.setTimeout(() => {
       setAutosaveStatus(saveAutosave(mapData) ? 'saved' : 'failed');
     }, AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [mapData]);
+  }, [mapData, preferences.autosave]);
 
   // Undo / Redo
   const handleUndo = useCallback(() => {
@@ -330,6 +350,9 @@ export function App() {
         if (key === 'o') {
           e.preventDefault();
           fileInputRef.current?.click();
+        } else if (key === ',') {
+          e.preventDefault();
+          setIsPreferencesOpen(true);
         } else if (key === 'e') {
           e.preventDefault();
           setIsExportOpen(true);
@@ -356,8 +379,12 @@ export function App() {
 
       // Selection editing with the select tool
       if (key === 'escape') {
-        if (isExportOpen) setIsExportOpen(false);
-        else setSelection(null);
+        if (isExportOpen || isPreferencesOpen) {
+          setIsExportOpen(false);
+          setIsPreferencesOpen(false);
+        } else {
+          setSelection(null);
+        }
         return;
       }
       if (key === '+' || key === '=') {
@@ -405,6 +432,7 @@ export function App() {
     activeSelection,
     activeTool,
     isExportOpen,
+    isPreferencesOpen,
   ]);
 
   // Procedural Generators
@@ -492,6 +520,8 @@ export function App() {
         },
         'separator',
         { label: 'Clear Map…', onSelect: handleClearMap },
+        'separator',
+        { label: 'Preferences…', shortcut: 'Ctrl+,', onSelect: () => setIsPreferencesOpen(true) },
       ],
     },
     {
@@ -503,7 +533,11 @@ export function App() {
         { label: 'Actual Size', shortcut: 'Ctrl+1', onSelect: handleActualSize },
         'separator',
         { label: 'Show Grid', shortcut: 'G', checked: mapData.showGrid, onSelect: toggleGrid },
-        { label: 'Properties Panel', checked: isPanelOpen, onSelect: () => setIsPanelOpen((v) => !v) },
+        {
+          label: 'Properties Panel',
+          checked: preferences.showPanel,
+          onSelect: () => changePreferences({ showPanel: !preferences.showPanel }),
+        },
       ],
     },
     {
@@ -582,7 +616,7 @@ export function App() {
           />
         </main>
 
-        {isPanelOpen && (
+        {preferences.showPanel && (
           <DockPanel
             activeTool={activeTool}
             brushSize={brushSize}
@@ -610,11 +644,21 @@ export function App() {
           Foliage: {Object.keys(mapData.foliage).length}
         </span>
         <span className="flex-1" />
-        {autosaveStatus === 'saved' && <span>Autosaved in this browser</span>}
-        {autosaveStatus === 'failed' && (
+        {!preferences.autosave && <span>Autosave off</span>}
+        {preferences.autosave && autosaveStatus === 'saved' && <span>Autosaved in this browser</span>}
+        {preferences.autosave && autosaveStatus === 'failed' && (
           <span className="text-ui-danger">Autosave failed - save a .dndmap file</span>
         )}
       </footer>
+
+      {isPreferencesOpen && (
+        <PreferencesDialog
+          preferences={preferences}
+          onChange={changePreferences}
+          onResetLocalData={handleResetLocalData}
+          onClose={() => setIsPreferencesOpen(false)}
+        />
+      )}
 
       <ExportModal
         mapData={mapData}

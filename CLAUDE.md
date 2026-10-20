@@ -12,7 +12,8 @@ Inspired by Dungeon Scrawl: match its features, never copy its code, art or asse
 
 ## Code map
 - `src/App.tsx`: map state, undo history (`modifyMap` with `coalesce` keys so one stroke/drag = one undo step), shortcuts, autosave.
-- `src/components/`: app chrome: `MenuBar` (menus are defined in `App.tsx`), `Toolbar`, `Toolbox`, `DockPanel` (right-hand properties), `ExportModal`. Shared tool list, theme names and button/field classes in `options.ts`; colour tokens (`bg-ui`, `border-ui-border`, ...) in `src/index.css`.
+- `src/components/`: app chrome: `MenuBar` (menus are defined in `App.tsx`), `Toolbar`, `Toolbox`, `DockPanel` (right-hand properties), `ExportModal`. Shared tool list, theme names and button/field classes in `options.ts`; colour tokens (`bg-ui`, `border-ui-border`, ...) in `src/index.css`, light by default and overridden per `data-ui-theme`/`data-accent` on `<html>`; never hard-code chrome colours.
+- `src/core/preferences.ts`: per-user settings (also read by the pre-paint script in `index.html`). `src/core/storage.ts`: all localStorage access, keys prefixed `cartographer.`.
 - `src/canvas/MapCanvas.tsx`: pointer input, tools, previews.
 - `src/core/renderers/mapRenderer.ts`: the single renderer used by canvas and all exports.
 - `src/core/objects.ts`: doors/stairs/props/labels: hit testing, selection, edits. Replace objects; never mutate them (history shares them).

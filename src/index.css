@@ -9,9 +9,40 @@
   --color-ui-border: #b6b6b6;
   --color-ui-text: #2b2b2b;
   --color-ui-muted: #6a6a6a;
+  --color-ui-hover: #ffffff;
   --color-ui-accent: #3584e4;
   --color-ui-accent-dark: #1f6fd0;
   --color-ui-danger: #c01c28;
+}
+
+/* UI themes and accents from Preferences, set as attributes on <html>.
+   The light palette above is the fallback. */
+:root {
+  color-scheme: light;
+}
+:root[data-ui-theme="dark"] {
+  color-scheme: dark;
+  --color-ui: #2e2e2e;
+  --color-ui-raised: #3a3a3a;
+  --color-ui-sunken: #252525;
+  --color-ui-field: #1f1f1f;
+  --color-ui-border: #4b4b4b;
+  --color-ui-text: #e4e4e4;
+  --color-ui-muted: #a3a3a3;
+  --color-ui-hover: #474747;
+  --color-ui-danger: #ff7b72;
+}
+:root[data-accent="green"] {
+  --color-ui-accent: #2e9a57;
+  --color-ui-accent-dark: #237a44;
+}
+:root[data-accent="orange"] {
+  --color-ui-accent: #e66100;
+  --color-ui-accent-dark: #c04f00;
+}
+:root[data-accent="purple"] {
+  --color-ui-accent: #9141ac;
+  --color-ui-accent-dark: #763591;
 }
 
 @layer base {
@@ -27,7 +58,18 @@
     user-select: none;
     -webkit-user-select: none;
     font-family: system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", Ubuntu, sans-serif;
+    background: var(--color-ui);
+    color: var(--color-ui-text);
+  }
+  html {
     font-size: 13px;
+  }
+  /* Interface size: everything is sized in rem, so this scales the chrome */
+  :root[data-ui-size="small"] {
+    font-size: 12px;
+  }
+  :root[data-ui-size="large"] {
+    font-size: 15px;
   }
   input, select, button {
     font: inherit;

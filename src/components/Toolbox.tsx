@@ -30,7 +30,7 @@ export const Toolbox: React.FC<ToolboxProps> = ({ activeTool, onSelectTool }) =>
               : 'border-transparent text-ui-text hover:border-ui-border hover:bg-ui-raised'
           }`}
         >
-          <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+          <Icon className="w-[1.4rem] h-[1.4rem]" strokeWidth={1.75} />
         </button>
       );
     })}

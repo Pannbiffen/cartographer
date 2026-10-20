@@ -62,7 +62,7 @@ export const STAIR_DIRECTIONS: PlacedStairs['direction'][] = ['up', 'down', 'lef
 
 // A plain push button
 export const BUTTON_CLASS =
-  'px-2 py-1 rounded-sm border border-ui-border bg-ui-raised text-ui-text hover:bg-white active:bg-ui-sunken disabled:opacity-50 disabled:hover:bg-ui-raised';
+  'px-2 py-1 rounded-sm border border-ui-border bg-ui-raised text-ui-text hover:bg-ui-hover active:bg-ui-sunken disabled:opacity-50 disabled:hover:bg-ui-raised';
 
 // A text field, number field or drop-down
 export const FIELD_CLASS =
@@ -73,6 +73,6 @@ export function optionButtonClass(active: boolean): string {
   return `px-2 py-1 rounded-sm capitalize border ${
     active
       ? 'bg-ui-accent border-ui-accent-dark text-white'
-      : 'bg-ui-raised border-ui-border text-ui-text hover:bg-white'
+      : 'bg-ui-raised border-ui-border text-ui-text hover:bg-ui-hover'
   }`;
 }

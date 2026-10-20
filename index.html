@@ -6,6 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cartographer — Free & Open-Source D&D Map Maker</title>
     <meta name="description" content="Free, open-source tabletop RPG map creator inspired by Dungeon Scrawl. Draw dungeon maps, rivers, foliage, and export to Universal VTT, PNG, and print-ready PDF." />
+    <script>
+      // Apply the saved UI theme before first paint (see src/core/preferences.ts)
+      (function () {
+        var d = document.documentElement, p = {};
+        try { p = JSON.parse(localStorage.getItem('cartographer.preferences.v1')) || {}; } catch (e) {}
+        var t = p.uiTheme || 'dark';
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        d.dataset.uiTheme = t;
+        d.dataset.accent = p.accent || 'blue';
+        d.dataset.uiSize = p.uiSize || 'normal';
+      })();
+    </script>
     <!-- Serif face for map labels; the app chrome uses the system font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

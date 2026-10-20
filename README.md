@@ -11,7 +11,8 @@
 
 ## ✨ Features
 
-- **Plain Desktop Interface**: Menu bar, toolbar, docked toolbox and properties panel, and a status bar, in neutral greys with your system font.
+- **Plain Desktop Interface**: Menu bar, toolbar, docked toolbox and properties panel, and a status bar, with your system font.
+- **Preferences** (Edit > Preferences): dark (default), light or system UI theme, accent colour, interface size, autosave on/off, and a reset that wipes everything stored in this browser.
 - **Pen & Parchment Aesthetic**: Hand-drawn style ink walls, exterior crosshatching, and four themes (Parchment, Blueprint, Slate, Monochrome).
 - **Select & Edit**: Select doors, stairs, props and labels to move, rotate, retype or delete them.
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.
@@ -96,6 +97,7 @@ npm run preview
 | `Ctrl + O` / `Cmd + O` | Open project |
 | `Ctrl + S` / `Cmd + S` | Save project (`.dndmap`) |
 | `Ctrl + E` / `Cmd + E` | Export |
+| `Ctrl + ,` / `Cmd + ,` | Preferences |
 
 ---
 
