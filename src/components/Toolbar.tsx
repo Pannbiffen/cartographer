@@ -46,13 +46,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onSelectTool }) =>
     },
     {
       id: 'water',
-      label: 'Water & Ripples (Free)',
+      label: 'Water',
       icon: <Waves className="w-5 h-5 text-sky-400" />,
       shortcut: 'W',
     },
     {
       id: 'foliage',
-      label: 'Foliage & Trees (Free)',
+      label: 'Foliage & Terrain',
       icon: <Trees className="w-5 h-5 text-emerald-400" />,
       shortcut: 'F',
     },

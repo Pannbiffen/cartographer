@@ -1,7 +1,7 @@
 # Cartographer 🗺️⚔️
 
 > **Free and Open-Source Web Tool for Creating D&D & Tabletop RPG Maps**  
-> An open-source, client-side alternative to Dungeon Scrawl with unlocked advanced features: water ripples, procedural foliage, hatching styles, cave generation, and Universal VTT export.
+> A free, open-source, client-side battlemap maker inspired by Dungeon Scrawl: rooms, water, foliage, doors and props, procedural generators, and print/VTT export.
 
 [![Deploy Cartographer to GitHub Pages](https://github.com/Pannbiffen/cartographer/actions/workflows/deploy.yml/badge.svg)](https://github.com/Pannbiffen/cartographer/actions/workflows/deploy.yml)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-blue?style=flat&logo=github)](https://pannbiffen.github.io/cartographer/)
@@ -11,20 +11,22 @@
 
 ## ✨ Features
 
-- **Cozy Pen & Parchment Aesthetic**: Classic Dyson Logos-style pen work, diagonal crosshatching, and warm textured parchment background.
-- **Water & Shorelines (100% Free)**: Draw lakes, rivers, moats, and subterranean pools with automatic concentric ripple wave lines and depth gradients.
-- **Procedural Foliage & Nature**: Paint trees, cloud-scallop canopies, bushes, and boulders without paying for subscriptions.
-- **Room Carving & Corridor Brushes**: Seamless polygon boolean merging, tunnels, wall outlines, and automatic perimeter hatching.
-- **Doors, Stairs & Props**: Snap-to-wall single and double doors, secret doors, straight/spiral stairs, pillars, chests, and altars.
+- **Pen & Parchment Aesthetic**: Hand-drawn style ink walls, exterior crosshatching, and four themes (Parchment, Blueprint, Slate, Monochrome).
+- **Room Tools**: Freehand room brush, click-drag rectangle rooms, and click-drag L-shaped corridors.
+- **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
+- **Foliage & Terrain**: Paint trees, bushes and boulders.
+- **Doors, Stairs & Props**: Doors snap to the nearest wall edge (standard, double, secret, portcullis, archway), stairs, pillars, chests, tables, altars, torches, barrels and sarcophagi.
 - **Procedural Generators**:
   - BSP Dungeon Generator (rooms + corridors)
   - Cellular Automata Cave Generator (winding organic caverns)
+  - Meandering river
 - **Export Capabilities**:
-  - 🖼️ **High-Res Images**: PNG / WebP up to 300 DPI with grid toggle.
-  - 🎲 **Universal VTT (`.dd2vtt`)**: Pre-baked line-of-sight walls, portals, and light occluders for Foundry VTT, Roll20, and Fantasy Grounds.
-  - 🖨️ **Printable Multi-Page PDF**: Tiled 1-inch physical battlegrid for home printers.
+  - 🖼️ **Images**: PNG or WebP at 1x–4x resolution, with or without grid.
+  - 🎲 **Universal VTT (`.dd2vtt`)**: Line-of-sight walls, door portals and torch lights for Foundry VTT (via the Universal Battlemap Importer module), Fantasy Grounds Unity and other UVTT-compatible tools.
+  - 🖨️ **Printable PDF**: Fit the whole map on one page, or print at true scale (1 square = 1 inch) tiled across A4 or US Letter pages.
   - 💾 **Project Save/Load**: Save `.dndmap` JSON files locally and resume anytime.
-- **100% Client-Side & Static**: Hosted on GitHub Pages with zero tracking, zero accounts, and full offline capability.
+- **Undo/Redo**: Up to 100 steps; each brush stroke or slider drag is a single step.
+- **100% Client-Side & Static**: Hosted on GitHub Pages with no tracking and no accounts.
 
 ---
 
@@ -56,18 +58,21 @@ npm run preview
 
 | Shortcut | Action |
 | :--- | :--- |
-| `Space` + Drag / `Middle Click` | Pan Viewport |
+| `Space` + Drag / `Alt` + Drag / `Middle Click` | Pan viewport |
 | `Scroll Wheel` | Zoom in / out |
-| `B` | Room Brush tool |
-| `W` | Water tool |
-| `F` | Foliage / Nature tool |
-| `D` | Door / Portal tool |
-| `S` | Stairs tool |
-| `E` | Eraser tool |
+| `B` | Room brush |
+| `R` | Rectangle room |
+| `T` | Corridor / tunnel |
+| `W` | Water |
+| `F` | Foliage & terrain |
+| `D` | Door |
+| `S` | Stairs |
+| `P` | Props |
+| `E` | Eraser |
+| `G` | Toggle grid |
 | `Ctrl + Z` / `Cmd + Z` | Undo |
 | `Ctrl + Y` / `Cmd + Shift + Z` | Redo |
-| `Ctrl + S` | Save Project JSON |
-| `G` | Toggle Grid visibility |
+| `Ctrl + S` / `Cmd + S` | Save project (`.dndmap`) |
 
 ---
 

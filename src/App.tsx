@@ -38,7 +38,6 @@ function createDefaultStarterMap(): MapData {
   // Hallway (0, -6 to -3)
   for (let y = -6; y <= -3; y++) {
     rooms[`0,${y}`] = true;
-    rooms[`-1,${y}`] = true;
   }
 
   // Grand Hall (-5 to 5, -2 to 6)
@@ -55,15 +54,17 @@ function createDefaultStarterMap(): MapData {
     }
   }
 
-  // East Chamber (6 to 10, -1 to 3)
-  for (let x = 6; x <= 10; x++) {
+  // East Chamber (7 to 11, -1 to 3), reached through a short passage
+  rooms['6,1'] = true;
+  for (let x = 7; x <= 11; x++) {
     for (let y = -1; y <= 3; y++) {
       rooms[`${x},${y}`] = true;
     }
   }
 
-  // West Cave (-11 to -6, 2 to 7)
-  for (let x = -11; x <= -6; x++) {
+  // West Cave (-12 to -7, 2 to 7), behind a secret passage
+  rooms['-6,4'] = true;
+  for (let x = -12; x <= -7; x++) {
     for (let y = 2; y <= 7; y++) {
       rooms[`${x},${y}`] = true;
     }
@@ -88,9 +89,9 @@ function createDefaultStarterMap(): MapData {
     water,
     foliage,
     doors: [
-      { id: 'd1', x: 0, y: -7, orientation: 'horizontal', type: 'standard' },
-      { id: 'd2', x: 5, y: 1, orientation: 'vertical', type: 'standard' },
-      { id: 'd3', x: -6, y: 4, orientation: 'vertical', type: 'secret' },
+      { id: 'd1', x: 0, y: -6, orientation: 'horizontal', type: 'standard' },
+      { id: 'd2', x: 6, y: 1, orientation: 'vertical', type: 'standard' },
+      { id: 'd3', x: -5, y: 4, orientation: 'vertical', type: 'secret' },
     ],
     stairs: [
       { id: 's1', x: 0, y: -10, width: 2, height: 1, direction: 'down', steps: 4 },
@@ -98,7 +99,7 @@ function createDefaultStarterMap(): MapData {
     props: [
       { id: 'p1', x: -3, y: 0, type: 'pillar', rotation: 0 },
       { id: 'p2', x: -3, y: 4, type: 'pillar', rotation: 0 },
-      { id: 'p3', x: 8, y: 1, type: 'altar', rotation: 0 },
+      { id: 'p3', x: 9, y: 1, type: 'altar', rotation: 0 },
       { id: 'p4', x: -10, y: 3, type: 'chest', rotation: 0 },
       { id: 'p5', x: -4, y: 2, type: 'torch', rotation: 0 },
     ],
