@@ -13,6 +13,8 @@ export type DoorType = 'standard' | 'double' | 'secret' | 'portcullis' | 'archwa
 
 export type PropType = 'pillar' | 'chest' | 'table' | 'altar' | 'torch' | 'barrel' | 'sarcophagus';
 
+export type FoliageType = 'tree' | 'bush' | 'rock';
+
 export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome';
 
 export interface GridCoord {
@@ -57,7 +59,7 @@ export interface MapData {
   hatchLength: number; // pixels
   rooms: { [key: string]: boolean }; // "x,y" => true for carved floor cells
   water: { [key: string]: boolean }; // "x,y" => true for water cells
-  foliage: { [key: string]: { type: 'tree' | 'bush' | 'rock'; seed: number } }; // "x,y"
+  foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
   doors: PlacedDoor[];
   stairs: PlacedStairs[];
   props: PlacedProp[];

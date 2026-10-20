@@ -4,6 +4,7 @@ import type {
   ToolType,
   DoorType,
   PropType,
+  FoliageType,
   ThemeType,
   ViewportTransform,
   MapHistoryState,
@@ -19,6 +20,7 @@ import {
   generateRiver,
 } from './core/generators/dungeonGenerator';
 import { triggerDownload } from './core/export/imageExporter';
+import { isTypingInField } from './core/keyboard';
 
 // Initial cozy starter dungeon to greet the cartographer
 function createDefaultStarterMap(): MapData {
@@ -141,6 +143,7 @@ export function App() {
   const [brushSize, setBrushSize] = useState<number>(1);
   const [selectedDoorType, setSelectedDoorType] = useState<DoorType>('standard');
   const [selectedPropType, setSelectedPropType] = useState<PropType>('pillar');
+  const [selectedFoliageType, setSelectedFoliageType] = useState<FoliageType>('tree');
 
   const [viewport, setViewport] = useState<ViewportTransform>({
     x: window.innerWidth ? window.innerWidth / 2 : 450,
@@ -256,14 +259,7 @@ export function App() {
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in a form field
-      if (
-        document.activeElement instanceof HTMLInputElement ||
-        document.activeElement instanceof HTMLTextAreaElement ||
-        document.activeElement instanceof HTMLSelectElement
-      ) {
-        return;
-      }
+      if (isTypingInField()) return;
 
       const key = e.key.toLowerCase();
       if (e.ctrlKey || e.metaKey) {
@@ -386,6 +382,8 @@ export function App() {
           onDoorTypeChange={setSelectedDoorType}
           selectedPropType={selectedPropType}
           onPropTypeChange={setSelectedPropType}
+          selectedFoliageType={selectedFoliageType}
+          onFoliageTypeChange={setSelectedFoliageType}
           mapData={mapData}
           onUpdateMapSettings={modifyMap}
           onGenerateDungeon={handleGenerateDungeon}
@@ -403,6 +401,7 @@ export function App() {
           brushSize={brushSize}
           selectedDoorType={selectedDoorType}
           selectedPropType={selectedPropType}
+          selectedFoliageType={selectedFoliageType}
           viewport={viewport}
           onViewportChange={setViewport}
           onModifyMap={modifyMap}

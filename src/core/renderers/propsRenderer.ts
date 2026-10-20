@@ -16,6 +16,22 @@ export function renderDoor(
   ctx.strokeStyle = inkColor;
   ctx.lineWidth = 2;
 
+  if (door.type === 'archway') {
+    // Open passage: solid stone jambs at both ends, no door leaf
+    const jamb = gridSize * 0.14;
+    const depth = 10;
+    ctx.fillStyle = inkColor;
+    if (door.orientation === 'horizontal') {
+      ctx.fillRect(x, y - depth / 2, jamb, depth);
+      ctx.fillRect(x + gridSize - jamb, y - depth / 2, jamb, depth);
+    } else {
+      ctx.fillRect(x - depth / 2, y, depth, jamb);
+      ctx.fillRect(x - depth / 2, y + gridSize - jamb, depth, jamb);
+    }
+    ctx.restore();
+    return;
+  }
+
   if (door.orientation === 'horizontal') {
     // Door along horizontal wall
     const doorWidth = gridSize * 0.8;

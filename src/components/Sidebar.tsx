@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ToolType, DoorType, PropType, MapData } from '../types/map';
+import type { ToolType, DoorType, PropType, FoliageType, MapData } from '../types/map';
 import type { ModifyMap } from '../App';
 import {
   Sliders,
@@ -19,6 +19,8 @@ interface SidebarProps {
   onDoorTypeChange: (type: DoorType) => void;
   selectedPropType: PropType;
   onPropTypeChange: (type: PropType) => void;
+  selectedFoliageType: FoliageType;
+  onFoliageTypeChange: (type: FoliageType) => void;
   mapData: MapData;
   onUpdateMapSettings: ModifyMap;
   onGenerateDungeon: () => void;
@@ -37,6 +39,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDoorTypeChange,
   selectedPropType,
   onPropTypeChange,
+  selectedFoliageType,
+  onFoliageTypeChange,
   mapData,
   onUpdateMapSettings,
   onGenerateDungeon,
@@ -98,12 +102,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="mb-3">
                 <label className="text-xs text-[#bdae9c] block mb-1">Door Type</label>
                 <div className="grid grid-cols-2 gap-1.5 text-xs">
-                  {(['standard', 'double', 'secret', 'portcullis'] as DoorType[]).map((type) => (
+                  {(['standard', 'double', 'secret', 'portcullis', 'archway'] as DoorType[]).map((type) => (
                     <button
                       key={type}
                       onClick={() => onDoorTypeChange(type)}
                       className={`py-1.5 px-2 rounded capitalize border transition ${
                         selectedDoorType === type
+                          ? 'bg-[#8b3a2b] border-[#c2513d] text-white font-medium'
+                          : 'bg-[#181310] border-[#3d3129] text-[#bdae9c] hover:bg-[#281f1a]'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Foliage Type */}
+            {activeTool === 'foliage' && (
+              <div className="mb-3">
+                <label className="text-xs text-[#bdae9c] block mb-1">Plant / Terrain</label>
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                  {(['tree', 'bush', 'rock'] as FoliageType[]).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => onFoliageTypeChange(type)}
+                      className={`py-1.5 px-2 rounded capitalize border transition ${
+                        selectedFoliageType === type
                           ? 'bg-[#8b3a2b] border-[#c2513d] text-white font-medium'
                           : 'bg-[#181310] border-[#3d3129] text-[#bdae9c] hover:bg-[#281f1a]'
                       }`}
@@ -273,7 +299,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="text-[11px] text-[#bdae9c] flex justify-between">
               <span>Rooms: {roomCount}</span>
               <span>Water: {waterCount}</span>
-              <span>Trees: {foliageCount}</span>
+              <span>Foliage: {foliageCount}</span>
             </div>
 
             <button

@@ -63,7 +63,10 @@ export function exportUniversalVtt(
   ]);
 
   // Convert doors to VTT portals
-  const portals: VttPortal[] = mapData.doors.map((door) => {
+  // Archways are open passages, so they don't become portals
+  const portals: VttPortal[] = mapData.doors
+    .filter((door) => door.type !== 'archway')
+    .map((door) => {
     const dx = door.x - minX;
     const dy = door.y - minY;
 
