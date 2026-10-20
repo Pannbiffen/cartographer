@@ -21,6 +21,9 @@ import {
 } from './core/generators/dungeonGenerator';
 import { triggerDownload } from './core/export/imageExporter';
 import { isTypingInField } from './core/keyboard';
+import { loadAutosave, saveAutosave } from './core/autosave';
+
+const AUTOSAVE_DELAY_MS = 800;
 
 // Initial cozy starter dungeon to greet the cartographer
 function createDefaultStarterMap(): MapData {
@@ -131,10 +134,16 @@ function normalizeLoadedMap(parsed: Partial<MapData>): MapData {
   };
 }
 
+// Resume the autosaved map if there is one, otherwise show the starter dungeon
+function initialMap(): MapData {
+  const saved = loadAutosave();
+  return saved ? normalizeLoadedMap(saved) : createDefaultStarterMap();
+}
+
 export function App() {
   const [history, setHistory] = useState<MapHistoryState>(() => ({
     past: [],
-    present: createDefaultStarterMap(),
+    present: initialMap(),
     future: [],
   }));
   const mapData = history.present;
@@ -187,6 +196,15 @@ export function App() {
     lastCoalesceRef.current = null;
     setHistory({ past: [], present: map, future: [] });
   }, []);
+
+  // Autosave shortly after the map stops changing
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saved' | 'failed'>('idle');
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAutosaveStatus(saveAutosave(mapData) ? 'saved' : 'failed');
+    }, AUTOSAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [mapData]);
 
   // Undo / Redo
   const handleUndo = useCallback(() => {
@@ -413,6 +431,12 @@ export function App() {
         <footer className="absolute bottom-2 left-4 right-4 z-10 pointer-events-none flex items-center justify-between text-xs text-[#bdae9c]">
           <div className="bg-[#231b17]/90 backdrop-blur-sm px-3 py-1 rounded-md border border-[#3d3129] font-mono pointer-events-auto shadow-md">
             {hoverCoord ? `Grid: (${hoverCoord.gx}, ${hoverCoord.gy})` : 'Canvas Ready'}
+            {autosaveStatus === 'saved' && (
+              <span className="ml-3 text-[#8fa880]">Autosaved in this browser</span>
+            )}
+            {autosaveStatus === 'failed' && (
+              <span className="ml-3 text-red-300">Autosave failed - save a .dndmap file</span>
+            )}
           </div>
 
           <div className="bg-[#231b17]/90 backdrop-blur-sm px-3 py-1 rounded-md border border-[#3d3129] font-sans hidden md:block pointer-events-auto shadow-md">
