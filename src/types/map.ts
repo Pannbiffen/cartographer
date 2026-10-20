@@ -1,4 +1,5 @@
-export type ToolType = 
+export type ToolType =
+  | 'select'
   | 'room-brush' 
   | 'room-rect' 
   | 'tunnel' 
@@ -16,6 +17,13 @@ export type PropType = 'pillar' | 'chest' | 'table' | 'altar' | 'torch' | 'barre
 export type FoliageType = 'tree' | 'bush' | 'rock';
 
 export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome';
+
+export type SelectableKind = 'door' | 'stairs' | 'prop';
+
+export interface Selection {
+  kind: SelectableKind;
+  id: string;
+}
 
 export interface GridCoord {
   x: number;

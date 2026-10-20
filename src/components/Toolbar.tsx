@@ -10,6 +10,7 @@ import {
   Footprints,
   Sparkles,
   Eraser,
+  MousePointer2,
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -26,6 +27,12 @@ interface ToolItem {
 
 export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onSelectTool }) => {
   const tools: ToolItem[] = [
+    {
+      id: 'select',
+      label: 'Select / Move',
+      icon: <MousePointer2 className="w-5 h-5" />,
+      shortcut: 'V',
+    },
     {
       id: 'room-brush',
       label: 'Room Brush',

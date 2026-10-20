@@ -1,5 +1,7 @@
 import React from 'react';
-import type { ToolType, DoorType, PropType, FoliageType, MapData } from '../types/map';
+import type { ToolType, DoorType, PropType, FoliageType, MapData, Selection } from '../types/map';
+import { SelectionInspector } from './SelectionInspector';
+import { DOOR_TYPES, PROP_TYPES, optionButtonClass } from './options';
 import type { ModifyMap } from '../App';
 import {
   Sliders,
@@ -21,6 +23,8 @@ interface SidebarProps {
   onPropTypeChange: (type: PropType) => void;
   selectedFoliageType: FoliageType;
   onFoliageTypeChange: (type: FoliageType) => void;
+  selection: Selection | null;
+  onClearSelection: () => void;
   mapData: MapData;
   onUpdateMapSettings: ModifyMap;
   onGenerateDungeon: () => void;
@@ -41,6 +45,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onPropTypeChange,
   selectedFoliageType,
   onFoliageTypeChange,
+  selection,
+  onClearSelection,
   mapData,
   onUpdateMapSettings,
   onGenerateDungeon,
@@ -74,6 +80,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Tool Options</span>
             </div>
 
+            {activeTool === 'select' && (
+              <SelectionInspector
+                mapData={mapData}
+                selection={selection}
+                onModifyMap={onUpdateMapSettings}
+                onClearSelection={onClearSelection}
+              />
+            )}
+
             {/* Brush size */}
             {(activeTool === 'room-brush' ||
               activeTool === 'tunnel' ||
@@ -102,15 +117,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="mb-3">
                 <label className="text-xs text-[#bdae9c] block mb-1">Door Type</label>
                 <div className="grid grid-cols-2 gap-1.5 text-xs">
-                  {(['standard', 'double', 'secret', 'portcullis', 'archway'] as DoorType[]).map((type) => (
+                  {DOOR_TYPES.map((type) => (
                     <button
                       key={type}
                       onClick={() => onDoorTypeChange(type)}
-                      className={`py-1.5 px-2 rounded capitalize border transition ${
-                        selectedDoorType === type
-                          ? 'bg-[#8b3a2b] border-[#c2513d] text-white font-medium'
-                          : 'bg-[#181310] border-[#3d3129] text-[#bdae9c] hover:bg-[#281f1a]'
-                      }`}
+                      className={optionButtonClass(selectedDoorType === type)}
                     >
                       {type}
                     </button>
@@ -128,11 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button
                       key={type}
                       onClick={() => onFoliageTypeChange(type)}
-                      className={`py-1.5 px-2 rounded capitalize border transition ${
-                        selectedFoliageType === type
-                          ? 'bg-[#8b3a2b] border-[#c2513d] text-white font-medium'
-                          : 'bg-[#181310] border-[#3d3129] text-[#bdae9c] hover:bg-[#281f1a]'
-                      }`}
+                      className={optionButtonClass(selectedFoliageType === type)}
                     >
                       {type}
                     </button>
@@ -146,17 +153,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="mb-3">
                 <label className="text-xs text-[#bdae9c] block mb-1">Select Prop</label>
                 <div className="grid grid-cols-2 gap-1.5 text-xs">
-                  {(
-                    ['pillar', 'chest', 'table', 'altar', 'torch', 'barrel', 'sarcophagus'] as PropType[]
-                  ).map((type) => (
+                  {PROP_TYPES.map((type) => (
                     <button
                       key={type}
                       onClick={() => onPropTypeChange(type)}
-                      className={`py-1.5 px-2 rounded capitalize border transition ${
-                        selectedPropType === type
-                          ? 'bg-[#8b3a2b] border-[#c2513d] text-white font-medium'
-                          : 'bg-[#181310] border-[#3d3129] text-[#bdae9c] hover:bg-[#281f1a]'
-                      }`}
+                      className={optionButtonClass(selectedPropType === type)}
                     >
                       {type}
                     </button>

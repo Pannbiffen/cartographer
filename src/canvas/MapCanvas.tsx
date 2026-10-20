@@ -6,6 +6,7 @@ import type {
   PropType,
   FoliageType,
   GridCoord,
+  Selection,
   ViewportTransform,
 } from '../types/map';
 import { THEMES } from '../core/theme';
@@ -20,6 +21,16 @@ import {
   lineCells,
 } from '../core/tools/toolGeometry';
 import { isTypingInField } from '../core/keyboard';
+import {
+  findDoor,
+  findSelected,
+  hitTestObject,
+  newObjectId,
+  objectBounds,
+  replaceDoor,
+  replaceProp,
+  replaceStairs,
+} from '../core/objects';
 import type { ModifyMap } from '../App';
 
 interface MapCanvasProps {
@@ -33,6 +44,8 @@ interface MapCanvasProps {
   onViewportChange: React.Dispatch<React.SetStateAction<ViewportTransform>>;
   onModifyMap: ModifyMap;
   onHoverCoord?: (coord: { gx: number; gy: number } | null) => void;
+  selection: Selection | null;
+  onSelect: (selection: Selection | null) => void;
 }
 
 interface HoverState {
@@ -63,6 +76,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   onViewportChange,
   onModifyMap,
   onHoverCoord,
+  selection,
+  onSelect,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isPanningRef = useRef<boolean>(false);
@@ -72,6 +87,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const dragStartRef = useRef<GridCoord | null>(null);
   const currentHoverRef = useRef<HoverState | null>(null);
   const strokeCountRef = useRef<number>(0);
+  // Object being dragged with the select tool, and where the drag began
+  const moveDragRef = useRef<{ sel: Selection; startCell: GridCoord; origin: GridCoord } | null>(
+    null
+  );
   const spaceHeldRef = useRef<boolean>(false);
   const [isSpaceHeld, setIsSpaceHeld] = useState<boolean>(false);
   const [isPanning, setIsPanning] = useState<boolean>(false);
@@ -121,7 +140,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
     // Live cursor & drag previews
     const hover = currentHoverRef.current;
-    if (hover && !isPanningRef.current) {
+    if (hover && !isPanningRef.current && activeTool !== 'select') {
       ctx.save();
       ctx.strokeStyle = theme.ink;
       ctx.lineWidth = 1.5;
@@ -171,8 +190,25 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       ctx.restore();
     }
 
+    // Selection outline
+    const bounds = selection ? objectBounds(mapData, selection) : null;
+    if (bounds) {
+      const pad = 4 / viewport.zoom;
+      ctx.save();
+      ctx.strokeStyle = '#c2513d';
+      ctx.lineWidth = 2 / viewport.zoom;
+      ctx.setLineDash([6 / viewport.zoom, 4 / viewport.zoom]);
+      ctx.strokeRect(
+        bounds.x * gridSize - pad,
+        bounds.y * gridSize - pad,
+        bounds.w * gridSize + pad * 2,
+        bounds.h * gridSize + pad * 2
+      );
+      ctx.restore();
+    }
+
     ctx.restore();
-  }, [mapData, activeTool, brushSize, viewport]);
+  }, [mapData, activeTool, brushSize, viewport, selection]);
 
   // Keep the canvas backing store matched to its on-screen size
   const drawRef = useRef(drawMap);
@@ -292,6 +328,47 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     [activeTool, brushSize, selectedFoliageType, onModifyMap]
   );
 
+  // Moves the dragged object: doors re-snap to the nearest wall edge, stairs
+  // and props shift by whole cells from where the drag started
+  const moveSelectedTo = (hover: HoverState) => {
+    const drag = moveDragRef.current;
+    if (!drag) return;
+    const coalesce = { coalesce: `move-${strokeCountRef.current}` };
+
+    if (drag.sel.kind === 'door') {
+      const door = findDoor(mapData, drag.sel.id);
+      const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
+      if (!door) return;
+      const same =
+        door.x === edge.x && door.y === edge.y && door.orientation === edge.orientation;
+      const occupied = mapData.doors.some(
+        (d) =>
+          d.id !== door.id &&
+          d.x === edge.x &&
+          d.y === edge.y &&
+          d.orientation === edge.orientation
+      );
+      if (!same && !occupied) {
+        onModifyMap((draft) => replaceDoor(draft, { ...door, ...edge }), coalesce);
+      }
+      return;
+    }
+
+    const x = drag.origin.x + hover.gx - drag.startCell.x;
+    const y = drag.origin.y + hover.gy - drag.startCell.y;
+    const obj = findSelected(mapData, drag.sel);
+    if (!obj || (obj.x === x && obj.y === y)) return;
+    onModifyMap((draft) => {
+      if (drag.sel.kind === 'stairs') {
+        const s = draft.stairs.find((st) => st.id === drag.sel.id);
+        if (s) replaceStairs(draft, { ...s, x, y });
+      } else {
+        const p = draft.props.find((pr) => pr.id === drag.sel.id);
+        if (p) replaceProp(draft, { ...p, x, y });
+      }
+    }, coalesce);
+  };
+
   const pointerToGrid = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     return screenToGrid(e.clientX - rect.left, e.clientY - rect.top);
@@ -317,7 +394,19 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const { gx, gy } = hover;
     currentHoverRef.current = hover;
 
-    if (activeTool === 'room-rect' || activeTool === 'tunnel') {
+    if (activeTool === 'select') {
+      const hit = hitTestObject(mapData, hover.worldX, hover.worldY);
+      onSelect(hit);
+      const obj = findSelected(mapData, hit);
+      if (hit && obj) {
+        strokeCountRef.current++;
+        moveDragRef.current = {
+          sel: hit,
+          startCell: { x: gx, y: gy },
+          origin: { x: obj.x, y: obj.y },
+        };
+      }
+    } else if (activeTool === 'room-rect' || activeTool === 'tunnel') {
       dragStartRef.current = { x: gx, y: gy };
       drawMap();
     } else if (activeTool === 'door') {
@@ -327,12 +416,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         draft.doors = draft.doors.filter(
           (d) => d.x !== edge.x || d.y !== edge.y || d.orientation !== edge.orientation
         );
-        draft.doors.push({ id: `door_${Date.now()}`, ...edge, type: selectedDoorType });
+        draft.doors.push({ id: newObjectId('door'), ...edge, type: selectedDoorType });
       });
     } else if (activeTool === 'stairs') {
       onModifyMap((draft) => {
         draft.stairs.push({
-          id: `stairs_${Date.now()}`,
+          id: newObjectId('stairs'),
           x: gx,
           y: gy,
           width: 1,
@@ -344,7 +433,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     } else if (activeTool === 'prop') {
       onModifyMap((draft) => {
         draft.props.push({
-          id: `prop_${Date.now()}`,
+          id: newObjectId('prop'),
           x: gx,
           y: gy,
           type: selectedPropType,
@@ -369,6 +458,17 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
 
     const hover = pointerToGrid(e);
+    if (moveDragRef.current) {
+      moveSelectedTo(hover);
+      currentHoverRef.current = hover;
+      return;
+    }
+    if (activeTool === 'select') {
+      const overObject = hitTestObject(mapData, hover.worldX, hover.worldY) !== null;
+      e.currentTarget.style.cursor = overObject ? 'move' : '';
+    } else {
+      e.currentTarget.style.cursor = '';
+    }
     const prev = currentHoverRef.current;
     const cellChanged = !prev || prev.gx !== hover.gx || prev.gy !== hover.gy;
     currentHoverRef.current = hover;
@@ -402,13 +502,21 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       });
     }
     dragStartRef.current = null;
+    moveDragRef.current = null;
     isDrawingRef.current = false;
     drawMap();
   };
 
   const handlePointerLeave = () => {
     // With pointer capture this only fires once a drag has finished
-    if (isDrawingRef.current || dragStartRef.current || isPanningRef.current) return;
+    if (
+      isDrawingRef.current ||
+      dragStartRef.current ||
+      moveDragRef.current ||
+      isPanningRef.current
+    ) {
+      return;
+    }
     currentHoverRef.current = null;
     onHoverCoord?.(null);
     drawMap();

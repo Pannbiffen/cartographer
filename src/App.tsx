@@ -8,6 +8,7 @@ import type {
   ThemeType,
   ViewportTransform,
   MapHistoryState,
+  Selection,
 } from './types/map';
 import { Header } from './components/Header';
 import { Toolbar } from './components/Toolbar';
@@ -22,6 +23,7 @@ import {
 import { triggerDownload } from './core/export/imageExporter';
 import { isTypingInField } from './core/keyboard';
 import { loadAutosave, saveAutosave } from './core/autosave';
+import { deleteObject, findSelected, rotateObject } from './core/objects';
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -150,6 +152,14 @@ export function App() {
   const lastCoalesceRef = useRef<string | null>(null);
 
   const [activeTool, setActiveTool] = useState<ToolType>('room-brush');
+  const [selection, setSelection] = useState<Selection | null>(null);
+  // A selection whose object was removed (undo, eraser) counts as none
+  const activeSelection = findSelected(mapData, selection) ? selection : null;
+
+  const chooseTool = useCallback((tool: ToolType) => {
+    setActiveTool(tool);
+    if (tool !== 'select') setSelection(null);
+  }, []);
   const [brushSize, setBrushSize] = useState<number>(1);
   const [selectedDoorType, setSelectedDoorType] = useState<DoorType>('standard');
   const [selectedPropType, setSelectedPropType] = useState<PropType>('pillar');
@@ -297,7 +307,26 @@ export function App() {
       }
       if (e.altKey) return;
 
+      // Selection editing with the select tool
+      if (key === 'escape') {
+        setSelection(null);
+        return;
+      }
+      if (activeSelection && activeTool === 'select') {
+        if (key === 'delete' || key === 'backspace') {
+          e.preventDefault();
+          modifyMap((draft) => deleteObject(draft, activeSelection));
+          setSelection(null);
+          return;
+        }
+        if (key === 'r') {
+          modifyMap((draft) => rotateObject(draft, activeSelection));
+          return;
+        }
+      }
+
       const toolKeys: Record<string, ToolType> = {
+        v: 'select',
         b: 'room-brush',
         r: 'room-rect',
         t: 'tunnel',
@@ -309,7 +338,7 @@ export function App() {
         e: 'eraser',
       };
       if (toolKeys[key]) {
-        setActiveTool(toolKeys[key]);
+        chooseTool(toolKeys[key]);
       } else if (key === 'g') {
         modifyMap((draft) => {
           draft.showGrid = !draft.showGrid;
@@ -319,7 +348,7 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo, handleSaveJson, modifyMap]);
+  }, [handleUndo, handleRedo, handleSaveJson, modifyMap, chooseTool, activeSelection, activeTool]);
 
   // Procedural Generators
   const handleGenerateDungeon = () => {
@@ -390,7 +419,7 @@ export function App() {
       {/* Main Workspace */}
       <main className="relative flex-1 w-full h-full overflow-hidden">
         {/* Floating Tool Palette */}
-        <Toolbar activeTool={activeTool} onSelectTool={setActiveTool} />
+        <Toolbar activeTool={activeTool} onSelectTool={chooseTool} />
 
         {/* Floating Right Inspector */}
         <Sidebar
@@ -403,6 +432,8 @@ export function App() {
           onPropTypeChange={setSelectedPropType}
           selectedFoliageType={selectedFoliageType}
           onFoliageTypeChange={setSelectedFoliageType}
+          selection={activeSelection}
+          onClearSelection={() => setSelection(null)}
           mapData={mapData}
           onUpdateMapSettings={modifyMap}
           onGenerateDungeon={handleGenerateDungeon}
@@ -425,6 +456,8 @@ export function App() {
           onViewportChange={setViewport}
           onModifyMap={modifyMap}
           onHoverCoord={setHoverCoord}
+          selection={activeSelection}
+          onSelect={setSelection}
         />
 
         {/* Bottom Status & Hint Bar */}

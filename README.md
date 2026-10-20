@@ -12,6 +12,7 @@
 ## ✨ Features
 
 - **Pen & Parchment Aesthetic**: Hand-drawn style ink walls, exterior crosshatching, and four themes (Parchment, Blueprint, Slate, Monochrome).
+- **Select & Edit**: Select doors, stairs and props to move, rotate, retype or delete them.
 - **Room Tools**: Freehand room brush, click-drag rectangle rooms, and click-drag L-shaped corridors.
 - **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
@@ -61,6 +62,10 @@ npm run preview
 | :--- | :--- |
 | `Space` + Drag / `Alt` + Drag / `Middle Click` | Pan viewport |
 | `Scroll Wheel` | Zoom in / out |
+| `V` | Select / move |
+| `R` (with a selection) | Rotate selection |
+| `Delete` / `Backspace` | Delete selection |
+| `Esc` | Clear selection |
 | `B` | Room brush |
 | `R` | Rectangle room |
 | `T` | Corridor / tunnel |
