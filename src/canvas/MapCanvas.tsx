@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import type { MapData, ToolType, DoorType, PropType, ViewportTransform } from '../types/map';
 import { THEMES } from '../core/theme';
 import { renderMap } from '../core/renderers/mapRenderer';
+import type { ModifyMap } from '../App';
 
 interface MapCanvasProps {
   mapData: MapData;
@@ -11,7 +12,7 @@ interface MapCanvasProps {
   selectedPropType: PropType;
   viewport: ViewportTransform;
   onViewportChange: (viewport: ViewportTransform) => void;
-  onModifyMap: (mutator: (draft: MapData) => void) => void;
+  onModifyMap: ModifyMap;
   onHoverCoord?: (coord: { gx: number; gy: number } | null) => void;
 }
 
@@ -32,6 +33,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const isDrawingRef = useRef<boolean>(false);
   const rectDragStartRef = useRef<{ gx: number; gy: number } | null>(null);
   const currentHoverRef = useRef<{ gx: number; gy: number } | null>(null);
+  const strokeCountRef = useRef<number>(0);
 
   // Screen to world grid coordinates
   const screenToGrid = useCallback(
@@ -188,7 +190,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             }
           }
         }
-      });
+      }, { coalesce: `stroke-${strokeCountRef.current}` });
     },
     [activeTool, brushSize, onModifyMap]
   );
@@ -252,6 +254,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         });
       } else {
         isDrawingRef.current = true;
+        strokeCountRef.current++;
         applyBrush(gx, gy);
       }
     }

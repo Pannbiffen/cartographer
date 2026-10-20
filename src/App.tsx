@@ -6,6 +6,7 @@ import type {
   PropType,
   ThemeType,
   ViewportTransform,
+  MapHistoryState,
 } from './types/map';
 import { Header } from './components/Header';
 import { Toolbar } from './components/Toolbar';
@@ -102,11 +103,39 @@ function createDefaultStarterMap(): MapData {
   };
 }
 
+const MAX_HISTORY = 100;
+
+export interface ModifyMapOptions {
+  // Consecutive edits sharing a coalesce key (one brush stroke, one slider
+  // drag, typing in the title) collapse into a single undo step
+  coalesce?: string;
+}
+
+export type ModifyMap = (mutator: (draft: MapData) => void, options?: ModifyMapOptions) => void;
+
+// Fill in any fields missing from older or hand-edited project files
+function normalizeLoadedMap(parsed: Partial<MapData>): MapData {
+  const defaults = createDefaultStarterMap();
+  return {
+    ...defaults,
+    ...parsed,
+    rooms: parsed.rooms ?? {},
+    water: parsed.water ?? {},
+    foliage: parsed.foliage ?? {},
+    doors: parsed.doors ?? [],
+    stairs: parsed.stairs ?? [],
+    props: parsed.props ?? [],
+  };
+}
+
 export function App() {
-  const [mapData, setMapData] = useState<MapData>(createDefaultStarterMap);
-  const [history, setHistory] = useState<MapData[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
-  const isUndoRedoAction = useRef<boolean>(false);
+  const [history, setHistory] = useState<MapHistoryState>(() => ({
+    past: [],
+    present: createDefaultStarterMap(),
+    future: [],
+  }));
+  const mapData = history.present;
+  const lastCoalesceRef = useRef<string | null>(null);
 
   const [activeTool, setActiveTool] = useState<ToolType>('room-brush');
   const [brushSize, setBrushSize] = useState<number>(1);
@@ -123,64 +152,62 @@ export function App() {
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [hoverCoord, setHoverCoord] = useState<{ gx: number; gy: number } | null>(null);
 
-  // Push map snapshot into history stack
-  const pushHistorySnapshot = useCallback(
-    (currentMap: MapData) => {
-      if (isUndoRedoAction.current) {
-        isUndoRedoAction.current = false;
-        return;
-      }
-      setHistory((prev) => {
-        const sliced = prev.slice(0, historyIndex + 1);
-        if (sliced.length >= 40) sliced.shift();
-        return [...sliced, currentMap];
-      });
-      setHistoryIndex((prev) => prev + 1);
-    },
-    [historyIndex]
-  );
+  // Modify map state with an immer-style draft mutator. The state updater
+  // stays pure so React StrictMode's double invocation can't record twice.
+  const modifyMap = useCallback<ModifyMap>((mutator, options) => {
+    const coalesce = options?.coalesce ?? null;
+    const merge = coalesce !== null && coalesce === lastCoalesceRef.current;
+    lastCoalesceRef.current = coalesce;
 
-  // Modify map state with an immer-style draft mutator
-  const modifyMap = useCallback(
-    (mutator: (draft: MapData) => void) => {
-      setMapData((prev) => {
-        pushHistorySnapshot(prev);
-        // Deep clone simple parts
-        const next: MapData = {
-          ...prev,
-          rooms: { ...prev.rooms },
-          water: { ...prev.water },
-          foliage: { ...prev.foliage },
-          doors: [...prev.doors],
-          stairs: [...prev.stairs],
-          props: [...prev.props],
-        };
-        mutator(next);
-        return next;
-      });
-    },
-    [pushHistorySnapshot]
-  );
+    setHistory((h) => {
+      const prev = h.present;
+      const next: MapData = {
+        ...prev,
+        rooms: { ...prev.rooms },
+        water: { ...prev.water },
+        foliage: { ...prev.foliage },
+        doors: [...prev.doors],
+        stairs: [...prev.stairs],
+        props: [...prev.props],
+      };
+      mutator(next);
+      return {
+        past: merge ? h.past : [...h.past, prev].slice(-MAX_HISTORY),
+        present: next,
+        future: [],
+      };
+    });
+  }, []);
+
+  const resetMap = useCallback((map: MapData) => {
+    lastCoalesceRef.current = null;
+    setHistory({ past: [], present: map, future: [] });
+  }, []);
 
   // Undo / Redo
   const handleUndo = useCallback(() => {
-    if (historyIndex >= 0 && history.length > 0) {
-      isUndoRedoAction.current = true;
-      const targetState = history[historyIndex];
-      setHistoryIndex((prev) => prev - 1);
-      setMapData(targetState);
-    }
-  }, [history, historyIndex]);
+    lastCoalesceRef.current = null;
+    setHistory((h) => {
+      if (h.past.length === 0) return h;
+      return {
+        past: h.past.slice(0, -1),
+        present: h.past[h.past.length - 1],
+        future: [h.present, ...h.future],
+      };
+    });
+  }, []);
 
   const handleRedo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      isUndoRedoAction.current = true;
-      const targetIndex = historyIndex + 1;
-      const targetState = history[targetIndex];
-      setHistoryIndex(targetIndex);
-      setMapData(targetState);
-    }
-  }, [history, historyIndex]);
+    lastCoalesceRef.current = null;
+    setHistory((h) => {
+      if (h.future.length === 0) return h;
+      return {
+        past: [...h.past, h.present],
+        present: h.future[0],
+        future: h.future.slice(1),
+      };
+    });
+  }, []);
 
   // Zoom helpers
   const handleZoomIn = () => {
@@ -197,63 +224,13 @@ export function App() {
     });
   };
 
-  // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in text input
-      if (
-        document.activeElement instanceof HTMLInputElement ||
-        document.activeElement instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-
-      if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        if (e.shiftKey) handleRedo();
-        else handleUndo();
-      } else if (e.key === 'y' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        handleRedo();
-      } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        handleSaveJson();
-      } else if (e.key.toLowerCase() === 'b') {
-        setActiveTool('room-brush');
-      } else if (e.key.toLowerCase() === 'r') {
-        setActiveTool('room-rect');
-      } else if (e.key.toLowerCase() === 't') {
-        setActiveTool('tunnel');
-      } else if (e.key.toLowerCase() === 'w') {
-        setActiveTool('water');
-      } else if (e.key.toLowerCase() === 'f') {
-        setActiveTool('foliage');
-      } else if (e.key.toLowerCase() === 'd') {
-        setActiveTool('door');
-      } else if (e.key.toLowerCase() === 's') {
-        setActiveTool('stairs');
-      } else if (e.key.toLowerCase() === 'p') {
-        setActiveTool('prop');
-      } else if (e.key.toLowerCase() === 'e') {
-        setActiveTool('eraser');
-      } else if (e.key.toLowerCase() === 'g') {
-        modifyMap((draft) => {
-          draft.showGrid = !draft.showGrid;
-        });
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo, modifyMap]);
-
   // Project JSON Save/Load
-  const handleSaveJson = () => {
+  const handleSaveJson = useCallback(() => {
     const jsonStr = JSON.stringify(mapData, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const cleanTitle = mapData.title.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'map';
     triggerDownload(blob, `${cleanTitle}.dndmap`);
-  };
+  }, [mapData]);
 
   const handleLoadJson = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -264,17 +241,70 @@ export function App() {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed && typeof parsed.rooms === 'object') {
-          setMapData(parsed);
-          setHistory([]);
-          setHistoryIndex(-1);
+          resetMap(normalizeLoadedMap(parsed));
+        } else {
+          alert('Invalid project file format.');
         }
-      } catch (err) {
+      } catch {
         alert('Invalid project file format.');
       }
     };
     reader.readAsText(file);
     e.target.value = '';
   };
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in a form field
+      if (
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement ||
+        document.activeElement instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      if (e.ctrlKey || e.metaKey) {
+        if (key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) handleRedo();
+          else handleUndo();
+        } else if (key === 'y') {
+          e.preventDefault();
+          handleRedo();
+        } else if (key === 's') {
+          e.preventDefault();
+          handleSaveJson();
+        }
+        return;
+      }
+      if (e.altKey) return;
+
+      const toolKeys: Record<string, ToolType> = {
+        b: 'room-brush',
+        r: 'room-rect',
+        t: 'tunnel',
+        w: 'water',
+        f: 'foliage',
+        d: 'door',
+        s: 'stairs',
+        p: 'prop',
+        e: 'eraser',
+      };
+      if (toolKeys[key]) {
+        setActiveTool(toolKeys[key]);
+      } else if (key === 'g') {
+        modifyMap((draft) => {
+          draft.showGrid = !draft.showGrid;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo, handleSaveJson, modifyMap]);
 
   // Procedural Generators
   const handleGenerateDungeon = () => {
@@ -326,11 +356,11 @@ export function App() {
       {/* Top Header */}
       <Header
         title={mapData.title}
-        onTitleChange={(title) => modifyMap((draft) => { draft.title = title; })}
+        onTitleChange={(title) => modifyMap((draft) => { draft.title = title; }, { coalesce: 'title' })}
         theme={mapData.theme}
         onThemeChange={(theme: ThemeType) => modifyMap((draft) => { draft.theme = theme; })}
-        canUndo={historyIndex >= 0}
-        canRedo={historyIndex < history.length - 1}
+        canUndo={history.past.length > 0}
+        canRedo={history.future.length > 0}
         onUndo={handleUndo}
         onRedo={handleRedo}
         zoom={viewport.zoom}

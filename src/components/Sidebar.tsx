@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ToolType, DoorType, PropType, MapData } from '../types/map';
+import type { ModifyMap } from '../App';
 import {
   Sliders,
   Grid,
@@ -19,7 +20,7 @@ interface SidebarProps {
   selectedPropType: PropType;
   onPropTypeChange: (type: PropType) => void;
   mapData: MapData;
-  onUpdateMapSettings: (updater: (draft: MapData) => void) => void;
+  onUpdateMapSettings: ModifyMap;
   onGenerateDungeon: () => void;
   onGenerateCave: () => void;
   onGenerateRiver: () => void;
@@ -160,7 +161,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onChange={(e) =>
                     onUpdateMapSettings((draft) => {
                       draft.hatchLength = parseInt(e.target.value, 10);
-                    })
+                    }, { coalesce: 'hatchLength' })
                   }
                   className="w-full accent-[#8b3a2b] cursor-pointer"
                 />
@@ -179,7 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onChange={(e) =>
                     onUpdateMapSettings((draft) => {
                       draft.hatchDensity = parseInt(e.target.value, 10);
-                    })
+                    }, { coalesce: 'hatchDensity' })
                   }
                   className="w-full accent-[#8b3a2b] cursor-pointer"
                 />
@@ -225,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onChange={(e) =>
                     onUpdateMapSettings((draft) => {
                       draft.gridOpacity = parseFloat(e.target.value);
-                    })
+                    }, { coalesce: 'gridOpacity' })
                   }
                   className="w-full accent-[#8b3a2b] cursor-pointer"
                 />
