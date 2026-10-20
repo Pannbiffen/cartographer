@@ -1,15 +1,7 @@
 // High-resolution image exporter, bounding box calculator, and PDF exporter
 import type { MapData } from '../../types/map';
 import { THEMES } from '../theme';
-import {
-  extractWallSegments,
-  renderDysonHatching,
-  renderWallOutlines,
-  extractWaterSegments,
-  renderWaterRipples,
-  renderFoliageCluster,
-} from '../geometry/hatching';
-import { renderDoor, renderStairs, renderProp } from '../renderers/propsRenderer';
+import { renderMap } from '../renderers/mapRenderer';
 import { jsPDF } from 'jspdf';
 import { exportUniversalVtt } from './vttExporter';
 
@@ -115,93 +107,7 @@ export function renderOffscreenMap(
   // Shift origin to min bounds
   ctx.translate(-bounds.minX * gridSize, -bounds.minY * gridSize);
 
-  // 1. Water
-  const waterKeys = Object.keys(mapData.water);
-  if (waterKeys.length > 0) {
-    ctx.fillStyle = theme.waterTint;
-    ctx.beginPath();
-    for (const key of waterKeys) {
-      if (!mapData.water[key]) continue;
-      const [gx, gy] = key.split(',').map(Number);
-      ctx.rect(gx * gridSize, gy * gridSize, gridSize, gridSize);
-    }
-    ctx.fill();
-
-    const waterSegments = extractWaterSegments(mapData.water, gridSize);
-    renderWaterRipples(ctx, waterSegments, theme.waterRipples);
-  }
-
-  // 2. Floor & Hatching
-  const roomKeys = Object.keys(mapData.rooms);
-  if (roomKeys.length > 0) {
-    ctx.fillStyle = theme.floor;
-    ctx.beginPath();
-    for (const key of roomKeys) {
-      if (!mapData.rooms[key]) continue;
-      const [gx, gy] = key.split(',').map(Number);
-      ctx.rect(gx * gridSize, gy * gridSize, gridSize, gridSize);
-    }
-    ctx.fill();
-
-    const wallSegments = extractWallSegments(mapData.rooms, gridSize);
-    renderDysonHatching(
-      ctx,
-      wallSegments,
-      gridSize,
-      mapData.hatchLength,
-      mapData.hatchDensity,
-      theme.hatch
-    );
-    renderWallOutlines(ctx, wallSegments, 3.2, theme.ink);
-  }
-
-  // 3. Foliage
-  for (const key of Object.keys(mapData.foliage)) {
-    const item = mapData.foliage[key];
-    if (!item) continue;
-    const [gx, gy] = key.split(',').map(Number);
-    renderFoliageCluster(
-      ctx,
-      gx,
-      gy,
-      gridSize,
-      item.type,
-      item.seed,
-      theme.foliageInk,
-      theme.foliageFill
-    );
-  }
-
-  // 4. Props, Doors, Stairs
-  for (const stairs of mapData.stairs) {
-    renderStairs(ctx, stairs, gridSize, theme.ink, theme.floor);
-  }
-  for (const door of mapData.doors) {
-    renderDoor(ctx, door, gridSize, theme.ink, theme.propFill);
-  }
-  for (const prop of mapData.props) {
-    renderProp(ctx, prop, gridSize, theme.ink);
-  }
-
-  // 5. Grid
-  if (includeGrid && mapData.showGrid) {
-    ctx.save();
-    ctx.strokeStyle = theme.grid;
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = mapData.gridOpacity;
-
-    ctx.beginPath();
-    for (let x = bounds.minX; x <= bounds.maxX + 1; x++) {
-      ctx.moveTo(x * gridSize, bounds.minY * gridSize);
-      ctx.lineTo(x * gridSize, (bounds.maxY + 1) * gridSize);
-    }
-    for (let y = bounds.minY; y <= bounds.maxY + 1; y++) {
-      ctx.moveTo(bounds.minX * gridSize, y * gridSize);
-      ctx.lineTo((bounds.maxX + 1) * gridSize, y * gridSize);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
+  renderMap(ctx, mapData, includeGrid ? bounds : null);
 
   ctx.restore();
   return canvas;

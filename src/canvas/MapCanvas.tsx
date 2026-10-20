@@ -1,15 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { MapData, ToolType, DoorType, PropType, ViewportTransform } from '../types/map';
 import { THEMES } from '../core/theme';
-import {
-  extractWallSegments,
-  renderDysonHatching,
-  renderWallOutlines,
-  extractWaterSegments,
-  renderWaterRipples,
-  renderFoliageCluster,
-} from '../core/geometry/hatching';
-import { renderDoor, renderStairs, renderProp } from '../core/renderers/propsRenderer';
+import { renderMap } from '../core/renderers/mapRenderer';
 
 interface MapCanvasProps {
   mapData: MapData;
@@ -74,115 +66,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     ctx.translate(viewport.x, viewport.y);
     ctx.scale(viewport.zoom, viewport.zoom);
 
-    // 1. Render Water Layer
-    const waterKeys = Object.keys(mapData.water);
-    if (waterKeys.length > 0) {
-      ctx.fillStyle = theme.waterTint;
-      ctx.beginPath();
-      for (const key of waterKeys) {
-        if (!mapData.water[key]) continue;
-        const [gx, gy] = key.split(',').map(Number);
-        ctx.rect(gx * gridSize, gy * gridSize, gridSize, gridSize);
-      }
-      ctx.fill();
-
-      // Render concentric water ripples
-      const waterSegments = extractWaterSegments(mapData.water, gridSize);
-      renderWaterRipples(ctx, waterSegments, theme.waterRipples);
-    }
-
-    // 2. Render Floor Polygons
-    const roomKeys = Object.keys(mapData.rooms);
-    if (roomKeys.length > 0) {
-      ctx.fillStyle = theme.floor;
-      ctx.beginPath();
-      for (const key of roomKeys) {
-        if (!mapData.rooms[key]) continue;
-        const [gx, gy] = key.split(',').map(Number);
-        ctx.rect(gx * gridSize, gy * gridSize, gridSize, gridSize);
-      }
-      ctx.fill();
-
-      // 3. Render Exterior Dyson Hatching
-      const wallSegments = extractWallSegments(mapData.rooms, gridSize);
-      renderDysonHatching(
-        ctx,
-        wallSegments,
-        gridSize,
-        mapData.hatchLength,
-        mapData.hatchDensity,
-        theme.hatch
-      );
-
-      // 4. Render Thick Wall Outlines
-      renderWallOutlines(ctx, wallSegments, 3.2, theme.ink);
-    }
-
-    // 5. Render Foliage (Trees, Bushes, Boulders)
-    const foliageKeys = Object.keys(mapData.foliage);
-    for (const key of foliageKeys) {
-      const item = mapData.foliage[key];
-      if (!item) continue;
-      const [gx, gy] = key.split(',').map(Number);
-      renderFoliageCluster(
-        ctx,
-        gx,
-        gy,
-        gridSize,
-        item.type,
-        item.seed,
-        theme.foliageInk,
-        theme.foliageFill
-      );
-    }
-
-    // 6. Render Placed Stairs
-    for (const stairs of mapData.stairs) {
-      renderStairs(ctx, stairs, gridSize, theme.ink, theme.floor);
-    }
-
-    // 7. Render Placed Doors
-    for (const door of mapData.doors) {
-      renderDoor(ctx, door, gridSize, theme.ink, theme.propFill);
-    }
-
-    // 8. Render Placed Props
-    for (const prop of mapData.props) {
-      renderProp(ctx, prop, gridSize, theme.ink);
-    }
-
-    // 9. Render Grid Overlay (if enabled)
-    if (mapData.showGrid) {
-      ctx.save();
-      ctx.strokeStyle = theme.grid;
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = mapData.gridOpacity;
-
-      // Determine visible bounding grid lines
-      const minX = Math.floor(-viewport.x / viewport.zoom / gridSize) * gridSize - gridSize;
-      const maxX = Math.ceil((width - viewport.x) / viewport.zoom / gridSize) * gridSize + gridSize;
-      const minY = Math.floor(-viewport.y / viewport.zoom / gridSize) * gridSize - gridSize;
-      const maxY = Math.ceil((height - viewport.y) / viewport.zoom / gridSize) * gridSize + gridSize;
-
-      ctx.beginPath();
-      for (let x = minX; x <= maxX; x += gridSize) {
-        ctx.moveTo(x, minY);
-        ctx.lineTo(x, maxY);
-      }
-      for (let y = minY; y <= maxY; y += gridSize) {
-        ctx.moveTo(minX, y);
-        ctx.lineTo(maxX, y);
-      }
-      ctx.stroke();
-
-      // Subtle coordinate marks around origin (0, 0)
-      ctx.fillStyle = theme.ink;
-      ctx.globalAlpha = 0.35;
-      ctx.font = '10px monospace';
-      ctx.fillText('(0,0)', 4, -4);
-
-      ctx.restore();
-    }
+    // Map layers, with grid lines limited to the visible area
+    const dpr = window.devicePixelRatio || 1;
+    renderMap(ctx, mapData, {
+      minX: Math.floor(-viewport.x / viewport.zoom / gridSize) - 1,
+      minY: Math.floor(-viewport.y / viewport.zoom / gridSize) - 1,
+      maxX: Math.ceil((width / dpr - viewport.x) / viewport.zoom / gridSize) + 1,
+      maxY: Math.ceil((height / dpr - viewport.y) / viewport.zoom / gridSize) + 1,
+    });
 
     // 10. Live Cursor & Drag Previews
     const hover = currentHoverRef.current;

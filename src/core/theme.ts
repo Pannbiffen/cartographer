@@ -18,7 +18,7 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
   parchment: {
     bg: '#f2e8d3',
     floor: '#fcf8ec',
-    grid: 'rgba(92, 70, 52, 0.22)',
+    grid: 'rgb(92, 70, 52)',
     ink: '#1e1611',
     hatch: '#2a1f18',
     waterTint: 'rgba(88, 148, 162, 0.38)',
@@ -30,7 +30,7 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
   blueprint: {
     bg: '#143862',
     floor: '#1b4a7d',
-    grid: 'rgba(255, 255, 255, 0.28)',
+    grid: '#ffffff',
     ink: '#f0f6ff',
     hatch: '#d8e8fc',
     waterTint: 'rgba(10, 60, 110, 0.55)',
@@ -42,7 +42,7 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
   slate: {
     bg: '#1b1d22',
     floor: '#262930',
-    grid: 'rgba(255, 255, 255, 0.12)',
+    grid: '#ffffff',
     ink: '#e2e5eb',
     hatch: '#8f96a3',
     waterTint: 'rgba(40, 85, 105, 0.42)',
@@ -54,7 +54,7 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
   monochrome: {
     bg: '#ffffff',
     floor: '#ffffff',
-    grid: 'rgba(0, 0, 0, 0.16)',
+    grid: '#000000',
     ink: '#000000',
     hatch: '#000000',
     waterTint: 'rgba(0, 0, 0, 0.08)',
