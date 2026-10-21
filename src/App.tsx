@@ -28,11 +28,11 @@ import {
   generateRiver,
 } from './core/generators/dungeonGenerator';
 import { triggerDownload } from './core/export/imageExporter';
-import { isTypingInField } from './core/keyboard';
+import { ARROW_DIRECTIONS, focusUsesArrows, isTypingInField } from './core/keyboard';
 import { clearAutosave, loadAutosave, saveAutosave } from './core/autosave';
 import { applyPreferences, loadPreferences, savePreferences, type Preferences } from './core/preferences';
 import { clearLocalData } from './core/storage';
-import { deleteObject, findSelected, rotateObject } from './core/objects';
+import { deleteObject, findSelected, nudgeObject, rotateObject } from './core/objects';
 import {
   addLayer,
   cloneLayer,
@@ -196,6 +196,8 @@ export function App() {
     [unsaved]
   );
   const lastCoalesceRef = useRef<string | null>(null);
+  // Counts arrow-key nudges; a held key's repeats share one undo step
+  const nudgeCountRef = useRef(0);
 
   const [activeTool, setActiveTool] = useState<ToolType>('room-brush');
   // Tools draw on the active layer; if it is gone (undo, delete) the top one is used
@@ -490,6 +492,16 @@ export function App() {
         }
         if (key === 'r') {
           modifyMap((draft) => rotateObject(draft, activeSelection));
+          return;
+        }
+        const direction = ARROW_DIRECTIONS[e.key];
+        if (direction && !focusUsesArrows()) {
+          e.preventDefault();
+          if (!e.repeat) nudgeCountRef.current++;
+          const [dx, dy] = direction;
+          modifyMap((draft) => nudgeObject(draft, activeSelection, dx, dy, e.shiftKey ? 1 : 0.5), {
+            coalesce: `nudge-${nudgeCountRef.current}`,
+          });
           return;
         }
       }

@@ -1,36 +1,27 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type React from 'react';
 import type { ViewportTransform } from '../types/map';
+import { ARROW_DIRECTIONS, focusUsesArrows } from '../core/keyboard';
 
 // Screen pixels per second while an arrow key is held, faster with Shift
 const PAN_SPEED = 700;
 const FAST_PAN_SPEED = 2100;
 
-const DIRECTIONS: Record<string, [number, number]> = {
-  ArrowLeft: [-1, 0],
-  ArrowRight: [1, 0],
-  ArrowUp: [0, -1],
-  ArrowDown: [0, 1],
-};
-
-/** Form controls handle arrow keys themselves (sliders, selects, radios) */
-function focusUsesArrows(): boolean {
-  const el = document.activeElement;
-  return (
-    el instanceof HTMLInputElement ||
-    el instanceof HTMLSelectElement ||
-    el instanceof HTMLTextAreaElement ||
-    (el instanceof HTMLElement && el.isContentEditable)
-  );
-}
-
 /**
  * Arrow keys pan the map smoothly for as long as they are held; the view
  * moves the way the arrow points. Several arrows at once pan diagonally.
+ * While `paused` (a selection is being edited) arrows are left to the app,
+ * which nudges the selected object instead.
  */
 export function useKeyboardPan(
-  onViewportChange: React.Dispatch<React.SetStateAction<ViewportTransform>>
+  onViewportChange: React.Dispatch<React.SetStateAction<ViewportTransform>>,
+  paused: boolean
 ) {
+  const pausedRef = useRef(paused);
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
   useEffect(() => {
     const held = new Set<string>();
     let fast = false;
@@ -43,8 +34,8 @@ export function useKeyboardPan(
       let dx = 0;
       let dy = 0;
       for (const key of held) {
-        dx += DIRECTIONS[key][0];
-        dy += DIRECTIONS[key][1];
+        dx += ARROW_DIRECTIONS[key][0];
+        dy += ARROW_DIRECTIONS[key][1];
       }
       const length = Math.hypot(dx, dy);
       if (length > 0) {
@@ -56,7 +47,8 @@ export function useKeyboardPan(
 
     const handleKeyDown = (e: KeyboardEvent) => {
       fast = e.shiftKey;
-      if (!(e.key in DIRECTIONS) || e.ctrlKey || e.metaKey || e.altKey || focusUsesArrows()) return;
+      if (!(e.key in ARROW_DIRECTIONS) || e.ctrlKey || e.metaKey || e.altKey || focusUsesArrows()) return;
+      if (pausedRef.current) return;
       // Stop the page or a scrollable panel scrolling too
       e.preventDefault();
       held.add(e.key);

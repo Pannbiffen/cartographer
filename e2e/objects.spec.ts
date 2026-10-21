@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openApp, gridPoint, clickCell, dragCells, saveMap } from './helpers';
+import { openApp, gridPoint, clickCell, dragCells, saveMap, view } from './helpers';
 
 test('doors snap to the nearest edge; archways are placeable', async ({ page }) => {
   await openApp(page);
@@ -56,6 +56,44 @@ test('select tool moves, rotates and deletes objects with undo', async ({ page }
   expect(map.layers[0].props.filter((p) => p.type === 'pillar')).toHaveLength(2);
   expect(map.layers[0].props.find((p) => p.id === 'p3')).toMatchObject({ x: 9, y: 1, rotation: 0 });
   expect(map.layers[0].doors.find((d) => d.id === 'd2')).toMatchObject({ x: 6, y: 1 });
+});
+
+test('arrow keys nudge the selected object instead of panning', async ({ page }) => {
+  await openApp(page);
+  await page.keyboard.press('v');
+  await clickCell(page, 9, 1); // altar
+  const before = await view(page);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Shift+ArrowDown');
+  expect(await view(page)).toEqual(before);
+
+  let map = await saveMap(page);
+  // Grid-snapped objects move a whole cell either way
+  expect(map.layers[0].props.find((p) => p.id === 'p3')).toMatchObject({ x: 10, y: 2 });
+  await page.keyboard.press('Control+z');
+  map = await saveMap(page);
+  expect(map.layers[0].props.find((p) => p.id === 'p3')).toMatchObject({ x: 10, y: 1 });
+
+  // Labels move half a cell, a whole one with Shift
+  await page.keyboard.press('l');
+  await clickCell(page, -12, -5);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('v');
+  await clickCell(page, -12, -5);
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Shift+ArrowUp');
+  map = await saveMap(page);
+  // Placed at the clicked cell's centre, (-11.5, -4.5)
+  const label = map.layers[0].labels.at(-1)!;
+  expect(label.x).toBeCloseTo(-12);
+  expect(label.y).toBeCloseTo(-5.5);
+
+  // With nothing selected the arrows pan again
+  await page.keyboard.press('Escape');
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(150);
+  await page.keyboard.up('ArrowRight');
+  expect((await view(page)).x).not.toEqual(before.x);
 });
 
 test('labels can be placed, typed, resized and dragged', async ({ page }) => {

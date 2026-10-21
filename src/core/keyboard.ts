@@ -11,3 +11,22 @@ export function isTypingInField(): boolean {
   if (el instanceof HTMLInputElement) return !NON_TEXT_INPUTS.has(el.type);
   return el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
 }
+
+/** Form controls handle arrow keys themselves (sliders, selects, radios) */
+export function focusUsesArrows(): boolean {
+  const el = document.activeElement;
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLSelectElement ||
+    el instanceof HTMLTextAreaElement ||
+    (el instanceof HTMLElement && el.isContentEditable)
+  );
+}
+
+/** Unit steps for the arrow keys, with y pointing down the screen */
+export const ARROW_DIRECTIONS: Record<string, [number, number]> = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+};

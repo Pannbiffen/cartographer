@@ -182,6 +182,37 @@ export function deleteObject(draft: MapData, sel: Selection) {
   else layer.props = layer.props.filter((p) => p.id !== sel.id);
 }
 
+/**
+ * Moves the selected object one step in direction (dx, dy): labels by
+ * `labelStep` cells, grid-snapped objects by a whole cell. A door won't move
+ * onto an edge another door already uses.
+ */
+export function nudgeObject(draft: MapData, sel: Selection, dx: number, dy: number, labelStep: number) {
+  const layer = findLayer(draft, sel.layerId);
+  if (!layer) return;
+  if (sel.kind === 'label') {
+    const l = findLabel(layer, sel.id);
+    if (l) replaceLabel(layer, { ...l, x: l.x + dx * labelStep, y: l.y + dy * labelStep });
+  } else if (sel.kind === 'door') {
+    const d = findDoor(layer, sel.id);
+    if (!d) return;
+    const moved = { ...d, x: d.x + dx, y: d.y + dy };
+    const occupied = layer.doors.some(
+      (o) => o.id !== d.id && o.x === moved.x && o.y === moved.y && o.orientation === moved.orientation
+    );
+    if (!occupied) replaceDoor(layer, moved);
+  } else if (sel.kind === 'stairs') {
+    const s = findStairs(layer, sel.id);
+    if (s) replaceStairs(layer, { ...s, x: s.x + dx, y: s.y + dy });
+  } else if (sel.kind === 'light') {
+    const l = findLight(layer, sel.id);
+    if (l) replaceLight(layer, { ...l, x: l.x + dx, y: l.y + dy });
+  } else {
+    const p = findProp(layer, sel.id);
+    if (p) replaceProp(layer, { ...p, x: p.x + dx, y: p.y + dy });
+  }
+}
+
 // Draft layers hold shallow copies, so objects are replaced rather than mutated
 export function replaceDoor(layer: LayerContent, door: PlacedDoor) {
   layer.doors = layer.doors.map((d) => (d.id === door.id ? door : d));

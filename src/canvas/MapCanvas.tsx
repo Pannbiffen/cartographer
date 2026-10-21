@@ -18,6 +18,7 @@ import type {
 import { THEMES } from '../core/theme';
 import { wheelZoomFactor, zoomAbout, type ZoomSpeed } from '../core/viewport';
 import { useKeyboardPan } from './useKeyboardPan';
+import { keepsSelection } from '../components/options';
 import { renderMap } from '../core/renderers/mapRenderer';
 import { renderLightMarkers } from '../core/renderers/lightingRenderer';
 import { DEFAULT_LIGHT } from '../core/lighting';
@@ -415,7 +416,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, [onViewportChange, zoomSpeed]);
 
-  useKeyboardPan(onViewportChange);
+  // With a selection being edited, arrow keys nudge it (App.tsx) instead
+  useKeyboardPan(onViewportChange, selection !== null && keepsSelection(activeTool));
 
   // Apply brush action to map cells around each centre cell
   const applyBrush = useCallback(
