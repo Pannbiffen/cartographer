@@ -46,7 +46,7 @@ import {
   normalizeLoadedMap,
   withLayer,
 } from './core/layers';
-import { MAX_ZOOM, MIN_ZOOM, fitViewport } from './core/viewport';
+import { fitViewport, zoomAbout } from './core/viewport';
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -298,14 +298,7 @@ export function App() {
     (zoomFor: (zoom: number) => number) => {
       const cx = (canvasSize?.width ?? 0) / 2;
       const cy = (canvasSize?.height ?? 0) / 2;
-      setViewport((v) => {
-        const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomFor(v.zoom)));
-        return {
-          x: cx - (cx - v.x) * (zoom / v.zoom),
-          y: cy - (cy - v.y) * (zoom / v.zoom),
-          zoom,
-        };
-      });
+      setViewport((v) => zoomAbout(v, cx, cy, zoomFor(v.zoom)));
     },
     [canvasSize]
   );
@@ -658,6 +651,7 @@ export function App() {
             activeLayerId={activeLayerId}
             viewport={viewport}
             onViewportChange={setViewport}
+            zoomSpeed={preferences.zoomSpeed}
             onResize={setCanvasSize}
             onModifyMap={modifyMap}
             onHoverCoord={setHoverCoord}

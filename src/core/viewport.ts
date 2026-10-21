@@ -11,6 +11,43 @@ const MAX_FIT_ZOOM = 2;
 const FIT_MARGIN_PX = 24;
 const FIT_MARGIN_CELLS = 0.75;
 
+/** Zoom to a new level, keeping the screen point (cx, cy) over the same spot on the map */
+export function zoomAbout(v: ViewportTransform, cx: number, cy: number, zoom: number): ViewportTransform {
+  const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+  return {
+    x: cx - (cx - v.x) * (clamped / v.zoom),
+    y: cy - (cy - v.y) * (clamped / v.zoom),
+    zoom: clamped,
+  };
+}
+
+export type ZoomSpeed = 'slow' | 'normal' | 'fast';
+
+// Zoom per pixel of wheel scroll; a mouse wheel notch (about 100 px) zooms
+// about 15% at normal speed
+const WHEEL_ZOOM_RATE: Record<ZoomSpeed, number> = { slow: 0.0007, normal: 0.0014, fast: 0.0028 };
+// Firefox reports some wheels in lines or pages rather than pixels
+const PX_PER_LINE = 33;
+const PX_PER_PAGE = 800;
+// Trackpad pinches arrive as ctrl + wheel with small deltas
+const PINCH_BOOST = 4;
+// One event never zooms more than a mouse wheel notch
+const MAX_WHEEL_DELTA = 100;
+
+/**
+ * Zoom factor for one wheel event. Scaling by the scroll distance rather than
+ * per event keeps trackpads, which send many small events, smooth.
+ */
+export function wheelZoomFactor(
+  e: Pick<WheelEvent, 'deltaY' | 'deltaMode' | 'ctrlKey'>,
+  speed: ZoomSpeed
+): number {
+  const unit = e.deltaMode === 1 ? PX_PER_LINE : e.deltaMode === 2 ? PX_PER_PAGE : 1;
+  const delta = e.deltaY * unit * (e.ctrlKey ? PINCH_BOOST : 1);
+  const clamped = Math.max(-MAX_WHEEL_DELTA, Math.min(MAX_WHEEL_DELTA, delta));
+  return Math.exp(-clamped * WHEEL_ZOOM_RATE[speed]);
+}
+
 /** Extent of everything drawn on the map's shown layers, in grid units, or null if empty */
 export function mapBounds(map: MapData): { x: number; y: number; w: number; h: number } | null {
   let minX = Infinity;

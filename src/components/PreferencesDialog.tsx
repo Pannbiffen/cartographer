@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { AccentColor, Preferences, UiSize, UiTheme } from '../core/preferences';
+import type { ZoomSpeed } from '../core/viewport';
 import { Dialog, DialogGroup } from './Dialog';
 import { BUTTON_CLASS, optionButtonClass } from './options';
 
@@ -19,6 +20,11 @@ const SIZES: [UiSize, string][] = [
   ['small', 'Small'],
   ['normal', 'Normal'],
   ['large', 'Large'],
+];
+const ZOOM_SPEEDS: [ZoomSpeed, string][] = [
+  ['slow', 'Slow'],
+  ['normal', 'Normal'],
+  ['fast', 'Fast'],
 ];
 // Swatch colours; the theme colours themselves live in index.css
 const ACCENTS: [AccentColor, string][] = [
@@ -115,6 +121,12 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
       </DialogGroup>
 
       <DialogGroup title="Behaviour">
+        <Choice
+          label="Wheel zoom speed"
+          options={ZOOM_SPEEDS}
+          value={preferences.zoomSpeed}
+          onChange={(zoomSpeed) => onChange({ zoomSpeed })}
+        />
         <Check
           label="Autosave the map in this browser"
           hint="Turning this off also deletes the autosaved copy."

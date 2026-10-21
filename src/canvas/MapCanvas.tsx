@@ -16,7 +16,7 @@ import type {
   ViewportTransform,
 } from '../types/map';
 import { THEMES } from '../core/theme';
-import { MAX_ZOOM, MIN_ZOOM } from '../core/viewport';
+import { wheelZoomFactor, zoomAbout, type ZoomSpeed } from '../core/viewport';
 import { renderMap } from '../core/renderers/mapRenderer';
 import { renderLightMarkers } from '../core/renderers/lightingRenderer';
 import { DEFAULT_LIGHT } from '../core/lighting';
@@ -81,6 +81,8 @@ interface MapCanvasProps {
   activeLayerId: string;
   viewport: ViewportTransform;
   onViewportChange: React.Dispatch<React.SetStateAction<ViewportTransform>>;
+  // How fast the mouse wheel zooms
+  zoomSpeed: ZoomSpeed;
   // Reports the canvas size in CSS pixels whenever it changes
   onResize?: (size: { width: number; height: number }) => void;
   onModifyMap: ModifyMap;
@@ -117,6 +119,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   activeLayerId,
   viewport,
   onViewportChange,
+  zoomSpeed,
   onResize,
   onModifyMap,
   onHoverCoord,
@@ -403,22 +406,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-
-      onViewportChange((v) => {
-        const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.zoom * zoomFactor));
-        // Keep point under cursor invariant
-        return {
-          x: mouseX - (mouseX - v.x) * (newZoom / v.zoom),
-          y: mouseY - (mouseY - v.y) * (newZoom / v.zoom),
-          zoom: newZoom,
-        };
-      });
+      const factor = wheelZoomFactor(e, zoomSpeed);
+      onViewportChange((v) => zoomAbout(v, mouseX, mouseY, v.zoom * factor));
     };
 
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [onViewportChange]);
+  }, [onViewportChange, zoomSpeed]);
 
   // Apply brush action to map cells around each centre cell
   const applyBrush = useCallback(

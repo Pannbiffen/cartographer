@@ -1,5 +1,6 @@
 // Per-user settings, kept in this browser and separate from any map
 import { readStored, writeStored } from './storage';
+import type { ZoomSpeed } from './viewport';
 
 export type UiTheme = 'dark' | 'light' | 'system';
 export type AccentColor = 'blue' | 'green' | 'orange' | 'purple';
@@ -11,6 +12,7 @@ export interface Preferences {
   uiSize: UiSize;
   autosave: boolean;
   showPanel: boolean;
+  zoomSpeed: ZoomSpeed;
 }
 
 // index.html reads the same key and defaults to avoid a flash of the wrong theme
@@ -22,6 +24,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   uiSize: 'normal',
   autosave: true,
   showPanel: true,
+  zoomSpeed: 'normal',
 };
 
 export function loadPreferences(): Preferences {
