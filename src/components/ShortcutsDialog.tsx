@@ -41,7 +41,7 @@ export const ShortcutsDialog: React.FC<ShortcutsDialogProps> = ({ menus, onClose
     .map((menu) => ({
       title: menu.label,
       rows: menu.items.flatMap((item): [string, string][] =>
-        item !== 'separator' && item.shortcut ? [[item.label.replace(/…$/, ''), item.shortcut]] : []
+        item !== 'separator' && 'shortcut' in item && item.shortcut ? [[item.label.replace(/…$/, ''), item.shortcut]] : []
       ),
     }))
     .filter((g) => g.rows.length > 0);

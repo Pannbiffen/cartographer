@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type {
   MapData,
   ToolType,
@@ -24,6 +24,7 @@ import { PreferencesDialog } from './components/PreferencesDialog';
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
 import { ShareDialog } from './components/ShareDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
+import { MyMapsDialog } from './components/MyMapsDialog';
 import {
   generateBspDungeon,
   generateCaveSystem,
@@ -31,7 +32,17 @@ import {
 } from './core/generators/dungeonGenerator';
 import { triggerDownload } from './core/export/imageExporter';
 import { ARROW_DIRECTIONS, focusUsesArrows, isTypingInField } from './core/keyboard';
-import { clearAutosave, loadAutosave, saveAutosave } from './core/autosave';
+import {
+  currentMapId,
+  forgetCurrentMap,
+  listMaps,
+  loadMap,
+  migrateLegacyAutosave,
+  newMapId,
+  rememberCurrentMap,
+  storeMap,
+  type LibraryEntry,
+} from './core/library';
 import { applyPreferences, loadPreferences, savePreferences, type Preferences } from './core/preferences';
 import { clearLocalData } from './core/storage';
 import {
@@ -172,13 +183,18 @@ export interface ModifyMapOptions {
 
 export type ModifyMap = (mutator: (draft: MapData) => void, options?: ModifyMapOptions) => void;
 
-// Resume the autosaved map if there is one, otherwise show the starter dungeon
-function initialMap(): { map: MapData; resumed: boolean } {
-  const saved = loadAutosave();
-  return saved
-    ? { map: normalizeLoadedMap(saved, createDefaultStarterMap()), resumed: true }
-    : { map: createDefaultStarterMap(), resumed: false };
+// Reopen the map in use on the last visit if there is one, otherwise show the starter dungeon
+function initialMap(): { map: MapData; id: string; resumed: boolean; saved: boolean } {
+  migrateLegacyAutosave();
+  const id = currentMapId();
+  const stored = id && loadMap(id);
+  if (!id || !stored) return { map: createDefaultStarterMap(), id: newMapId(), resumed: false, saved: true };
+  const saved = !!listMaps().find((e) => e.id === id)?.saved;
+  return { map: normalizeLoadedMap(stored, createDefaultStarterMap()), id, resumed: true, saved };
 }
+
+// File > Open Recent lists this many maps
+const RECENT_MAPS = 8;
 
 /** Cells of one terrain kind across all layers */
 function countCells(map: MapData, kind: 'rooms' | 'water' | 'foliage'): number {
@@ -193,10 +209,20 @@ export function App() {
     future: [],
   }));
   const mapData = history.present;
-  // The map as last saved to or opened from a file. A resumed autosave may
-  // never have been saved, so it counts as unsaved.
-  const [savedMap, setSavedMap] = useState<MapData | null>(() => (initial.resumed ? null : initial.map));
+  // The map as last saved to or opened from a file. A map reopened from My
+  // Maps counts as saved only if it matched its file when it was stored.
+  const [savedMap, setSavedMap] = useState<MapData | null>(() => (initial.saved ? initial.map : null));
   const unsaved = mapData !== savedMap;
+  // Read by the autosave, which can run in the same event as a save
+  const savedMapRef = useRef(savedMap);
+  const markSaved = useCallback((map: MapData | null) => {
+    savedMapRef.current = map;
+    setSavedMap(map);
+  }, []);
+  // The open map's entry in My Maps. A new or starter map (pristine) is only
+  // stored once it has been changed.
+  const [mapId, setMapId] = useState(initial.id);
+  const [pristineMap, setPristineMap] = useState<MapData | null>(() => (initial.resumed ? null : initial.map));
   // Replacing the map (New, Open) waits for an answer while it has unsaved changes
   const [pendingReplace, setPendingReplace] = useState<{ action: string; run: () => void } | null>(null);
   const confirmReplace = useCallback(
@@ -291,18 +317,28 @@ export function App() {
     setHistory({ past: [], present: map, future: [] });
   }, []);
 
-  // Autosave shortly after the map stops changing
+  // Autosave into My Maps shortly after the map stops changing. A pending
+  // save can be flushed, so replacing the map doesn't lose the last edits.
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saved' | 'failed'>('idle');
+  const flushAutosaveRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (!preferences.autosave) {
-      clearAutosave();
+      forgetCurrentMap();
       return;
     }
-    const timer = window.setTimeout(() => {
-      setAutosaveStatus(saveAutosave(mapData) ? 'saved' : 'failed');
-    }, AUTOSAVE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [mapData, preferences.autosave]);
+    if (mapData === pristineMap) return;
+    const save = () => {
+      window.clearTimeout(timer);
+      flushAutosaveRef.current = null;
+      setAutosaveStatus(storeMap(mapId, mapData, mapData === savedMapRef.current) ? 'saved' : 'failed');
+    };
+    const timer = window.setTimeout(save, AUTOSAVE_DELAY_MS);
+    flushAutosaveRef.current = save;
+    return () => {
+      window.clearTimeout(timer);
+      flushAutosaveRef.current = null;
+    };
+  }, [mapData, mapId, unsaved, pristineMap, preferences.autosave]);
 
   // With autosave off, closing or reloading the tab would lose work not
   // saved to a file, so the browser asks first
@@ -381,18 +417,24 @@ export function App() {
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const cleanTitle = mapData.title.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'map';
     triggerDownload(blob, `${cleanTitle}.dndmap`);
-    setSavedMap(mapData);
-  }, [mapData]);
+    markSaved(mapData);
+  }, [mapData, markSaved]);
 
-  // A replacing map starts its own history, framed in the window
+  // A replacing map starts its own history, framed in the window. The map it
+  // replaces stays in My Maps; one reopened from there keeps its entry (id).
   const replaceMap = useCallback(
-    (map: MapData) => {
+    (map: MapData, from: { id?: string; saved?: boolean; pristine?: boolean } = {}) => {
+      flushAutosaveRef.current?.();
+      if (from.id && preferences.autosave) rememberCurrentMap(from.id);
       requestFit();
       resetMap(map);
-      setSavedMap(map);
+      setMapId(from.id ?? newMapId());
+      markSaved(from.saved === false ? null : map);
+      setPristineMap(from.pristine ? map : null);
+      setAutosaveStatus('idle');
       setSelection(null);
     },
-    [requestFit, resetMap]
+    [requestFit, resetMap, markSaved, preferences.autosave]
   );
 
   // Opening a share link, on load or pasted into an open tab, offers its map.
@@ -421,8 +463,31 @@ export function App() {
   }, []);
 
   const handleNewMap = useCallback(() => {
-    confirmReplace('Start a new map', () => replaceMap(createBlankMap(preferences.newMap)));
+    confirmReplace('Start a new map', () => replaceMap(createBlankMap(preferences.newMap), { pristine: true }));
   }, [confirmReplace, replaceMap, preferences.newMap]);
+
+  // My Maps and File > Open Recent. The recent list is reread when the open
+  // map changes or the dialog closes, not on every render.
+  const [isMyMapsOpen, setIsMyMapsOpen] = useState(false);
+  const recentMaps = useMemo(
+    () => (isMyMapsOpen ? [] : listMaps().filter((e) => e.id !== mapId).slice(0, RECENT_MAPS)),
+    [mapId, isMyMapsOpen]
+  );
+  const openMyMaps = () => {
+    flushAutosaveRef.current?.();
+    setIsMyMapsOpen(true);
+  };
+  const handleOpenStoredMap = (entry: LibraryEntry) => {
+    const stored = loadMap(entry.id);
+    if (!stored) {
+      alert('This map could not be read from browser storage.');
+      return;
+    }
+    const map = normalizeLoadedMap(stored, createDefaultStarterMap());
+    confirmReplace(`Open “${entry.title || 'Untitled map'}”`, () =>
+      replaceMap(map, { id: entry.id, saved: entry.saved })
+    );
+  };
 
   const handleLoadJson = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -663,6 +728,15 @@ export function App() {
       items: [
         { label: 'New', shortcut: 'Ctrl+Alt+N', onSelect: handleNewMap },
         { label: 'Open…', shortcut: 'Ctrl+O', onSelect: () => fileInputRef.current?.click() },
+        {
+          label: 'Open Recent',
+          disabled: recentMaps.length === 0,
+          submenu: recentMaps.map((entry) => ({
+            label: entry.title || 'Untitled map',
+            onSelect: () => handleOpenStoredMap(entry),
+          })),
+        },
+        { label: 'My Maps…', onSelect: openMyMaps },
         { label: 'Save', shortcut: 'Ctrl+S', onSelect: handleSaveJson },
         { label: 'Share Link…', onSelect: () => setIsShareOpen(true) },
         'separator',
@@ -862,7 +936,7 @@ export function App() {
         {!preferences.autosave && <span>Autosave off</span>}
         {preferences.autosave && autosaveStatus === 'saved' && <span>Autosaved in this browser</span>}
         {preferences.autosave && autosaveStatus === 'failed' && (
-          <span className="text-ui-danger">Autosave failed - save a .dndmap file</span>
+          <span className="text-ui-danger">Autosave failed - delete maps in File &gt; My Maps or save a .dndmap file</span>
         )}
       </footer>
 
@@ -885,12 +959,27 @@ export function App() {
 
       {isShareOpen && <ShareDialog mapData={mapData} onClose={() => setIsShareOpen(false)} />}
 
+      {isMyMapsOpen && (
+        <MyMapsDialog
+          currentId={mapId}
+          autosave={preferences.autosave}
+          onOpen={handleOpenStoredMap}
+          onRenameOpenMap={(title) =>
+            modifyMap((draft) => {
+              draft.title = title;
+            })
+          }
+          onClose={() => setIsMyMapsOpen(false)}
+        />
+      )}
+
       {isShortcutsOpen && <ShortcutsDialog menus={menus} onClose={() => setIsShortcutsOpen(false)} />}
 
       {pendingReplace && (
         <UnsavedChangesDialog
           action={pendingReplace.action}
           mapTitle={mapData.title}
+          keptInBrowser={preferences.autosave}
           onSaveFirst={() => {
             handleSaveJson();
             pendingReplace.run();

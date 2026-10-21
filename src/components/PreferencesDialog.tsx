@@ -169,7 +169,7 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
         />
         <Check
           label="Autosave the map in this browser"
-          hint="Turning this off also deletes the autosaved copy."
+          hint="Maps already in File > My Maps stay there."
           checked={preferences.autosave}
           onChange={(autosave) => onChange({ autosave })}
         />
@@ -252,8 +252,8 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
         {confirmingReset ? (
           <div role="alert" className="flex flex-col gap-2 border border-ui-danger p-2">
             <p className="leading-snug">
-              <strong>This deletes your preferences and the autosaved map from this browser</strong>, then
-              reloads with the starter map. The current map is lost unless you saved it as a .dndmap file.
+              <strong>This deletes your preferences and every map in My Maps from this browser</strong>, then
+              reloads with the starter map. Maps are lost unless you saved them as .dndmap files.
               Files you have saved or exported are not affected.
             </p>
             <div className="flex justify-end gap-2">
@@ -271,7 +271,7 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
         ) : (
           <div className="flex items-center justify-between gap-3">
             <span className="text-ui-muted leading-snug">
-              Preferences and the autosaved map are stored only in this browser.
+              Preferences and My Maps are stored only in this browser.
             </span>
             <button onClick={() => setConfirmingReset(true)} className={`${BUTTON_CLASS} shrink-0 text-ui-danger`}>
               Reset all local data…

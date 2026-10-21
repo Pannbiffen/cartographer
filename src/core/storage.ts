@@ -16,9 +16,14 @@ export function readStored(key: string): unknown {
 
 /** Returns false when storage is unavailable or full */
 export function writeStored(key: string, value: unknown): boolean {
+  return writeStoredJson(key, JSON.stringify(value));
+}
+
+/** Stores text that is already JSON; returns false when storage is unavailable or full */
+export function writeStoredJson(key: string, json: string): boolean {
   if (cleared) return false;
   try {
-    localStorage.setItem(KEY_PREFIX + key, JSON.stringify(value));
+    localStorage.setItem(KEY_PREFIX + key, json);
     return true;
   } catch {
     return false;
@@ -33,7 +38,7 @@ export function removeStored(key: string) {
   }
 }
 
-/** Deletes preferences, the autosaved map and anything else stored locally */
+/** Deletes preferences, the maps kept in this browser and anything else stored locally */
 export function clearLocalData() {
   cleared = true;
   try {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
 import { formatShortcut } from '../core/keyboard';
 
 export type MenuItem =
@@ -11,6 +11,8 @@ export type MenuItem =
       // Shown with a check mark when true, an empty slot when false
       checked?: boolean;
     }
+  // Opens to the side on hover or click
+  | { label: string; submenu: MenuItem[]; disabled?: boolean }
   | 'separator';
 
 export interface Menu {
@@ -70,33 +72,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({ menus }) => {
                 aria-label={menu.label}
                 className="absolute left-0 top-full z-50 min-w-56 py-1 bg-ui-raised border border-ui-border shadow-md"
               >
-                {menu.items.map((item, j) =>
-                  item === 'separator' ? (
-                    <div key={j} role="separator" className="my-1 border-t border-ui-border" />
-                  ) : (
-                    <button
-                      key={item.label}
-                      role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
-                      aria-checked={item.checked}
-                      disabled={item.disabled}
-                      onClick={() => {
-                        setOpenIndex(null);
-                        item.onSelect();
-                      }}
-                      className="group flex w-full items-center gap-2 px-2 py-1 text-left text-ui-text enabled:hover:bg-ui-accent enabled:hover:text-white disabled:text-ui-muted/60"
-                    >
-                      <span className="w-4 flex justify-center">
-                        {item.checked && <Check className="w-3.5 h-3.5" />}
-                      </span>
-                      <span className="flex-1 whitespace-nowrap">{item.label}</span>
-                      {item.shortcut && (
-                        <span className="pl-6 text-ui-muted group-enabled:group-hover:text-white/85 whitespace-nowrap">
-                          {formatShortcut(item.shortcut)}
-                        </span>
-                      )}
-                    </button>
-                  )
-                )}
+                <MenuItems items={menu.items} onDone={() => setOpenIndex(null)} />
               </div>
             )}
           </div>
@@ -104,4 +80,65 @@ export const MenuBar: React.FC<MenuBarProps> = ({ menus }) => {
       })}
     </nav>
   );
+};
+
+const ITEM_CLASS =
+  'group flex w-full items-center gap-2 px-2 py-1 text-left text-ui-text enabled:hover:bg-ui-accent enabled:hover:text-white disabled:text-ui-muted/60';
+
+// The items of one open menu or submenu; onDone closes the whole menu
+const MenuItems: React.FC<{ items: MenuItem[]; onDone: () => void }> = ({ items, onDone }) => {
+  const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
+  return items.map((item, j) => {
+    if (item === 'separator') return <div key={j} role="separator" className="my-1 border-t border-ui-border" />;
+    if ('submenu' in item) {
+      const isOpen = openSubmenu === j && !item.disabled;
+      return (
+        <div key={j} className="relative" onPointerEnter={() => setOpenSubmenu(j)}>
+          <button
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={isOpen}
+            disabled={item.disabled}
+            onClick={() => setOpenSubmenu(isOpen ? null : j)}
+            className={`${ITEM_CLASS} ${isOpen ? 'bg-ui-accent text-white' : ''}`}
+          >
+            <span className="w-4" />
+            <span className="flex-1 whitespace-nowrap">{item.label}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+          {isOpen && (
+            <div
+              role="menu"
+              aria-label={item.label}
+              className="absolute left-full -top-1 z-50 min-w-48 max-w-80 py-1 bg-ui-raised border border-ui-border shadow-md"
+            >
+              <MenuItems items={item.submenu} onDone={onDone} />
+            </div>
+          )}
+        </div>
+      );
+    }
+    return (
+      <button
+        key={j}
+        role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+        aria-checked={item.checked}
+        disabled={item.disabled}
+        onPointerEnter={() => setOpenSubmenu(null)}
+        onClick={() => {
+          onDone();
+          item.onSelect();
+        }}
+        className={ITEM_CLASS}
+      >
+        <span className="w-4 flex justify-center">{item.checked && <Check className="w-3.5 h-3.5" />}</span>
+        <span className="flex-1 truncate whitespace-nowrap">{item.label}</span>
+        {item.shortcut && (
+          <span className="pl-6 text-ui-muted group-enabled:group-hover:text-white/85 whitespace-nowrap">
+            {formatShortcut(item.shortcut)}
+          </span>
+        )}
+      </button>
+    );
+  });
 };

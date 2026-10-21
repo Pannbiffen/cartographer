@@ -42,7 +42,7 @@ test('the System theme follows the operating system', async ({ page }) => {
   await expect(html(page)).toHaveAttribute('data-ui-theme', 'dark');
 });
 
-test('autosave can be turned off, which drops the saved map', async ({ page }) => {
+test('autosave can be turned off; maps already stored stay in My Maps', async ({ page }) => {
   await openApp(page);
   await dragCells(page, [-15, 8], [-5, 8]);
   await expect(page.getByText('Autosaved in this browser')).toBeVisible();
@@ -55,6 +55,10 @@ test('autosave can be turned off, which drops the saved map', async ({ page }) =
   await openApp(page);
   expect((await stats(page)).rooms).toBe(194);
   await expect(page.getByText('Autosave off')).toBeVisible();
+  await page.getByRole('menuitem', { name: 'File' }).click();
+  await page.getByRole('menuitem', { name: 'My Maps…' }).click();
+  await expect(page.getByRole('dialog', { name: 'My Maps' })).toContainText('Autosave is off');
+  await expect(page.getByRole('dialog', { name: 'My Maps' }).getByRole('option')).toHaveCount(1);
 });
 
 test('with autosave off, leaving with unsaved work asks first', async ({ page }) => {
