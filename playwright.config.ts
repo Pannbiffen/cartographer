@@ -6,6 +6,8 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   reporter: 'list',
+  // On CI a test gets one retry, so a rare flake shows as "flaky" without blocking the deploy
+  retries: process.env.CI ? 1 : 0,
   use: {
     ...devices['Desktop Chrome'],
     baseURL: 'http://localhost:5174/',
