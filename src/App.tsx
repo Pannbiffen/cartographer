@@ -316,6 +316,11 @@ export function App() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [preferences.autosave, unsaved]);
 
+  // The tab names the map, with a dot while it has changes not saved to a file
+  useEffect(() => {
+    document.title = `${unsaved ? '• ' : ''}${mapData.title || 'Untitled map'} — Cartographer`;
+  }, [unsaved, mapData.title]);
+
   // Undo / Redo
   const handleUndo = useCallback(() => {
     lastCoalesceRef.current = null;

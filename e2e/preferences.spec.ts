@@ -62,7 +62,10 @@ test('with autosave off, leaving with unsaved work asks first', async ({ page })
   await page.keyboard.press('Control+,');
   await page.getByLabel(/Autosave the map/).uncheck();
   await page.keyboard.press('Escape');
+  await expect(page).toHaveTitle('The Sunken Crypt — Cartographer');
   await dragCells(page, [-15, 8], [-5, 8]);
+  // The tab shows there are unsaved changes
+  await expect(page).toHaveTitle('• The Sunken Crypt — Cartographer');
 
   // Closing asks; dismissing keeps the page open
   const warning = page.waitForEvent('dialog');
@@ -74,6 +77,7 @@ test('with autosave off, leaving with unsaved work asks first', async ({ page })
 
   // Once saved to a file it closes without asking
   await saveMap(page);
+  await expect(page).toHaveTitle('The Sunken Crypt — Cartographer');
   const dialogs: string[] = [];
   page.on('dialog', (d) => {
     dialogs.push(d.type());
