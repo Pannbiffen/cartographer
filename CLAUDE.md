@@ -1,6 +1,6 @@
 # Cartographer
 
-Free, open-source D&D battlemap maker (React 19 + TypeScript + Vite + Tailwind, 2D canvas). Every push runs lint, build and the e2e suite in GitHub Actions (`.github/workflows/deploy.yml`); `main` deploys to GitHub Pages only when they pass: https://pannbiffen.github.io/cartographer/
+Free, open-source D&D battlemap maker (React 19 + TypeScript + Vite + Tailwind, 2D canvas). Every push runs lint, build and the e2e suite in GitHub Actions (`.github/workflows/deploy.yml`) as a warning only: `main` deploys to GitHub Pages straight away, whatever they report: https://pannbiffen.github.io/cartographer/
 
 Inspired by Dungeon Scrawl: match its features, never copy its code, art or assets. Over time it should become its own product.
 

@@ -1,6 +1,7 @@
 name: Test and deploy Cartographer
 
-# Every push runs the checks; only main deploys to GitHub Pages, and only once they pass
+# Every push runs the checks. Pushes to main also deploy to GitHub Pages straight away,
+# alongside the checks: a failing check marks the commit but does not hold the deploy back.
 on:
   push:
     branches: ['**']
@@ -50,7 +51,6 @@ jobs:
           retention-days: 7
 
   deploy:
-    needs: test
     if: github.ref == 'refs/heads/main'
     permissions:
       pages: write
