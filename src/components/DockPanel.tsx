@@ -13,6 +13,7 @@ import type {
   ThemeType,
 } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
+import { StylePresets } from './StylePresets';
 import { Slider } from './Slider';
 import { ArrowDown, ArrowUp, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
 import {
@@ -394,6 +395,10 @@ export const DockPanel: React.FC<DockPanelProps> = ({
             ))}
           </select>
         </label>
+      </Section>
+
+      <Section title="Style presets">
+        <StylePresets mapData={mapData} onModifyMap={onModifyMap} />
       </Section>
 
       <Section title="Walls">

@@ -101,7 +101,7 @@ test('opening a project frames the new map', async ({ page }) => {
   const rooms: Record<string, boolean> = {};
   for (let x = 100; x < 104; x++) for (let y = 50; y < 53; y++) rooms[`${x},${y}`] = true;
 
-  await page.locator('input[type=file]').setInputFiles({
+  await page.getByLabel('Open map file').setInputFiles({
     name: 'far.dndmap',
     mimeType: 'application/json',
     buffer: Buffer.from(

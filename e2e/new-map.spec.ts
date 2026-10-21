@@ -74,7 +74,7 @@ test('opening a file over unsaved changes asks first', async ({ page }) => {
   const map = await saveMap(page);
   await dragCells(page, [7, 6], [10, 6]);
 
-  await page.locator('input[type=file]').setInputFiles({
+  await page.getByLabel('Open map file').setInputFiles({
     name: 'other.dndmap',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ ...map, title: 'Other Map' })),

@@ -42,7 +42,7 @@ test('project files round-trip and version 1 files without layers or labels stil
   const { rooms, water, foliage, doors, stairs, props } = layers[0];
   const legacy = { ...settings, version: 1, title: 'Legacy Map', rooms, water, foliage, doors, stairs, props };
 
-  await page.locator('input[type=file]').setInputFiles({
+  await page.getByLabel('Open map file').setInputFiles({
     name: 'old.dndmap',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(legacy)),

@@ -859,6 +859,7 @@ export function App() {
         ref={fileInputRef}
         type="file"
         accept=".json,.dndmap"
+        aria-label="Open map file"
         onChange={handleLoadJson}
         className="hidden"
       />

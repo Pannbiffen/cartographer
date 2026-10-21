@@ -14,6 +14,7 @@
 - **Plain Desktop Interface**: Menu bar, toolbar, docked toolbox and properties panel, and a status bar, with your system font.
 - **Preferences** (Edit > Preferences): dark (default), light or system UI theme, accent colour, interface size, autosave on/off, and a reset that wipes everything stored in this browser.
 - **Pen & Parchment Aesthetic**: Four themes (Parchment, Blueprint, Slate, Monochrome), bold, fine or rough pen walls, and pen-stroke, crosshatch, stipple or soft-shadow hatching outside them.
+- **Style Presets**: Save a map's look (style, walls, hatching, grid) under a name in the Style presets panel, apply it to any map in one click, and export or import presets as a `.json` file to share them with friends.
 - **Select & Edit**: Select doors, stairs, props and labels to move (drag or arrow keys), rotate, retype, duplicate, copy and paste, or delete them.
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.
 - **Room Numbers**: Keyed-dungeon markers in a circle or box that count up (1, 2, 3...) as you place them.
