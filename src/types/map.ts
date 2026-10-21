@@ -19,6 +19,13 @@ export type FoliageType = 'tree' | 'bush' | 'rock';
 
 export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome';
 
+export type FloorTexture = 'plain' | 'flagstones' | 'planks' | 'cobbles' | 'tiles' | 'dirt';
+
+// How the rock outside the walls is shaded
+export type HatchStyle = 'dyson' | 'crosshatch' | 'stipple' | 'shadow' | 'none';
+
+export type WallStyle = 'bold' | 'fine' | 'rough';
+
 // Plain text, or a room number keyed in a circle or box
 export type LabelStyle = 'text' | 'circle' | 'box';
 
@@ -73,6 +80,7 @@ export interface PlacedLabel {
 /** Everything drawn on one layer */
 export interface LayerContent {
   rooms: { [key: string]: boolean }; // "x,y" => true for carved floor cells
+  floors: { [key: string]: FloorTexture }; // "x,y" => pattern on a floor cell; missing = plain
   water: { [key: string]: boolean }; // "x,y" => true for water cells
   foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
   doors: PlacedDoor[];
@@ -98,6 +106,8 @@ export interface MapData {
   gridOpacity: number;
   hatchDensity: number; // 1 to 5
   hatchLength: number; // pixels
+  hatchStyle: HatchStyle;
+  wallStyle: WallStyle;
   layers: MapLayer[]; // bottom to top; never empty
 }
 

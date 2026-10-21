@@ -5,6 +5,7 @@ import type {
   DoorType,
   PropType,
   FoliageType,
+  FloorTexture,
   LabelStyle,
   ViewportTransform,
   MapHistoryState,
@@ -111,6 +112,8 @@ function createDefaultStarterMap(): MapData {
     gridOpacity: 0.22,
     hatchDensity: 3,
     hatchLength: 14,
+    hatchStyle: 'dyson',
+    wallStyle: 'bold',
     layers: [
       newLayer('layer1', 'Dungeon', {
         rooms,
@@ -198,6 +201,7 @@ export function App() {
   const [selectedDoorType, setSelectedDoorType] = useState<DoorType>('standard');
   const [selectedPropType, setSelectedPropType] = useState<PropType>('pillar');
   const [selectedFoliageType, setSelectedFoliageType] = useState<FoliageType>('tree');
+  const [floorTexture, setFloorTexture] = useState<FloorTexture>('plain');
   const [labelStyle, setLabelStyle] = useState<LabelStyle>('text');
 
   const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, zoom: 1 });
@@ -643,6 +647,7 @@ export function App() {
             selectedDoorType={selectedDoorType}
             selectedPropType={selectedPropType}
             selectedFoliageType={selectedFoliageType}
+            floorTexture={floorTexture}
             labelStyle={labelStyle}
             activeLayerId={activeLayerId}
             viewport={viewport}
@@ -666,6 +671,8 @@ export function App() {
             onPropTypeChange={setSelectedPropType}
             selectedFoliageType={selectedFoliageType}
             onFoliageTypeChange={setSelectedFoliageType}
+            floorTexture={floorTexture}
+            onFloorTextureChange={setFloorTexture}
             labelStyle={labelStyle}
             onLabelStyleChange={setLabelStyle}
             selection={activeSelection}

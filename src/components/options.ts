@@ -13,7 +13,17 @@ import {
   Type,
   Waves,
 } from 'lucide-react';
-import type { DoorType, LabelStyle, PlacedStairs, PropType, ThemeType, ToolType } from '../types/map';
+import type {
+  DoorType,
+  FloorTexture,
+  HatchStyle,
+  LabelStyle,
+  PlacedStairs,
+  PropType,
+  ThemeType,
+  ToolType,
+  WallStyle,
+} from '../types/map';
 
 export interface ToolInfo {
   id: ToolType;
@@ -41,6 +51,20 @@ export const THEME_NAMES: [ThemeType, string][] = [
   ['blueprint', 'Blueprint'],
   ['slate', 'Dark Slate'],
   ['monochrome', 'Monochrome Ink'],
+];
+
+export const FLOOR_TEXTURES: FloorTexture[] = ['plain', 'flagstones', 'planks', 'cobbles', 'tiles', 'dirt'];
+export const HATCH_STYLES: [HatchStyle, string][] = [
+  ['dyson', 'Pen strokes'],
+  ['crosshatch', 'Crosshatch'],
+  ['stipple', 'Stipple'],
+  ['shadow', 'Soft shadow'],
+  ['none', 'None'],
+];
+export const WALL_STYLES: [WallStyle, string][] = [
+  ['bold', 'Bold ink'],
+  ['fine', 'Fine ink'],
+  ['rough', 'Rough pen'],
 ];
 
 export const DOOR_TYPES: DoorType[] = ['standard', 'double', 'secret', 'portcullis', 'archway'];

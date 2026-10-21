@@ -90,7 +90,7 @@ export function extractWallSegments(
 }
 
 // Pseudo-random deterministic hash for organic jitter
-function pseudoRandom(x: number, y: number, seed: number = 42): number {
+export function pseudoRandom(x: number, y: number, seed: number = 42): number {
   const sinVal = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453;
   return sinVal - Math.floor(sinVal);
 }
@@ -147,25 +147,137 @@ export function renderDysonHatching(
   ctx.restore();
 }
 
+/** Adds the area within `width` of any wall to the current path, with round corners */
+function bandPath(ctx: CanvasRenderingContext2D, segments: WallSegment[], width: number) {
+  for (const seg of segments) {
+    if (seg.y1 === seg.y2) {
+      ctx.rect(Math.min(seg.x1, seg.x2), seg.y1 - width, Math.abs(seg.x2 - seg.x1), width * 2);
+    } else {
+      ctx.rect(seg.x1 - width, Math.min(seg.y1, seg.y2), width * 2, Math.abs(seg.y2 - seg.y1));
+    }
+    for (const [x, y] of [[seg.x1, seg.y1], [seg.x2, seg.y2]]) {
+      ctx.moveTo(x + width, y);
+      ctx.arc(x, y, width, 0, Math.PI * 2);
+    }
+  }
+}
+
 /**
- * Renders thick hand-drawn wall boundary outlines
+ * Shades a band of `width` pixels around the walls with crosshatching,
+ * stippling or a soft shadow. Floors drawn afterwards cover its inner half.
+ */
+export function renderBandHatching(
+  ctx: CanvasRenderingContext2D,
+  segments: WallSegment[],
+  style: 'crosshatch' | 'stipple' | 'shadow',
+  width: number,
+  density: number,
+  inkColor: string
+) {
+  if (segments.length === 0) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const seg of segments) {
+    minX = Math.min(minX, seg.x1, seg.x2);
+    minY = Math.min(minY, seg.y1, seg.y2);
+    maxX = Math.max(maxX, seg.x1, seg.x2);
+    maxY = Math.max(maxY, seg.y1, seg.y2);
+  }
+  minX -= width;
+  minY -= width;
+  maxX += width;
+  maxY += width;
+
+  ctx.save();
+  ctx.strokeStyle = inkColor;
+  ctx.fillStyle = inkColor;
+  if (style === 'shadow') {
+    // A wide faint band under a narrow one, so it darkens towards the wall
+    ctx.globalAlpha = 0.16;
+    for (const w of [width, width * 0.5]) {
+      ctx.beginPath();
+      bandPath(ctx, segments, w);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  ctx.beginPath();
+  bandPath(ctx, segments, width);
+  ctx.clip();
+  if (style === 'crosshatch') {
+    // Two sets of diagonals, tighter with more density
+    const spacing = Math.max(4, 14 - density * 1.8);
+    const size = maxY - minY;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    const start = Math.floor((minX - size) / spacing) * spacing;
+    for (let x = start; x <= maxX; x += spacing) {
+      ctx.moveTo(x, minY);
+      ctx.lineTo(x + size, maxY);
+      ctx.moveTo(x + size, minY);
+      ctx.lineTo(x, maxY);
+    }
+    ctx.stroke();
+  } else {
+    // Dots on a jittered lattice, so they look placed by hand
+    const spacing = Math.max(3, 9 - density * 1.2);
+    ctx.beginPath();
+    for (let y = Math.floor(minY / spacing) * spacing; y <= maxY; y += spacing) {
+      for (let x = Math.floor(minX / spacing) * spacing; x <= maxX; x += spacing) {
+        const px = x + (pseudoRandom(x, y, 3) - 0.5) * spacing;
+        const py = y + (pseudoRandom(x, y, 7) - 0.5) * spacing;
+        const r = 0.5 + pseudoRandom(x, y, 13) * 0.7;
+        ctx.moveTo(px + r, py);
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+      }
+    }
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * Renders wall boundary outlines: bold or fine ink, or a rough
+ * double-pass pen line
  */
 export function renderWallOutlines(
   ctx: CanvasRenderingContext2D,
   segments: WallSegment[],
-  strokeWidth: number = 3,
+  style: 'bold' | 'fine' | 'rough' = 'bold',
   inkColor: string = '#1e1713'
 ) {
   ctx.save();
   ctx.strokeStyle = inkColor;
-  ctx.lineWidth = strokeWidth;
   ctx.lineCap = 'square';
   ctx.lineJoin = 'miter';
 
   ctx.beginPath();
-  for (const seg of segments) {
-    ctx.moveTo(seg.x1, seg.y1);
-    ctx.lineTo(seg.x2, seg.y2);
+  if (style === 'rough') {
+    // Two wobbly strokes per wall, bending through a jittered midpoint.
+    // Corner jitter depends only on the corner, so neighbouring walls meet.
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    const jitter = (x: number, y: number, salt: number) => (pseudoRandom(x, y, salt) - 0.5) * 2.4;
+    for (const seg of segments) {
+      const mx = (seg.x1 + seg.x2) / 2;
+      const my = (seg.y1 + seg.y2) / 2;
+      for (const pass of [1, 2]) {
+        ctx.moveTo(seg.x1 + jitter(seg.x1, seg.y1, pass), seg.y1 + jitter(seg.x1, seg.y1, pass + 10));
+        ctx.quadraticCurveTo(
+          mx + jitter(mx, my, pass + 20),
+          my + jitter(mx, my, pass + 30),
+          seg.x2 + jitter(seg.x2, seg.y2, pass),
+          seg.y2 + jitter(seg.x2, seg.y2, pass + 10)
+        );
+      }
+    }
+  } else {
+    ctx.lineWidth = style === 'fine' ? 1.6 : 3.2;
+    for (const seg of segments) {
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+    }
   }
   ctx.stroke();
   ctx.restore();

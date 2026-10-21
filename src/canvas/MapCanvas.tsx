@@ -1,10 +1,12 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type {
+  LayerContent,
   MapData,
   ToolType,
   DoorType,
   PropType,
   FoliageType,
+  FloorTexture,
   GridCoord,
   LabelStyle,
   Selection,
@@ -45,6 +47,8 @@ interface MapCanvasProps {
   selectedDoorType: DoorType;
   selectedPropType: PropType;
   selectedFoliageType: FoliageType;
+  // Texture laid by the room tools
+  floorTexture: FloorTexture;
   labelStyle: LabelStyle;
   // Layer the drawing tools edit
   activeLayerId: string;
@@ -80,6 +84,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedDoorType,
   selectedPropType,
   selectedFoliageType,
+  floorTexture,
   labelStyle,
   activeLayerId,
   viewport,
@@ -333,7 +338,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             const key = `${gx},${gy}`;
 
             if (activeTool === 'room-brush') {
-              draft.rooms[key] = true;
+              carveFloor(draft, key, floorTexture);
             } else if (activeTool === 'water') {
               draft.water[key] = true;
             } else if (activeTool === 'foliage') {
@@ -346,6 +351,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
               }
             } else if (activeTool === 'eraser') {
               delete draft.rooms[key];
+              delete draft.floors[key];
               delete draft.water[key];
               delete draft.foliage[key];
               draft.doors = draft.doors.filter((d) => !doorTouchesCell(d, gx, gy));
@@ -360,7 +366,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         { coalesce: `stroke-${strokeCountRef.current}` }
       );
     },
-    [activeTool, brushSize, selectedFoliageType, editLayer]
+    [activeTool, brushSize, selectedFoliageType, floorTexture, editLayer]
   );
 
   // Moves the dragged object: doors re-snap to the nearest wall edge, stairs
@@ -589,7 +595,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const cells =
         activeTool === 'tunnel' ? tunnelCells(start, here, brushSize) : rectCells(start, here);
       editLayer((draft) => {
-        for (const c of cells) draft.rooms[`${c.x},${c.y}`] = true;
+        for (const c of cells) carveFloor(draft, `${c.x},${c.y}`, floorTexture);
       });
     }
     dragStartRef.current = null;
@@ -636,6 +642,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     </div>
   );
 };
+
+/** Makes a cell floor with the given texture; drawing over floor re-textures it */
+function carveFloor(layer: LayerContent, key: string, texture: FloorTexture) {
+  layer.rooms[key] = true;
+  if (texture === 'plain') delete layer.floors[key];
+  else layer.floors[key] = texture;
+}
 
 function usesBrush(tool: ToolType): boolean {
   return tool === 'room-brush' || tool === 'water' || tool === 'foliage' || tool === 'eraser';

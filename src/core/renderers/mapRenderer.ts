@@ -4,6 +4,7 @@ import { THEMES } from '../theme';
 import {
   extractWallSegments,
   renderDysonHatching,
+  renderBandHatching,
   renderWallOutlines,
   extractWaterSegments,
   renderWaterRipples,
@@ -11,6 +12,7 @@ import {
 } from '../geometry/hatching';
 import { renderDoor, renderStairs, renderProp } from './propsRenderer';
 import { renderLabel } from './labelRenderer';
+import { renderFloorTextures } from './floorRenderer';
 
 export interface GridRange {
   minX: number;
@@ -70,18 +72,24 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Ma
 
   // 1. Exterior hatching goes down first so floors cover any strokes that
   //    stray into neighbouring rooms
-  renderDysonHatching(
-    ctx,
-    wallSegments,
-    gridSize,
-    mapData.hatchLength,
-    mapData.hatchDensity,
-    theme.hatch
-  );
+  const hatchStyle = mapData.hatchStyle;
+  if (hatchStyle === 'dyson') {
+    renderDysonHatching(
+      ctx,
+      wallSegments,
+      gridSize,
+      mapData.hatchLength,
+      mapData.hatchDensity,
+      theme.hatch
+    );
+  } else if (hatchStyle !== 'none') {
+    renderBandHatching(ctx, wallSegments, hatchStyle, mapData.hatchLength, mapData.hatchDensity, theme.hatch);
+  }
 
-  // 2. Floors
+  // 2. Floors and their textures
   ctx.fillStyle = theme.floor;
   fillCells(ctx, layer.rooms, gridSize);
+  renderFloorTextures(ctx, layer.rooms, layer.floors, gridSize, theme.ink);
 
   // 3. Water sits on top of floors (pools inside rooms) and terrain
   if (Object.keys(layer.water).length > 0) {
@@ -92,7 +100,7 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Ma
   }
 
   // 4. Thick wall outlines
-  renderWallOutlines(ctx, wallSegments, 3.2, theme.ink);
+  renderWallOutlines(ctx, wallSegments, mapData.wallStyle, theme.ink);
 
   // 5. Foliage (trees, bushes, boulders)
   for (const key of Object.keys(layer.foliage)) {

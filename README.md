@@ -13,12 +13,13 @@
 
 - **Plain Desktop Interface**: Menu bar, toolbar, docked toolbox and properties panel, and a status bar, with your system font.
 - **Preferences** (Edit > Preferences): dark (default), light or system UI theme, accent colour, interface size, autosave on/off, and a reset that wipes everything stored in this browser.
-- **Pen & Parchment Aesthetic**: Hand-drawn style ink walls, exterior crosshatching, and four themes (Parchment, Blueprint, Slate, Monochrome).
+- **Pen & Parchment Aesthetic**: Four themes (Parchment, Blueprint, Slate, Monochrome), bold, fine or rough pen walls, and pen-stroke, crosshatch, stipple or soft-shadow hatching outside them.
 - **Select & Edit**: Select doors, stairs, props and labels to move, rotate, retype or delete them.
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.
 - **Room Numbers**: Keyed-dungeon markers in a circle or box that count up (1, 2, 3...) as you place them.
 - **Layers**: Split a map into layers (dungeon, water, terrain, objects...) that can be shown or hidden, locked, reordered, renamed and faded. Tools draw on the active layer; hidden layers are left out of exports.
 - **Room Tools**: Freehand room brush, click-drag rectangle rooms, and click-drag L-shaped corridors.
+- **Floor Textures**: Procedurally drawn flagstones, wooden planks, cobbles, tiles or dirt, chosen per room as you draw it.
 - **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
 - **Doors, Stairs & Props**: Doors snap to the nearest wall edge (standard, double, secret, portcullis, archway), stairs, pillars, chests, tables, altars, torches, barrels and sarcophagi.

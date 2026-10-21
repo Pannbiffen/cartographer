@@ -1,8 +1,30 @@
 import React from 'react';
-import type { ToolType, DoorType, PropType, FoliageType, LabelStyle, MapData, Selection, ThemeType } from '../types/map';
+import type {
+  ToolType,
+  DoorType,
+  PropType,
+  FoliageType,
+  FloorTexture,
+  LabelStyle,
+  MapData,
+  Selection,
+  ThemeType,
+} from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
 import { ArrowDown, ArrowUp, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
-import { DOOR_TYPES, BUTTON_CLASS, FIELD_CLASS, LABEL_STYLES, PROP_TYPES, THEME_NAMES, TOOLS, optionButtonClass } from './options';
+import {
+  DOOR_TYPES,
+  BUTTON_CLASS,
+  FIELD_CLASS,
+  FLOOR_TEXTURES,
+  HATCH_STYLES,
+  LABEL_STYLES,
+  PROP_TYPES,
+  THEME_NAMES,
+  TOOLS,
+  WALL_STYLES,
+  optionButtonClass,
+} from './options';
 import type { ModifyMap } from '../App';
 import { findLayer, withLayer } from '../core/layers';
 
@@ -16,6 +38,8 @@ interface DockPanelProps {
   onPropTypeChange: (type: PropType) => void;
   selectedFoliageType: FoliageType;
   onFoliageTypeChange: (type: FoliageType) => void;
+  floorTexture: FloorTexture;
+  onFloorTextureChange: (texture: FloorTexture) => void;
   labelStyle: LabelStyle;
   onLabelStyleChange: (style: LabelStyle) => void;
   selection: Selection | null;
@@ -85,6 +109,28 @@ const Choices = <T extends string>({
       ))}
     </div>
   </div>
+);
+
+// A labelled drop-down of [value, name] pairs
+const Picker = <T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: [T, string][];
+  value: T;
+  onChange: (value: T) => void;
+}) => (
+  <label className="flex flex-col gap-0.5">
+    <span>{label}</span>
+    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value as T)} className={FIELD_CLASS}>
+      {options.map(([id, name]) => (
+        <option key={id} value={id}>{name}</option>
+      ))}
+    </select>
+  </label>
 );
 
 const ICON_BUTTON_CLASS = `${BUTTON_CLASS} flex items-center justify-center`;
@@ -214,6 +260,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onPropTypeChange,
   selectedFoliageType,
   onFoliageTypeChange,
+  floorTexture,
+  onFloorTextureChange,
   labelStyle,
   onLabelStyleChange,
   selection,
@@ -267,6 +315,10 @@ export const DockPanel: React.FC<DockPanelProps> = ({
             max={5}
             onChange={onBrushSizeChange}
           />
+        )}
+
+        {(activeTool === 'room-brush' || activeTool === 'room-rect' || activeTool === 'tunnel') && (
+          <Choices label="Floor" options={FLOOR_TEXTURES} value={floorTexture} columns={2} onChange={onFloorTextureChange} />
         )}
 
         {activeTool === 'door' && (
@@ -328,9 +380,21 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         </label>
       </Section>
 
-      <Section title="Hatching">
+      <Section title="Walls">
+        <Picker
+          label="Wall style"
+          options={WALL_STYLES}
+          value={mapData.wallStyle}
+          onChange={(v) => onModifyMap((draft) => { draft.wallStyle = v; })}
+        />
+        <Picker
+          label="Hatching"
+          options={HATCH_STYLES}
+          value={mapData.hatchStyle}
+          onChange={(v) => onModifyMap((draft) => { draft.hatchStyle = v; })}
+        />
         <Slider
-          label="Length"
+          label="Hatching width"
           value={mapData.hatchLength}
           display={`${mapData.hatchLength}px`}
           min={6}
@@ -338,7 +402,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
           onChange={(v) => onModifyMap((draft) => { draft.hatchLength = v; }, { coalesce: 'hatchLength' })}
         />
         <Slider
-          label="Density"
+          label="Hatching density"
           value={mapData.hatchDensity}
           display={String(mapData.hatchDensity)}
           min={1}
