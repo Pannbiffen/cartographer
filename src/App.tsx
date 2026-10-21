@@ -246,6 +246,7 @@ export function App() {
     return applyPreferences(preferences);
   }, [preferences]);
   const handleResetLocalData = () => {
+    skipUnloadWarningRef.current = true;
     clearLocalData();
     window.location.reload();
   };
@@ -292,6 +293,18 @@ export function App() {
     }, AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [mapData, preferences.autosave]);
+
+  // With autosave off, closing or reloading the tab would lose work not
+  // saved to a file, so the browser asks first
+  const skipUnloadWarningRef = useRef(false);
+  useEffect(() => {
+    if (preferences.autosave || !unsaved) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      if (!skipUnloadWarningRef.current) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [preferences.autosave, unsaved]);
 
   // Undo / Redo
   const handleUndo = useCallback(() => {

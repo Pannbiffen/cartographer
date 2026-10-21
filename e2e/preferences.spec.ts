@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, dragCells, stats } from './helpers';
+import { openApp, dragCells, saveMap, stats } from './helpers';
 
 const html = (page: Page) => page.locator('html');
 
@@ -55,6 +55,33 @@ test('autosave can be turned off, which drops the saved map', async ({ page }) =
   await openApp(page);
   expect((await stats(page)).rooms).toBe(194);
   await expect(page.getByText('Autosave off')).toBeVisible();
+});
+
+test('with autosave off, leaving with unsaved work asks first', async ({ page }) => {
+  await openApp(page);
+  await page.keyboard.press('Control+,');
+  await page.getByLabel(/Autosave the map/).uncheck();
+  await page.keyboard.press('Escape');
+  await dragCells(page, [-15, 8], [-5, 8]);
+
+  // Closing asks; dismissing keeps the page open
+  const warning = page.waitForEvent('dialog');
+  await page.close({ runBeforeUnload: true });
+  const dialog = await warning;
+  expect(dialog.type()).toBe('beforeunload');
+  await dialog.dismiss();
+  expect(page.isClosed()).toBe(false);
+
+  // Once saved to a file it closes without asking
+  await saveMap(page);
+  const dialogs: string[] = [];
+  page.on('dialog', (d) => {
+    dialogs.push(d.type());
+    void d.accept();
+  });
+  await page.close({ runBeforeUnload: true });
+  await page.waitForEvent('close');
+  expect(dialogs).toEqual([]);
 });
 
 test('resetting local data asks first, then restores defaults', async ({ page }) => {

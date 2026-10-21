@@ -38,7 +38,7 @@
   - 🔗 **Share Links**: File > Share Link puts a compressed copy of the map in a link. Friends who open it get their own copy to view, edit or save; nothing is uploaded anywhere.
 - **Navigation**: Maps open framed in the window and `Ctrl + 0` brings the whole map back into view. Pan with the arrow keys or by dragging, and zoom with the wheel or a trackpad at the speed you set in Preferences.
 - **New Maps**: File > New starts a blank map with the style, hatching and grid you pick in Preferences (or copied from the open map), and asks before discarding changes you haven't saved to a file.
-- **Autosave**: Your current map is kept in this browser and restored when you reopen the page. Save a `.dndmap` file to back it up or move it to another device.
+- **Autosave**: Your current map is kept in this browser and restored when you reopen the page. Save a `.dndmap` file to back it up or move it to another device. With autosave off, the browser asks before you close a tab with unsaved work.
 - **Undo/Redo**: Up to 100 steps; each brush stroke or slider drag is a single step.
 - **100% Client-Side & Static**: Hosted on GitHub Pages with no tracking and no accounts.
 
