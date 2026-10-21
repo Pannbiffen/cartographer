@@ -17,6 +17,7 @@ import type {
 } from '../types/map';
 import { THEMES } from '../core/theme';
 import { wheelZoomFactor, zoomAbout, type ZoomSpeed } from '../core/viewport';
+import { useKeyboardPan } from './useKeyboardPan';
 import { renderMap } from '../core/renderers/mapRenderer';
 import { renderLightMarkers } from '../core/renderers/lightingRenderer';
 import { DEFAULT_LIGHT } from '../core/lighting';
@@ -413,6 +414,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, [onViewportChange, zoomSpeed]);
+
+  useKeyboardPan(onViewportChange);
 
   // Apply brush action to map cells around each centre cell
   const applyBrush = useCallback(

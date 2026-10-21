@@ -16,6 +16,43 @@ async function zoomAfterWheel(page: Page, deltaY: number, times = 1) {
   return (await view(page)).zoom / before;
 }
 
+test('arrow keys pan the map while held, faster with Shift', async ({ page }) => {
+  await openApp(page);
+  const start = await view(page);
+
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(300);
+  await page.keyboard.up('ArrowRight');
+  const afterRight = await view(page);
+  // The view moves right, so the map slides left
+  const slow = start.x - afterRight.x;
+  expect(slow).toBeGreaterThan(50);
+  expect(afterRight.y).toBe(start.y);
+  expect(afterRight.zoom).toBe(start.zoom);
+
+  await page.keyboard.down('Shift');
+  await page.keyboard.down('ArrowUp');
+  await page.waitForTimeout(300);
+  await page.keyboard.up('ArrowUp');
+  await page.keyboard.up('Shift');
+  const afterUp = await view(page);
+  expect(afterUp.y - afterRight.y).toBeGreaterThan(slow * 1.5);
+
+  // Panning stops once the key is released
+  await page.waitForTimeout(150);
+  expect(await view(page)).toEqual(afterUp);
+});
+
+test('arrow keys in a form field do not pan the map', async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel('Map title').focus();
+  const start = await view(page);
+  await page.keyboard.down('ArrowLeft');
+  await page.waitForTimeout(200);
+  await page.keyboard.up('ArrowLeft');
+  expect(await view(page)).toEqual(start);
+});
+
 test('wheel zoom follows the scroll distance and the zoom speed preference', async ({ page }) => {
   await openApp(page);
 
