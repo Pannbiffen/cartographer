@@ -92,26 +92,33 @@ test('new maps start with the look chosen in Preferences', async ({ page }) => {
   await group.getByLabel('Grid shape').selectOption('hex-flat');
   await group.getByLabel('Show battle grid').uncheck();
   await page.keyboard.press('Escape');
+  // Wait for the autosave, so the reloaded map always counts as unsaved
+  await expect(page.getByText('Autosaved in this browser')).toBeVisible();
 
   // Kept across reloads like the other preferences
   await page.reload();
   await openApp(page);
   await fileMenu(page, 'New');
+  await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
+  await expect(page.getByLabel('Map style')).toHaveValue('blueprint');
   let map = await saveMap(page);
   expect(map).toMatchObject({ theme: 'blueprint', gridType: 'hex-flat', showGrid: false, hatchLength: 14 });
 
   // Copy the open map's look, then restore the defaults
   await page.getByLabel('Map style').selectOption('slate');
+  await page.getByLabel('Map title').fill('Scratch');
   await (await openPreferences(page)).getByRole('button', { name: /current map/ }).click();
   await page.keyboard.press('Escape');
   await page.keyboard.press('Control+Alt+n');
   await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
+  await expect(page.getByLabel('Map title')).toHaveValue('Untitled map');
   map = await saveMap(page);
   expect(map).toMatchObject({ theme: 'slate', gridType: 'hex-flat', showGrid: false });
 
   await (await openPreferences(page)).getByRole('button', { name: 'Restore defaults' }).click();
   await page.keyboard.press('Escape');
   await fileMenu(page, 'New');
+  await expect(page.getByLabel('Map style')).toHaveValue('parchment');
   map = await saveMap(page);
   expect(map).toMatchObject({ theme: 'parchment', gridType: 'square', showGrid: true, gridOpacity: 0.22 });
 });
