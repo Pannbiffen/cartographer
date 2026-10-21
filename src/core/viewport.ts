@@ -1,5 +1,6 @@
 import type { MapData, Selection, ViewportTransform } from '../types/map';
 import { objectBounds } from './objects';
+import { visibleLayers } from './layers';
 
 export const MIN_ZOOM = 0.2;
 export const MAX_ZOOM = 4;
@@ -9,7 +10,7 @@ const MAX_FIT_ZOOM = 2;
 const FIT_MARGIN_PX = 24;
 const FIT_MARGIN_CELLS = 0.75;
 
-/** Extent of everything drawn on the map, in grid units, or null if empty */
+/** Extent of everything drawn on the map's shown layers, in grid units, or null if empty */
 export function mapBounds(map: MapData): { x: number; y: number; w: number; h: number } | null {
   let minX = Infinity;
   let minY = Infinity;
@@ -22,21 +23,24 @@ export function mapBounds(map: MapData): { x: number; y: number; w: number; h: n
     maxY = Math.max(maxY, y + h);
   };
 
-  for (const cells of [map.rooms, map.water, map.foliage]) {
-    for (const key of Object.keys(cells)) {
-      const [x, y] = key.split(',').map(Number);
-      include(x, y, 1, 1);
+  for (const layer of visibleLayers(map)) {
+    for (const cells of [layer.rooms, layer.water, layer.foliage]) {
+      for (const key of Object.keys(cells)) {
+        const [x, y] = key.split(',').map(Number);
+        include(x, y, 1, 1);
+      }
     }
-  }
-  const objects: Selection[] = [
-    ...map.doors.map((d) => ({ kind: 'door' as const, id: d.id })),
-    ...map.stairs.map((s) => ({ kind: 'stairs' as const, id: s.id })),
-    ...map.props.map((p) => ({ kind: 'prop' as const, id: p.id })),
-    ...map.labels.map((l) => ({ kind: 'label' as const, id: l.id })),
-  ];
-  for (const sel of objects) {
-    const b = objectBounds(map, sel);
-    if (b) include(b.x, b.y, b.w, b.h);
+    const layerId = layer.id;
+    const objects: Selection[] = [
+      ...layer.doors.map((d) => ({ kind: 'door' as const, id: d.id, layerId })),
+      ...layer.stairs.map((s) => ({ kind: 'stairs' as const, id: s.id, layerId })),
+      ...layer.props.map((p) => ({ kind: 'prop' as const, id: p.id, layerId })),
+      ...layer.labels.map((l) => ({ kind: 'label' as const, id: l.id, layerId })),
+    ];
+    for (const sel of objects) {
+      const b = objectBounds(map, sel);
+      if (b) include(b.x, b.y, b.w, b.h);
+    }
   }
 
   return minX === Infinity ? null : { x: minX, y: minY, w: maxX - minX, h: maxY - minY };

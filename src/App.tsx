@@ -29,6 +29,21 @@ import { clearAutosave, loadAutosave, saveAutosave } from './core/autosave';
 import { applyPreferences, loadPreferences, savePreferences, type Preferences } from './core/preferences';
 import { clearLocalData } from './core/storage';
 import { deleteObject, findSelected, rotateObject } from './core/objects';
+import {
+  addLayer,
+  cloneLayer,
+  deleteLayer,
+  emptyContent,
+  findLayer,
+  isLayerEditable,
+  moveLayer,
+  newLayer,
+  newLayerId,
+  nextLayerName,
+  isMapLike,
+  normalizeLoadedMap,
+  withLayer,
+} from './core/layers';
 import { MAX_ZOOM, MIN_ZOOM, fitViewport } from './core/viewport';
 
 const AUTOSAVE_DELAY_MS = 800;
@@ -88,7 +103,7 @@ function createDefaultStarterMap(): MapData {
   foliage['5,-8'] = { type: 'rock', seed: 404 };
 
   return {
-    version: 1,
+    version: 2,
     title: 'The Sunken Crypt',
     gridSize: 40,
     theme: 'parchment',
@@ -96,27 +111,31 @@ function createDefaultStarterMap(): MapData {
     gridOpacity: 0.22,
     hatchDensity: 3,
     hatchLength: 14,
-    rooms,
-    water,
-    foliage,
-    doors: [
-      { id: 'd1', x: 0, y: -6, orientation: 'horizontal', type: 'standard' },
-      { id: 'd2', x: 6, y: 1, orientation: 'vertical', type: 'standard' },
-      { id: 'd3', x: -5, y: 4, orientation: 'vertical', type: 'secret' },
-    ],
-    stairs: [
-      { id: 's1', x: 0, y: -10, width: 2, height: 1, direction: 'down', steps: 4 },
-    ],
-    props: [
-      { id: 'p1', x: -3, y: 0, type: 'pillar', rotation: 0 },
-      { id: 'p2', x: -3, y: 4, type: 'pillar', rotation: 0 },
-      { id: 'p3', x: 9, y: 1, type: 'altar', rotation: 0 },
-      { id: 'p4', x: -10, y: 3, type: 'chest', rotation: 0 },
-      { id: 'p5', x: -4, y: 2, type: 'torch', rotation: 0 },
-    ],
-    labels: [
-      { id: 'l1', x: 0.5, y: 5.5, text: 'Grand Hall', size: 20 },
-      { id: 'l2', x: -9, y: 6.5, text: 'Hidden Vault', size: 16 },
+    layers: [
+      newLayer('layer1', 'Dungeon', {
+        rooms,
+        water,
+        foliage,
+        doors: [
+          { id: 'd1', x: 0, y: -6, orientation: 'horizontal', type: 'standard' },
+          { id: 'd2', x: 6, y: 1, orientation: 'vertical', type: 'standard' },
+          { id: 'd3', x: -5, y: 4, orientation: 'vertical', type: 'secret' },
+        ],
+        stairs: [
+          { id: 's1', x: 0, y: -10, width: 2, height: 1, direction: 'down', steps: 4 },
+        ],
+        props: [
+          { id: 'p1', x: -3, y: 0, type: 'pillar', rotation: 0 },
+          { id: 'p2', x: -3, y: 4, type: 'pillar', rotation: 0 },
+          { id: 'p3', x: 9, y: 1, type: 'altar', rotation: 0 },
+          { id: 'p4', x: -10, y: 3, type: 'chest', rotation: 0 },
+          { id: 'p5', x: -4, y: 2, type: 'torch', rotation: 0 },
+        ],
+        labels: [
+          { id: 'l1', x: 0.5, y: 5.5, text: 'Grand Hall', size: 20 },
+          { id: 'l2', x: -9, y: 6.5, text: 'Hidden Vault', size: 16 },
+        ],
+      }),
     ],
   };
 }
@@ -131,26 +150,15 @@ export interface ModifyMapOptions {
 
 export type ModifyMap = (mutator: (draft: MapData) => void, options?: ModifyMapOptions) => void;
 
-// Fill in any fields missing from older or hand-edited project files
-function normalizeLoadedMap(parsed: Partial<MapData>): MapData {
-  const defaults = createDefaultStarterMap();
-  return {
-    ...defaults,
-    ...parsed,
-    rooms: parsed.rooms ?? {},
-    water: parsed.water ?? {},
-    foliage: parsed.foliage ?? {},
-    doors: parsed.doors ?? [],
-    stairs: parsed.stairs ?? [],
-    props: parsed.props ?? [],
-    labels: parsed.labels ?? [],
-  };
-}
-
 // Resume the autosaved map if there is one, otherwise show the starter dungeon
 function initialMap(): MapData {
   const saved = loadAutosave();
-  return saved ? normalizeLoadedMap(saved) : createDefaultStarterMap();
+  return saved ? normalizeLoadedMap(saved, createDefaultStarterMap()) : createDefaultStarterMap();
+}
+
+/** Cells of one terrain kind across all layers */
+function countCells(map: MapData, kind: 'rooms' | 'water' | 'foliage'): number {
+  return map.layers.reduce((n, layer) => n + Object.keys(layer[kind]).length, 0);
 }
 
 export function App() {
@@ -163,9 +171,24 @@ export function App() {
   const lastCoalesceRef = useRef<string | null>(null);
 
   const [activeTool, setActiveTool] = useState<ToolType>('room-brush');
+  // Tools draw on the active layer; if it is gone (undo, delete) the top one is used
+  const [activeLayerChoice, setActiveLayerId] = useState<string>('');
+  const activeLayer = findLayer(mapData, activeLayerChoice) ?? mapData.layers[mapData.layers.length - 1];
+  const activeLayerId = activeLayer.id;
+  const activeLayerEditable = isLayerEditable(activeLayer);
+
   const [selection, setSelection] = useState<Selection | null>(null);
-  // A selection whose object was removed (undo, eraser) counts as none
-  const activeSelection = findSelected(mapData, selection) ? selection : null;
+  // A selection whose object was removed (undo, eraser) or whose layer was
+  // hidden or locked counts as none
+  const activeSelection =
+    selection && isLayerEditable(findLayer(mapData, selection.layerId)) && findSelected(mapData, selection)
+      ? selection
+      : null;
+  // Selecting an object makes its layer the one being edited
+  const select = useCallback((sel: Selection | null) => {
+    setSelection(sel);
+    if (sel) setActiveLayerId(sel.layerId);
+  }, []);
 
   const chooseTool = useCallback((tool: ToolType) => {
     setActiveTool(tool);
@@ -208,16 +231,7 @@ export function App() {
 
     setHistory((h) => {
       const prev = h.present;
-      const next: MapData = {
-        ...prev,
-        rooms: { ...prev.rooms },
-        water: { ...prev.water },
-        foliage: { ...prev.foliage },
-        doors: [...prev.doors],
-        stairs: [...prev.stairs],
-        props: [...prev.props],
-        labels: [...prev.labels],
-      };
+      const next: MapData = { ...prev, layers: prev.layers.map(cloneLayer) };
       mutator(next);
       return {
         past: merge ? h.past : [...h.past, prev].slice(-MAX_HISTORY),
@@ -322,9 +336,9 @@ export function App() {
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        if (parsed && typeof parsed.rooms === 'object') {
+        if (isMapLike(parsed)) {
           requestFit();
-          resetMap(normalizeLoadedMap(parsed));
+          resetMap(normalizeLoadedMap(parsed, createDefaultStarterMap()));
         } else {
           alert('Invalid project file format.');
         }
@@ -437,55 +451,62 @@ export function App() {
     isPreferencesOpen,
   ]);
 
-  // Procedural Generators
+  // Procedural generators replace the active layer's content
   const handleGenerateDungeon = () => {
     const res = generateBspDungeon(28, 20, 4);
     requestFit();
-    modifyMap((draft) => {
-      draft.rooms = res.rooms;
-      draft.water = {};
-      draft.foliage = {};
-      draft.doors = [];
-      draft.stairs = [{ id: 's1', x: 0, y: 0, width: 1, height: 2, direction: 'down', steps: 4 }];
-      draft.props = [];
-      draft.labels = [];
-    });
+    modifyMap((draft) =>
+      withLayer(draft, activeLayerId, (layer) =>
+        Object.assign(layer, emptyContent(), {
+          rooms: res.rooms,
+          stairs: [{ id: 's1', x: 0, y: 0, width: 1, height: 2, direction: 'down', steps: 4 }],
+        })
+      )
+    );
   };
 
   const handleGenerateCave = () => {
     const res = generateCaveSystem(32, 24, 0.45);
     requestFit();
-    modifyMap((draft) => {
-      draft.rooms = res.rooms;
-      draft.water = res.water;
-      draft.foliage = {};
-      draft.doors = [];
-      draft.stairs = [];
-      draft.props = [];
-      draft.labels = [];
-    });
+    modifyMap((draft) =>
+      withLayer(draft, activeLayerId, (layer) =>
+        Object.assign(layer, emptyContent(), { rooms: res.rooms, water: res.water })
+      )
+    );
   };
 
   const handleGenerateRiver = () => {
     const water = generateRiver(-18, 18, 0, 3);
-    modifyMap((draft) => {
-      draft.water = { ...draft.water, ...water };
-    });
+    modifyMap((draft) =>
+      withLayer(draft, activeLayerId, (layer) => {
+        layer.water = { ...layer.water, ...water };
+      })
+    );
   };
 
   const handleClearMap = () => {
     if (window.confirm('Are you sure you want to clear the entire map?')) {
       modifyMap((draft) => {
-        draft.rooms = {};
-        draft.water = {};
-        draft.foliage = {};
-        draft.doors = [];
-        draft.stairs = [];
-        draft.props = [];
-        draft.labels = [];
+        draft.layers = draft.layers.map((layer) => ({ ...layer, ...emptyContent() }));
       });
     }
   };
+
+  // Layers
+  const handleAddLayer = () => {
+    const layer = newLayer(newLayerId(), nextLayerName(mapData));
+    modifyMap((draft) => addLayer(draft, layer, activeLayerId));
+    setActiveLayerId(layer.id);
+  };
+  const handleDeleteLayer = () => {
+    // The layer below takes over, or the new bottom one
+    const index = mapData.layers.findIndex((l) => l.id === activeLayerId);
+    const next = mapData.layers[index - 1] ?? mapData.layers[index + 1];
+    modifyMap((draft) => deleteLayer(draft, activeLayerId));
+    if (next) setActiveLayerId(next.id);
+  };
+  const handleMoveLayer = (delta: 1 | -1) => modifyMap((draft) => moveLayer(draft, activeLayerId, delta));
+  const activeLayerIndex = mapData.layers.indexOf(activeLayer);
 
   const selectionEditable = activeSelection !== null && (activeTool === 'select' || activeTool === 'label');
   const menus: Menu[] = [
@@ -543,6 +564,20 @@ export function App() {
       ],
     },
     {
+      label: 'Layer',
+      items: [
+        { label: 'New Layer', onSelect: handleAddLayer },
+        { label: 'Delete Layer', disabled: mapData.layers.length <= 1, onSelect: handleDeleteLayer },
+        'separator',
+        {
+          label: 'Move Layer Up',
+          disabled: activeLayerIndex >= mapData.layers.length - 1,
+          onSelect: () => handleMoveLayer(1),
+        },
+        { label: 'Move Layer Down', disabled: activeLayerIndex <= 0, onSelect: () => handleMoveLayer(-1) },
+      ],
+    },
+    {
       label: 'Tools',
       items: [
         ...TOOLS.map((t) => ({
@@ -552,9 +587,9 @@ export function App() {
           onSelect: () => chooseTool(t.id),
         })),
         'separator',
-        { label: 'Generate Dungeon', onSelect: handleGenerateDungeon },
-        { label: 'Generate Cave', onSelect: handleGenerateCave },
-        { label: 'Add River', onSelect: handleGenerateRiver },
+        { label: 'Generate Dungeon', disabled: !activeLayerEditable, onSelect: handleGenerateDungeon },
+        { label: 'Generate Cave', disabled: !activeLayerEditable, onSelect: handleGenerateCave },
+        { label: 'Add River', disabled: !activeLayerEditable, onSelect: handleGenerateRiver },
       ],
     },
     {
@@ -609,13 +644,14 @@ export function App() {
             selectedPropType={selectedPropType}
             selectedFoliageType={selectedFoliageType}
             labelStyle={labelStyle}
+            activeLayerId={activeLayerId}
             viewport={viewport}
             onViewportChange={setViewport}
             onResize={setCanvasSize}
             onModifyMap={modifyMap}
             onHoverCoord={setHoverCoord}
             selection={activeSelection}
-            onSelect={setSelection}
+            onSelect={select}
           />
         </main>
 
@@ -636,6 +672,11 @@ export function App() {
             onClearSelection={() => setSelection(null)}
             mapData={mapData}
             onModifyMap={modifyMap}
+            activeLayerId={activeLayerId}
+            onSelectLayer={setActiveLayerId}
+            onAddLayer={handleAddLayer}
+            onDeleteLayer={handleDeleteLayer}
+            onMoveLayer={handleMoveLayer}
           />
         )}
       </div>
@@ -645,9 +686,14 @@ export function App() {
           {hoverCoord ? `Grid: (${hoverCoord.gx}, ${hoverCoord.gy})` : ''}
         </span>
         <span data-testid="map-stats" className="tabular-nums">
-          Rooms: {Object.keys(mapData.rooms).length} · Water: {Object.keys(mapData.water).length} ·
-          Foliage: {Object.keys(mapData.foliage).length}
+          Rooms: {countCells(mapData, 'rooms')} · Water: {countCells(mapData, 'water')} ·
+          Foliage: {countCells(mapData, 'foliage')}
         </span>
+        {!activeLayerEditable && (
+          <span className="text-ui-danger">
+            Layer “{activeLayer.name}” is {activeLayer.visible ? 'locked' : 'hidden'}
+          </span>
+        )}
         <span className="flex-1" />
         {!preferences.autosave && <span>Autosave off</span>}
         {preferences.autosave && autosaveStatus === 'saved' && <span>Autosaved in this browser</span>}

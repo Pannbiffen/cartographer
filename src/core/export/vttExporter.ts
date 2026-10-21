@@ -1,6 +1,7 @@
 // Universal VTT (.dd2vtt) Exporter
 import type { MapData } from '../../types/map';
 import { extractWallSegments } from '../geometry/hatching';
+import { visibleLayers } from '../layers';
 
 export interface VttPoint {
   x: number;
@@ -47,8 +48,10 @@ export function exportUniversalVtt(
   const widthUnits = Math.max(1, maxX - minX + 1);
   const heightUnits = Math.max(1, maxY - minY + 1);
 
-  // Extract outer wall segments
-  const rawSegments = extractWallSegments(mapData.rooms, gridSize);
+  // Walls outline the floor of every shown layer together
+  const layers = visibleLayers(mapData);
+  const rooms = Object.assign({}, ...layers.map((l) => l.rooms));
+  const rawSegments = extractWallSegments(rooms, gridSize);
 
   // Convert wall segments to grid units relative to (minX, minY)
   const lineOfSight: [VttPoint, VttPoint][] = rawSegments.map((seg) => [
@@ -64,7 +67,8 @@ export function exportUniversalVtt(
 
   // Convert doors to VTT portals
   // Archways are open passages, so they don't become portals
-  const portals: VttPortal[] = mapData.doors
+  const portals: VttPortal[] = layers
+    .flatMap((l) => l.doors)
     .filter((door) => door.type !== 'archway')
     .map((door) => {
     const dx = door.x - minX;
@@ -94,7 +98,8 @@ export function exportUniversalVtt(
   });
 
   // Convert placed torches to VTT dynamic light sources
-  const lights: VttLight[] = mapData.props
+  const lights: VttLight[] = layers
+    .flatMap((l) => l.props)
     .filter((p) => p.type === 'torch')
     .map((torch) => ({
       position: {

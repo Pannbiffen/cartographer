@@ -35,6 +35,7 @@ import {
   replaceProp,
   replaceStairs,
 } from '../core/objects';
+import { findLayer, isLayerEditable, withLayer } from '../core/layers';
 import type { ModifyMap } from '../App';
 
 interface MapCanvasProps {
@@ -45,6 +46,8 @@ interface MapCanvasProps {
   selectedPropType: PropType;
   selectedFoliageType: FoliageType;
   labelStyle: LabelStyle;
+  // Layer the drawing tools edit
+  activeLayerId: string;
   viewport: ViewportTransform;
   onViewportChange: React.Dispatch<React.SetStateAction<ViewportTransform>>;
   // Reports the canvas size in CSS pixels whenever it changes
@@ -78,6 +81,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedPropType,
   selectedFoliageType,
   labelStyle,
+  activeLayerId,
   viewport,
   onViewportChange,
   onResize,
@@ -101,6 +105,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     startWorld: { x: number; y: number };
     origin: GridCoord;
   } | null>(null);
+  // Drawing is blocked while the active layer is hidden or locked
+  const layerEditable = isLayerEditable(findLayer(mapData, activeLayerId));
+  const editLayer = useCallback(
+    (edit: Parameters<typeof withLayer>[2], options?: Parameters<ModifyMap>[1]) =>
+      onModifyMap((draft) => withLayer(draft, activeLayerId, edit), options),
+    [onModifyMap, activeLayerId]
+  );
   const spaceHeldRef = useRef<boolean>(false);
   const [isSpaceHeld, setIsSpaceHeld] = useState<boolean>(false);
   const [isPanning, setIsPanning] = useState<boolean>(false);
@@ -150,7 +161,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
     // Live cursor & drag previews
     const hover = currentHoverRef.current;
-    if (hover && !isPanningRef.current && activeTool !== 'select' && activeTool !== 'label') {
+    if (
+      hover &&
+      layerEditable &&
+      !isPanningRef.current &&
+      activeTool !== 'select' &&
+      activeTool !== 'label'
+    ) {
       ctx.save();
       ctx.strokeStyle = theme.ink;
       ctx.lineWidth = 1.5;
@@ -218,7 +235,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
 
     ctx.restore();
-  }, [mapData, activeTool, brushSize, viewport, selection]);
+  }, [mapData, activeTool, brushSize, viewport, selection, layerEditable]);
 
   // Keep the canvas backing store matched to its on-screen size
   const drawRef = useRef(drawMap);
@@ -310,7 +327,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       for (const center of centers) {
         for (const c of brushCells(center.x, center.y, brushSize)) cells.set(`${c.x},${c.y}`, c);
       }
-      onModifyMap(
+      editLayer(
         (draft) => {
           for (const { x: gx, y: gy } of cells.values()) {
             const key = `${gx},${gy}`;
@@ -343,7 +360,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         { coalesce: `stroke-${strokeCountRef.current}` }
       );
     },
-    [activeTool, brushSize, selectedFoliageType, onModifyMap]
+    [activeTool, brushSize, selectedFoliageType, editLayer]
   );
 
   // Moves the dragged object: doors re-snap to the nearest wall edge, stairs
@@ -352,14 +369,18 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const drag = moveDragRef.current;
     if (!drag) return;
     const coalesce = { coalesce: `move-${strokeCountRef.current}` };
+    const layer = findLayer(mapData, drag.sel.layerId);
+    if (!layer) return;
+    const editDragged = (edit: Parameters<typeof withLayer>[2]) =>
+      onModifyMap((draft) => withLayer(draft, layer.id, edit), coalesce);
 
     if (drag.sel.kind === 'door') {
-      const door = findDoor(mapData, drag.sel.id);
+      const door = findDoor(layer, drag.sel.id);
       const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
       if (!door) return;
       const same =
         door.x === edge.x && door.y === edge.y && door.orientation === edge.orientation;
-      const occupied = mapData.doors.some(
+      const occupied = layer.doors.some(
         (d) =>
           d.id !== door.id &&
           d.x === edge.x &&
@@ -367,7 +388,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           d.orientation === edge.orientation
       );
       if (!same && !occupied) {
-        onModifyMap((draft) => replaceDoor(draft, { ...door, ...edge }), coalesce);
+        editDragged((draft) => replaceDoor(draft, { ...door, ...edge }));
       }
       return;
     }
@@ -377,9 +398,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const snap = (v: number) => Math.round(v * 8) / 8;
       const x = snap(drag.origin.x + (hover.worldX - drag.startWorld.x) / mapData.gridSize);
       const y = snap(drag.origin.y + (hover.worldY - drag.startWorld.y) / mapData.gridSize);
-      const label = mapData.labels.find((l) => l.id === drag.sel.id);
+      const label = layer.labels.find((l) => l.id === drag.sel.id);
       if (label && (label.x !== x || label.y !== y)) {
-        onModifyMap((draft) => replaceLabel(draft, { ...label, x, y }), coalesce);
+        editDragged((draft) => replaceLabel(draft, { ...label, x, y }));
       }
       return;
     }
@@ -388,7 +409,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const y = drag.origin.y + hover.gy - drag.startCell.y;
     const obj = findSelected(mapData, drag.sel);
     if (!obj || (obj.x === x && obj.y === y)) return;
-    onModifyMap((draft) => {
+    editDragged((draft) => {
       if (drag.sel.kind === 'stairs') {
         const s = draft.stairs.find((st) => st.id === drag.sel.id);
         if (s) replaceStairs(draft, { ...s, x, y });
@@ -396,7 +417,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         const p = draft.props.find((pr) => pr.id === drag.sel.id);
         if (p) replaceProp(draft, { ...p, x, y });
       }
-    }, coalesce);
+    });
   };
 
   const pointerToGrid = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -452,10 +473,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         };
         return;
       }
+      if (!layerEditable) return;
       // Room-number markers count up from the highest number on the map
       const id = newObjectId('label');
-      const text = labelStyle === 'text' ? 'New label' : String(nextRoomNumber(mapData.labels));
-      onModifyMap((draft) => {
+      const text =
+        labelStyle === 'text'
+          ? 'New label'
+          : String(nextRoomNumber(mapData.layers.flatMap((l) => l.labels)));
+      editLayer((draft) => {
         draft.labels.push({
           id,
           x: hover.worldX / mapData.gridSize,
@@ -465,13 +490,15 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           style: labelStyle,
         });
       });
-      onSelect({ kind: 'label', id });
+      onSelect({ kind: 'label', id, layerId: activeLayerId });
+    } else if (!layerEditable) {
+      return;
     } else if (activeTool === 'room-rect' || activeTool === 'tunnel') {
       dragStartRef.current = { x: gx, y: gy };
       drawMap();
     } else if (activeTool === 'door') {
       const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
-      onModifyMap((draft) => {
+      editLayer((draft) => {
         // Placing on an occupied edge replaces the door there
         draft.doors = draft.doors.filter(
           (d) => d.x !== edge.x || d.y !== edge.y || d.orientation !== edge.orientation
@@ -479,7 +506,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         draft.doors.push({ id: newObjectId('door'), ...edge, type: selectedDoorType });
       });
     } else if (activeTool === 'stairs') {
-      onModifyMap((draft) => {
+      editLayer((draft) => {
         draft.stairs.push({
           id: newObjectId('stairs'),
           x: gx,
@@ -491,7 +518,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         });
       });
     } else if (activeTool === 'prop') {
-      onModifyMap((draft) => {
+      editLayer((draft) => {
         draft.props.push({
           id: newObjectId('prop'),
           x: gx,
@@ -526,6 +553,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (activeTool === 'select') {
       const overObject = hitTestObject(mapData, hover.worldX, hover.worldY) !== null;
       e.currentTarget.style.cursor = overObject ? 'move' : '';
+    } else if (!layerEditable) {
+      e.currentTarget.style.cursor = 'not-allowed';
     } else if (activeTool === 'label') {
       e.currentTarget.style.cursor = 'text';
     } else {
@@ -559,7 +588,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const here = { x: end.gx, y: end.gy };
       const cells =
         activeTool === 'tunnel' ? tunnelCells(start, here, brushSize) : rectCells(start, here);
-      onModifyMap((draft) => {
+      editLayer((draft) => {
         for (const c of cells) draft.rooms[`${c.x},${c.y}`] = true;
       });
     }

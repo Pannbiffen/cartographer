@@ -17,6 +17,7 @@
 - **Select & Edit**: Select doors, stairs, props and labels to move, rotate, retype or delete them.
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.
 - **Room Numbers**: Keyed-dungeon markers in a circle or box that count up (1, 2, 3...) as you place them.
+- **Layers**: Split a map into layers (dungeon, water, terrain, objects...) that can be shown or hidden, locked, reordered, renamed and faded. Tools draw on the active layer; hidden layers are left out of exports.
 - **Room Tools**: Freehand room brush, click-drag rectangle rooms, and click-drag L-shaped corridors.
 - **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.

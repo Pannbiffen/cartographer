@@ -1,5 +1,5 @@
 // Shared map renderer used by both the live canvas and the exporters
-import type { MapData } from '../../types/map';
+import type { MapData, MapLayer } from '../../types/map';
 import { THEMES } from '../theme';
 import {
   extractWallSegments,
@@ -33,18 +33,40 @@ function fillCells(
   ctx.fill();
 }
 
-/**
- * Draws all map layers in world coordinates (the caller sets up pan/zoom and
- * fills the background). Grid lines are drawn over `gridRange` when given.
- */
-export function renderMap(
+// Scratch canvas for drawing a see-through layer before blending it in
+let blendCanvas: HTMLCanvasElement | null = null;
+
+/** Runs `draw` on a blank canvas matching `ctx`, then blends it in at `opacity` */
+function drawWithOpacity(
   ctx: CanvasRenderingContext2D,
-  mapData: MapData,
-  gridRange: GridRange | null
+  opacity: number,
+  draw: (layerCtx: CanvasRenderingContext2D) => void
 ) {
+  blendCanvas ??= document.createElement('canvas');
+  const { width, height } = ctx.canvas;
+  if (blendCanvas.width !== width || blendCanvas.height !== height) {
+    blendCanvas.width = width;
+    blendCanvas.height = height;
+  }
+  const layerCtx = blendCanvas.getContext('2d');
+  if (!layerCtx) return;
+  layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+  layerCtx.clearRect(0, 0, width, height);
+  layerCtx.setTransform(ctx.getTransform());
+  draw(layerCtx);
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = opacity;
+  ctx.drawImage(blendCanvas, 0, 0);
+  ctx.restore();
+}
+
+/** One layer's terrain and objects, bottom to top (labels are drawn separately) */
+function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: MapData) {
   const theme = THEMES[mapData.theme] || THEMES.parchment;
   const gridSize = mapData.gridSize;
-  const wallSegments = extractWallSegments(mapData.rooms, gridSize);
+  const wallSegments = extractWallSegments(layer.rooms, gridSize);
 
   // 1. Exterior hatching goes down first so floors cover any strokes that
   //    stray into neighbouring rooms
@@ -59,13 +81,13 @@ export function renderMap(
 
   // 2. Floors
   ctx.fillStyle = theme.floor;
-  fillCells(ctx, mapData.rooms, gridSize);
+  fillCells(ctx, layer.rooms, gridSize);
 
   // 3. Water sits on top of floors (pools inside rooms) and terrain
-  if (Object.keys(mapData.water).length > 0) {
+  if (Object.keys(layer.water).length > 0) {
     ctx.fillStyle = theme.waterTint;
-    fillCells(ctx, mapData.water, gridSize);
-    const waterSegments = extractWaterSegments(mapData.water, gridSize);
+    fillCells(ctx, layer.water, gridSize);
+    const waterSegments = extractWaterSegments(layer.water, gridSize);
     renderWaterRipples(ctx, waterSegments, theme.waterRipples);
   }
 
@@ -73,8 +95,8 @@ export function renderMap(
   renderWallOutlines(ctx, wallSegments, 3.2, theme.ink);
 
   // 5. Foliage (trees, bushes, boulders)
-  for (const key of Object.keys(mapData.foliage)) {
-    const item = mapData.foliage[key];
+  for (const key of Object.keys(layer.foliage)) {
+    const item = layer.foliage[key];
     if (!item) continue;
     const [gx, gy] = key.split(',').map(Number);
     renderFoliageCluster(
@@ -90,17 +112,39 @@ export function renderMap(
   }
 
   // 6. Stairs, doors, props
-  for (const stairs of mapData.stairs) {
+  for (const stairs of layer.stairs) {
     renderStairs(ctx, stairs, gridSize, theme.ink, theme.floor);
   }
-  for (const door of mapData.doors) {
+  for (const door of layer.doors) {
     renderDoor(ctx, door, gridSize, theme.ink, theme.propFill);
   }
-  for (const prop of mapData.props) {
+  for (const prop of layer.props) {
     renderProp(ctx, prop, gridSize, theme.ink);
   }
+}
 
-  // 7. Grid overlay
+/**
+ * Draws all shown map layers in world coordinates (the caller sets up
+ * pan/zoom and fills the background). Grid lines are drawn over `gridRange`
+ * when given.
+ */
+export function renderMap(
+  ctx: CanvasRenderingContext2D,
+  mapData: MapData,
+  gridRange: GridRange | null
+) {
+  const theme = THEMES[mapData.theme] || THEMES.parchment;
+  const gridSize = mapData.gridSize;
+  const layers = mapData.layers.filter((l) => l.visible && l.opacity > 0);
+
+  // A see-through layer is drawn whole and then blended, so its own
+  // overlapping strokes don't show through each other
+  for (const layer of layers) {
+    if (layer.opacity >= 1) renderLayer(ctx, layer, mapData);
+    else drawWithOpacity(ctx, layer.opacity, (layerCtx) => renderLayer(layerCtx, layer, mapData));
+  }
+
+  // Grid overlay
   if (gridRange && mapData.showGrid) {
     ctx.save();
     ctx.strokeStyle = theme.grid;
@@ -120,8 +164,13 @@ export function renderMap(
     ctx.restore();
   }
 
-  // 8. Labels sit above everything, including the grid
-  for (const label of mapData.labels) {
-    renderLabel(ctx, label, gridSize, theme.ink, theme.floor);
+  // Labels of every layer sit above everything, including the grid
+  for (const layer of layers) {
+    ctx.save();
+    ctx.globalAlpha = layer.opacity;
+    for (const label of layer.labels) {
+      renderLabel(ctx, label, gridSize, theme.ink, theme.floor);
+    }
+    ctx.restore();
   }
 }

@@ -14,7 +14,7 @@ test('doors snap to the nearest edge; archways are placeable', async ({ page }) 
   await page.mouse.click(p.x, p.y);
 
   const map = await saveMap(page);
-  const placed = map.doors.slice(3).map(({ x, y, orientation, type }) => ({ x, y, orientation, type }));
+  const placed = map.layers[0].doors.slice(3).map(({ x, y, orientation, type }) => ({ x, y, orientation, type }));
   expect(placed).toEqual([
     { x: 3, y: -2, orientation: 'vertical', type: 'archway' },
     { x: 2, y: -1, orientation: 'horizontal', type: 'standard' },
@@ -26,7 +26,7 @@ test('eraser removes stairs from any cell they cover', async ({ page }) => {
   await page.keyboard.press('e');
   // Starter stairs are 2x1 at (0,-10); erase the right-hand cell
   await clickCell(page, 1, -10);
-  expect((await saveMap(page)).stairs).toEqual([]);
+  expect((await saveMap(page)).layers[0].stairs).toEqual([]);
 });
 
 test('select tool moves, rotates and deletes objects with undo', async ({ page }) => {
@@ -46,16 +46,16 @@ test('select tool moves, rotates and deletes objects with undo', async ({ page }
   await page.keyboard.press('Delete');
 
   let map = await saveMap(page);
-  expect(map.props.find((p) => p.id === 'p3')).toMatchObject({ x: 8, y: 2, rotation: 90 });
-  expect(map.doors.find((d) => d.id === 'd2')).toMatchObject({ x: 6, y: 2 });
-  expect(map.props.filter((p) => p.type === 'pillar')).toHaveLength(1);
+  expect(map.layers[0].props.find((p) => p.id === 'p3')).toMatchObject({ x: 8, y: 2, rotation: 90 });
+  expect(map.layers[0].doors.find((d) => d.id === 'd2')).toMatchObject({ x: 6, y: 2 });
+  expect(map.layers[0].props.filter((p) => p.type === 'pillar')).toHaveLength(1);
 
   // Delete, door drag, rotate and altar drag are one undo step each
   for (let i = 0; i < 4; i++) await page.keyboard.press('Control+z');
   map = await saveMap(page);
-  expect(map.props.filter((p) => p.type === 'pillar')).toHaveLength(2);
-  expect(map.props.find((p) => p.id === 'p3')).toMatchObject({ x: 9, y: 1, rotation: 0 });
-  expect(map.doors.find((d) => d.id === 'd2')).toMatchObject({ x: 6, y: 1 });
+  expect(map.layers[0].props.filter((p) => p.type === 'pillar')).toHaveLength(2);
+  expect(map.layers[0].props.find((p) => p.id === 'p3')).toMatchObject({ x: 9, y: 1, rotation: 0 });
+  expect(map.layers[0].doors.find((d) => d.id === 'd2')).toMatchObject({ x: 6, y: 1 });
 });
 
 test('labels can be placed, typed, resized and dragged', async ({ page }) => {
@@ -73,7 +73,7 @@ test('labels can be placed, typed, resized and dragged', async ({ page }) => {
   await dragCells(page, [-12, -5], [-12, -3]);
 
   const map = await saveMap(page);
-  expect(map.labels.at(-1)).toMatchObject({ text: 'Throne Room', size: 30, x: -11.5, y: -2.5 });
+  expect(map.layers[0].labels.at(-1)).toMatchObject({ text: 'Throne Room', size: 30, x: -11.5, y: -2.5 });
 });
 
 test('room-number markers count up and can switch style', async ({ page }) => {
@@ -90,7 +90,7 @@ test('room-number markers count up and can switch style', async ({ page }) => {
   await page.getByRole('button', { name: 'text style' }).click();
 
   const map = await saveMap(page);
-  expect(map.labels.slice(2).map(({ text, style }) => ({ text, style }))).toEqual([
+  expect(map.layers[0].labels.slice(2).map(({ text, style }) => ({ text, style }))).toEqual([
     { text: '1', style: 'text' },
     { text: '2', style: 'circle' },
     { text: '3', style: 'box' },

@@ -87,7 +87,10 @@ test('opening a project frames the new map', async ({ page }) => {
     name: 'far.dndmap',
     mimeType: 'application/json',
     buffer: Buffer.from(
-      JSON.stringify({ ...map, rooms, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [] })
+      JSON.stringify({
+        ...map,
+        layers: [{ ...map.layers[0], rooms, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [] }],
+      })
     ),
   });
   await expect(page.getByTestId('map-stats')).toContainText('Rooms: 12');

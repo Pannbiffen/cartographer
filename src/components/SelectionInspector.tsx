@@ -11,6 +11,7 @@ import {
   optionButtonClass,
 } from './options';
 import type { ModifyMap } from '../App';
+import { findLayer, withLayer } from '../core/layers';
 import {
   deleteObject,
   findDoor,
@@ -67,21 +68,26 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
     );
   }
 
-  const door = selection.kind === 'door' ? findDoor(mapData, selection.id) : undefined;
-  const stairs = selection.kind === 'stairs' ? findStairs(mapData, selection.id) : undefined;
-  const prop = selection.kind === 'prop' ? findProp(mapData, selection.id) : undefined;
-  const label = selection.kind === 'label' ? findLabel(mapData, selection.id) : undefined;
+  const layer = findLayer(mapData, selection.layerId);
+  if (!layer) return null;
+  const door = selection.kind === 'door' ? findDoor(layer, selection.id) : undefined;
+  const stairs = selection.kind === 'stairs' ? findStairs(layer, selection.id) : undefined;
+  const prop = selection.kind === 'prop' ? findProp(layer, selection.id) : undefined;
+  const label = selection.kind === 'label' ? findLabel(layer, selection.id) : undefined;
+  // Edits apply to the selected object's own layer
+  const editLayer = (edit: Parameters<typeof withLayer>[2], options?: Parameters<ModifyMap>[1]) =>
+    onModifyMap((draft) => withLayer(draft, layer.id, edit), options);
 
   const setLabel = (changes: Partial<PlacedLabel>) => {
     if (!label) return;
-    onModifyMap((draft) => replaceLabel(draft, { ...label, ...changes }), {
+    editLayer((draft) => replaceLabel(draft, { ...label, ...changes }), {
       coalesce: `label-${label.id}-${Object.keys(changes).join()}`,
     });
   };
 
   const setStairs = (changes: Partial<PlacedStairs>) => {
     if (!stairs) return;
-    onModifyMap((draft) => replaceStairs(draft, { ...stairs, ...changes }), {
+    editLayer((draft) => replaceStairs(draft, { ...stairs, ...changes }), {
       coalesce: `stairs-${stairs.id}-${Object.keys(changes).join()}`,
     });
   };
@@ -97,7 +103,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
           {DOOR_TYPES.map((type) => (
             <button
               key={type}
-              onClick={() => onModifyMap((draft) => replaceDoor(draft, { ...door, type }))}
+              onClick={() => editLayer((draft) => replaceDoor(draft, { ...door, type }))}
               className={optionButtonClass(door.type === type)}
             >
               {type}
@@ -154,7 +160,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
           {PROP_TYPES.map((type) => (
             <button
               key={type}
-              onClick={() => onModifyMap((draft) => replaceProp(draft, { ...prop, type }))}
+              onClick={() => editLayer((draft) => replaceProp(draft, { ...prop, type }))}
               className={optionButtonClass(prop.type === type)}
             >
               {type}

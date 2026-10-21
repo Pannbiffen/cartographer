@@ -1,8 +1,10 @@
 import React from 'react';
 import type { ToolType, DoorType, PropType, FoliageType, LabelStyle, MapData, Selection, ThemeType } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
-import { DOOR_TYPES, FIELD_CLASS, LABEL_STYLES, PROP_TYPES, THEME_NAMES, TOOLS, optionButtonClass } from './options';
+import { ArrowDown, ArrowUp, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
+import { DOOR_TYPES, BUTTON_CLASS, FIELD_CLASS, LABEL_STYLES, PROP_TYPES, THEME_NAMES, TOOLS, optionButtonClass } from './options';
 import type { ModifyMap } from '../App';
+import { findLayer, withLayer } from '../core/layers';
 
 interface DockPanelProps {
   activeTool: ToolType;
@@ -20,6 +22,11 @@ interface DockPanelProps {
   onClearSelection: () => void;
   mapData: MapData;
   onModifyMap: ModifyMap;
+  activeLayerId: string;
+  onSelectLayer: (id: string) => void;
+  onAddLayer: () => void;
+  onDeleteLayer: () => void;
+  onMoveLayer: (delta: 1 | -1) => void;
 }
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -80,6 +87,122 @@ const Choices = <T extends string>({
   </div>
 );
 
+const ICON_BUTTON_CLASS = `${BUTTON_CLASS} flex items-center justify-center`;
+
+// Layer list (top layer first) with show/lock toggles, plus the active layer's settings
+const LayersSection: React.FC<
+  Pick<
+    DockPanelProps,
+    'mapData' | 'onModifyMap' | 'activeLayerId' | 'onSelectLayer' | 'onAddLayer' | 'onDeleteLayer' | 'onMoveLayer'
+  >
+> = ({ mapData, onModifyMap, activeLayerId, onSelectLayer, onAddLayer, onDeleteLayer, onMoveLayer }) => {
+  const active = findLayer(mapData, activeLayerId);
+  const index = active ? mapData.layers.indexOf(active) : -1;
+  const editLayer = (id: string, edit: Parameters<typeof withLayer>[2], coalesce?: string) =>
+    onModifyMap((draft) => withLayer(draft, id, edit), coalesce ? { coalesce } : undefined);
+
+  return (
+    <Section title="Layers">
+      <ul aria-label="Layers" className="border border-ui-border rounded-sm bg-ui-field">
+        {[...mapData.layers].reverse().map((layer) => {
+          const isActive = layer.id === activeLayerId;
+          const toggleClass = `p-1 rounded-sm ${isActive ? 'hover:bg-ui-accent-dark' : 'hover:bg-ui-hover'}`;
+          return (
+            <li
+              key={layer.id}
+              className={`flex items-center gap-0.5 px-0.5 ${isActive ? 'bg-ui-accent text-white' : ''}`}
+            >
+              <button
+                aria-label={`${layer.visible ? 'Hide' : 'Show'} ${layer.name}`}
+                title={layer.visible ? 'Hide layer' : 'Show layer'}
+                onClick={() => editLayer(layer.id, (l) => { l.visible = !l.visible; })}
+                className={toggleClass}
+              >
+                {layer.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 opacity-60" />}
+              </button>
+              <button
+                aria-label={`${layer.locked ? 'Unlock' : 'Lock'} ${layer.name}`}
+                title={layer.locked ? 'Unlock layer' : 'Lock layer'}
+                onClick={() => editLayer(layer.id, (l) => { l.locked = !l.locked; })}
+                className={toggleClass}
+              >
+                {layer.locked ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5 opacity-40" />}
+              </button>
+              <button
+                aria-pressed={isActive}
+                onClick={() => onSelectLayer(layer.id)}
+                className={`flex-1 min-w-0 truncate text-left px-1 py-1 ${layer.visible ? '' : 'opacity-60'}`}
+              >
+                {layer.name || 'Untitled layer'}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="grid grid-cols-4 gap-1">
+        <button aria-label="New layer" title="New layer" onClick={onAddLayer} className={ICON_BUTTON_CLASS}>
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+        <button
+          aria-label="Move layer up"
+          title="Move layer up"
+          disabled={index >= mapData.layers.length - 1}
+          onClick={() => onMoveLayer(1)}
+          className={ICON_BUTTON_CLASS}
+        >
+          <ArrowUp className="w-3.5 h-3.5" />
+        </button>
+        <button
+          aria-label="Move layer down"
+          title="Move layer down"
+          disabled={index <= 0}
+          onClick={() => onMoveLayer(-1)}
+          className={ICON_BUTTON_CLASS}
+        >
+          <ArrowDown className="w-3.5 h-3.5" />
+        </button>
+        <button
+          aria-label="Delete layer"
+          title="Delete layer"
+          disabled={mapData.layers.length <= 1}
+          onClick={onDeleteLayer}
+          className={`${ICON_BUTTON_CLASS} text-ui-danger`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {active && (
+        <>
+          <label className="flex flex-col gap-0.5">
+            <span>Name</span>
+            <input
+              type="text"
+              aria-label="Layer name"
+              value={active.name}
+              onChange={(e) => editLayer(active.id, (l) => { l.name = e.target.value; }, `layer-name-${active.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur();
+              }}
+              className={FIELD_CLASS}
+            />
+          </label>
+          <Slider
+            label="Layer opacity"
+            value={active.opacity}
+            display={`${Math.round(active.opacity * 100)}%`}
+            min={0.1}
+            max={1}
+            step={0.05}
+            onChange={(v) => editLayer(active.id, (l) => { l.opacity = v; }, `layer-opacity-${active.id}`)}
+          />
+        </>
+      )}
+    </Section>
+  );
+};
+
 // Properties panel docked to the right of the canvas
 export const DockPanel: React.FC<DockPanelProps> = ({
   activeTool,
@@ -97,6 +220,11 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onClearSelection,
   mapData,
   onModifyMap,
+  activeLayerId,
+  onSelectLayer,
+  onAddLayer,
+  onDeleteLayer,
+  onMoveLayer,
 }) => {
   const toolLabel = TOOLS.find((t) => t.id === activeTool)?.label ?? 'Tool';
   const usesBrushSize =
@@ -162,6 +290,16 @@ export const DockPanel: React.FC<DockPanelProps> = ({
           </p>
         )}
       </Section>
+
+      <LayersSection
+        mapData={mapData}
+        onModifyMap={onModifyMap}
+        activeLayerId={activeLayerId}
+        onSelectLayer={onSelectLayer}
+        onAddLayer={onAddLayer}
+        onDeleteLayer={onDeleteLayer}
+        onMoveLayer={onMoveLayer}
+      />
 
       <Section title="Map">
         <label className="flex flex-col gap-0.5">

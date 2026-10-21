@@ -27,6 +27,7 @@ export type SelectableKind = 'door' | 'stairs' | 'prop' | 'label';
 export interface Selection {
   kind: SelectableKind;
   id: string;
+  layerId: string;
 }
 
 export interface GridCoord {
@@ -69,15 +70,8 @@ export interface PlacedLabel {
   style?: LabelStyle; // missing in older maps: 'text'
 }
 
-export interface MapData {
-  version: number;
-  title: string;
-  gridSize: number; // pixels per grid cell (e.g. 40)
-  theme: ThemeType;
-  showGrid: boolean;
-  gridOpacity: number;
-  hatchDensity: number; // 1 to 5
-  hatchLength: number; // pixels
+/** Everything drawn on one layer */
+export interface LayerContent {
   rooms: { [key: string]: boolean }; // "x,y" => true for carved floor cells
   water: { [key: string]: boolean }; // "x,y" => true for water cells
   foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
@@ -85,6 +79,26 @@ export interface MapData {
   stairs: PlacedStairs[];
   props: PlacedProp[];
   labels: PlacedLabel[];
+}
+
+export interface MapLayer extends LayerContent {
+  id: string;
+  name: string;
+  visible: boolean;
+  locked: boolean; // locked layers can't be drawn on or selected from
+  opacity: number; // 0 to 1
+}
+
+export interface MapData {
+  version: number; // 2 since layers; version 1 kept one layer's content at the top level
+  title: string;
+  gridSize: number; // pixels per grid cell (e.g. 40)
+  theme: ThemeType;
+  showGrid: boolean;
+  gridOpacity: number;
+  hatchDensity: number; // 1 to 5
+  hatchLength: number; // pixels
+  layers: MapLayer[]; // bottom to top; never empty
 }
 
 export interface ViewportTransform {

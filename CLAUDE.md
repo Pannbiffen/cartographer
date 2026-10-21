@@ -18,7 +18,8 @@ Inspired by Dungeon Scrawl: match its features, never copy its code, art or asse
 - `src/core/viewport.ts`: zoom limits, map bounds and zoom-to-fit.
 - `src/canvas/MapCanvas.tsx`: pointer input, tools, previews.
 - `src/core/renderers/mapRenderer.ts`: the single renderer used by canvas and all exports.
-- `src/core/objects.ts`: doors/stairs/props/labels: hit testing, selection, edits. Replace objects; never mutate them (history shares them).
+- `src/core/layers.ts`: map content lives in `map.layers` (bottom to top); map-wide settings stay on `MapData`. Edit a layer in a mutator with `withLayer(draft, id, ...)`; tools use the active layer and skip hidden/locked ones. Loading goes through `normalizeLoadedMap`, which also upgrades version 1 files (content at the top level).
+- `src/core/objects.ts`: doors/stairs/props/labels: hit testing, selection (carries its `layerId`), edits. Replace objects; never mutate them (history shares them).
 - `src/core/tools/toolGeometry.ts`: brush, tunnel and door-edge geometry.
 - `src/core/export/`: PNG/WebP, tiled PDF, Universal VTT.
 

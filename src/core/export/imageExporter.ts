@@ -4,6 +4,7 @@ import { THEMES } from '../theme';
 import { renderMap } from '../renderers/mapRenderer';
 import { jsPDF } from 'jspdf';
 import { exportUniversalVtt } from './vttExporter';
+import { visibleLayers } from '../layers';
 
 export interface BoundingBox {
   minX: number;
@@ -17,36 +18,28 @@ export interface BoundingBox {
 export function computeMapBounds(mapData: MapData, margin: number = 2): BoundingBox {
   const coords: { x: number; y: number }[] = [];
 
-  for (const key of Object.keys(mapData.rooms)) {
-    if (mapData.rooms[key]) {
-      const [x, y] = key.split(',').map(Number);
-      coords.push({ x, y });
+  // Hidden layers are left out of exports
+  for (const layer of visibleLayers(mapData)) {
+    for (const cells of [layer.rooms, layer.water, layer.foliage]) {
+      for (const key of Object.keys(cells)) {
+        if (!cells[key]) continue;
+        const [x, y] = key.split(',').map(Number);
+        coords.push({ x, y });
+      }
     }
-  }
-  for (const key of Object.keys(mapData.water)) {
-    if (mapData.water[key]) {
-      const [x, y] = key.split(',').map(Number);
-      coords.push({ x, y });
+    for (const door of layer.doors) {
+      coords.push({ x: door.x, y: door.y });
     }
-  }
-  for (const key of Object.keys(mapData.foliage)) {
-    if (mapData.foliage[key]) {
-      const [x, y] = key.split(',').map(Number);
-      coords.push({ x, y });
+    for (const stairs of layer.stairs) {
+      coords.push({ x: stairs.x, y: stairs.y });
+      coords.push({ x: stairs.x + stairs.width - 1, y: stairs.y + stairs.height - 1 });
     }
-  }
-  for (const door of mapData.doors) {
-    coords.push({ x: door.x, y: door.y });
-  }
-  for (const stairs of mapData.stairs) {
-    coords.push({ x: stairs.x, y: stairs.y });
-    coords.push({ x: stairs.x + stairs.width - 1, y: stairs.y + stairs.height - 1 });
-  }
-  for (const prop of mapData.props) {
-    coords.push({ x: prop.x, y: prop.y });
-  }
-  for (const label of mapData.labels) {
-    coords.push({ x: Math.floor(label.x), y: Math.floor(label.y) });
+    for (const prop of layer.props) {
+      coords.push({ x: prop.x, y: prop.y });
+    }
+    for (const label of layer.labels) {
+      coords.push({ x: Math.floor(label.x), y: Math.floor(label.y) });
+    }
   }
 
   if (coords.length === 0) {

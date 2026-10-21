@@ -35,16 +35,23 @@ test('exports WebP images and tiled PDFs', async ({ page }) => {
   expect(text.match(/\/Type \/Page\b(?!s)/g)).toHaveLength(8);
 });
 
-test('project files round-trip and old files without labels still load', async ({ page }) => {
+test('project files round-trip and version 1 files without layers or labels still load', async ({ page }) => {
   await openApp(page);
   const map = await saveMap(page);
-  const { labels: _labels, ...legacy } = map;
+  const { layers, ...settings } = map;
+  const { rooms, water, foliage, doors, stairs, props } = layers[0];
+  const legacy = { ...settings, version: 1, title: 'Legacy Map', rooms, water, foliage, doors, stairs, props };
 
   await page.locator('input[type=file]').setInputFiles({
     name: 'old.dndmap',
     mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify({ ...legacy, title: 'Legacy Map' })),
+    buffer: Buffer.from(JSON.stringify(legacy)),
   });
   await expect(page.getByLabel('Map title')).toHaveValue('Legacy Map');
-  expect((await saveMap(page)).labels).toEqual([]);
+  const loaded = await saveMap(page);
+  expect(loaded.version).toBe(2);
+  expect(loaded.layers).toHaveLength(1);
+  expect(loaded.layers[0]).toMatchObject({ name: 'Dungeon', visible: true, locked: false, opacity: 1, labels: [] });
+  expect(loaded.layers[0].doors).toEqual(doors);
+  expect(loaded).not.toHaveProperty('rooms');
 });
