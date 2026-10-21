@@ -1,7 +1,7 @@
 import React from 'react';
-import type { ToolType, DoorType, PropType, FoliageType, MapData, Selection, ThemeType } from '../types/map';
+import type { ToolType, DoorType, PropType, FoliageType, LabelStyle, MapData, Selection, ThemeType } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
-import { DOOR_TYPES, FIELD_CLASS, PROP_TYPES, THEME_NAMES, TOOLS, optionButtonClass } from './options';
+import { DOOR_TYPES, FIELD_CLASS, LABEL_STYLES, PROP_TYPES, THEME_NAMES, TOOLS, optionButtonClass } from './options';
 import type { ModifyMap } from '../App';
 
 interface DockPanelProps {
@@ -14,6 +14,8 @@ interface DockPanelProps {
   onPropTypeChange: (type: PropType) => void;
   selectedFoliageType: FoliageType;
   onFoliageTypeChange: (type: FoliageType) => void;
+  labelStyle: LabelStyle;
+  onLabelStyleChange: (style: LabelStyle) => void;
   selection: Selection | null;
   onClearSelection: () => void;
   mapData: MapData;
@@ -89,6 +91,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onPropTypeChange,
   selectedFoliageType,
   onFoliageTypeChange,
+  labelStyle,
+  onLabelStyleChange,
   selection,
   onClearSelection,
   mapData,
@@ -105,14 +109,20 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   return (
     <aside aria-label="Properties" className="w-64 shrink-0 bg-ui border-l border-ui-border overflow-y-auto text-ui-text">
       <Section title={toolLabel}>
+        {activeTool === 'label' && (
+          <Choices label="New labels" options={LABEL_STYLES} value={labelStyle} columns={3} onChange={onLabelStyleChange} />
+        )}
         {(activeTool === 'select' || activeTool === 'label') && (
           <SelectionInspector
             mapData={mapData}
             selection={selection}
-            focusLabelText={activeTool === 'label'}
+            // Room numbers fill themselves in, so keep clicking instead of typing
+            focusLabelText={activeTool === 'label' && labelStyle === 'text'}
             hint={
               activeTool === 'label'
-                ? 'Click the map to place a label, or click a label to edit or drag it.'
+                ? labelStyle === 'text'
+                  ? 'Click the map to place a label, or click a label to edit or drag it.'
+                  : 'Click the map to place the next room number (1, 2, 3...).'
                 : undefined
             }
             onModifyMap={onModifyMap}

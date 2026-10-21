@@ -19,6 +19,9 @@ export type FoliageType = 'tree' | 'bush' | 'rock';
 
 export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome';
 
+// Plain text, or a room number keyed in a circle or box
+export type LabelStyle = 'text' | 'circle' | 'box';
+
 export type SelectableKind = 'door' | 'stairs' | 'prop' | 'label';
 
 export interface Selection {
@@ -63,6 +66,7 @@ export interface PlacedLabel {
   y: number;
   text: string;
   size: number; // font size in map pixels
+  style?: LabelStyle; // missing in older maps: 'text'
 }
 
 export interface MapData {

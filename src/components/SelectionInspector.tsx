@@ -3,6 +3,7 @@ import type { MapData, PlacedLabel, PlacedStairs, Selection } from '../types/map
 import {
   DOOR_TYPES,
   LABEL_SIZES,
+  LABEL_STYLES,
   PROP_TYPES,
   STAIR_DIRECTIONS,
   BUTTON_CLASS,
@@ -182,6 +183,18 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
                 className={optionButtonClass(label.size === size)}
               >
                 {name}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            {LABEL_STYLES.map((style) => (
+              <button
+                key={style}
+                aria-label={`${style} style`}
+                onClick={() => setLabel({ style })}
+                className={optionButtonClass((label.style ?? 'text') === style)}
+              >
+                {style}
               </button>
             ))}
           </div>

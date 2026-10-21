@@ -16,6 +16,7 @@
 - **Pen & Parchment Aesthetic**: Hand-drawn style ink walls, exterior crosshatching, and four themes (Parchment, Blueprint, Slate, Monochrome).
 - **Select & Edit**: Select doors, stairs, props and labels to move, rotate, retype or delete them.
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.
+- **Room Numbers**: Keyed-dungeon markers in a circle or box that count up (1, 2, 3...) as you place them.
 - **Room Tools**: Freehand room brush, click-drag rectangle rooms, and click-drag L-shaped corridors.
 - **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.

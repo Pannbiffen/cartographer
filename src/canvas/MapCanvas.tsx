@@ -6,12 +6,14 @@ import type {
   PropType,
   FoliageType,
   GridCoord,
+  LabelStyle,
   Selection,
   ViewportTransform,
 } from '../types/map';
 import { THEMES } from '../core/theme';
 import { MAX_ZOOM, MIN_ZOOM } from '../core/viewport';
 import { renderMap } from '../core/renderers/mapRenderer';
+import { nextRoomNumber } from '../core/renderers/labelRenderer';
 import {
   brushCells,
   rectCells,
@@ -42,6 +44,7 @@ interface MapCanvasProps {
   selectedDoorType: DoorType;
   selectedPropType: PropType;
   selectedFoliageType: FoliageType;
+  labelStyle: LabelStyle;
   viewport: ViewportTransform;
   onViewportChange: React.Dispatch<React.SetStateAction<ViewportTransform>>;
   // Reports the canvas size in CSS pixels whenever it changes
@@ -74,6 +77,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedDoorType,
   selectedPropType,
   selectedFoliageType,
+  labelStyle,
   viewport,
   onViewportChange,
   onResize,
@@ -448,14 +452,17 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         };
         return;
       }
+      // Room-number markers count up from the highest number on the map
       const id = newObjectId('label');
+      const text = labelStyle === 'text' ? 'New label' : String(nextRoomNumber(mapData.labels));
       onModifyMap((draft) => {
         draft.labels.push({
           id,
           x: hover.worldX / mapData.gridSize,
           y: hover.worldY / mapData.gridSize,
-          text: 'New label',
+          text,
           size: 20,
+          style: labelStyle,
         });
       });
       onSelect({ kind: 'label', id });

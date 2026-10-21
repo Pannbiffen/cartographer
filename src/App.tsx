@@ -5,6 +5,7 @@ import type {
   DoorType,
   PropType,
   FoliageType,
+  LabelStyle,
   ViewportTransform,
   MapHistoryState,
   Selection,
@@ -174,6 +175,7 @@ export function App() {
   const [selectedDoorType, setSelectedDoorType] = useState<DoorType>('standard');
   const [selectedPropType, setSelectedPropType] = useState<PropType>('pillar');
   const [selectedFoliageType, setSelectedFoliageType] = useState<FoliageType>('tree');
+  const [labelStyle, setLabelStyle] = useState<LabelStyle>('text');
 
   const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, zoom: 1 });
   // Canvas size in CSS pixels, known after its first layout
@@ -606,6 +608,7 @@ export function App() {
             selectedDoorType={selectedDoorType}
             selectedPropType={selectedPropType}
             selectedFoliageType={selectedFoliageType}
+            labelStyle={labelStyle}
             viewport={viewport}
             onViewportChange={setViewport}
             onResize={setCanvasSize}
@@ -627,6 +630,8 @@ export function App() {
             onPropTypeChange={setSelectedPropType}
             selectedFoliageType={selectedFoliageType}
             onFoliageTypeChange={setSelectedFoliageType}
+            labelStyle={labelStyle}
+            onLabelStyleChange={setLabelStyle}
             selection={activeSelection}
             onClearSelection={() => setSelection(null)}
             mapData={mapData}

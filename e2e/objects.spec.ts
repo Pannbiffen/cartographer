@@ -75,3 +75,24 @@ test('labels can be placed, typed, resized and dragged', async ({ page }) => {
   const map = await saveMap(page);
   expect(map.labels.at(-1)).toMatchObject({ text: 'Throne Room', size: 30, x: -11.5, y: -2.5 });
 });
+
+test('room-number markers count up and can switch style', async ({ page }) => {
+  await openApp(page);
+  await page.keyboard.press('l');
+  await page.getByRole('button', { name: 'circle', exact: true }).click();
+  await clickCell(page, -12, -5);
+  await clickCell(page, -10, -5);
+  await page.getByRole('button', { name: 'box', exact: true }).click();
+  await clickCell(page, -8, -5);
+  // A select-tool click on a marker can restyle it
+  await page.keyboard.press('v');
+  await clickCell(page, -12, -5);
+  await page.getByRole('button', { name: 'text style' }).click();
+
+  const map = await saveMap(page);
+  expect(map.labels.slice(2).map(({ text, style }) => ({ text, style }))).toEqual([
+    { text: '1', style: 'text' },
+    { text: '2', style: 'circle' },
+    { text: '3', style: 'box' },
+  ]);
+});

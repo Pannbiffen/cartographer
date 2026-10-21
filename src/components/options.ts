@@ -13,7 +13,7 @@ import {
   Type,
   Waves,
 } from 'lucide-react';
-import type { DoorType, PlacedStairs, PropType, ThemeType, ToolType } from '../types/map';
+import type { DoorType, LabelStyle, PlacedStairs, PropType, ThemeType, ToolType } from '../types/map';
 
 export interface ToolInfo {
   id: ToolType;
@@ -58,6 +58,7 @@ export const LABEL_SIZES: [string, number][] = [
   ['medium', 20],
   ['large', 30],
 ];
+export const LABEL_STYLES: LabelStyle[] = ['text', 'circle', 'box'];
 export const STAIR_DIRECTIONS: PlacedStairs['direction'][] = ['up', 'down', 'left', 'right'];
 
 // A plain push button
