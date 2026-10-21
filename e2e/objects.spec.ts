@@ -88,7 +88,15 @@ test('arrow keys nudge the selected object instead of panning', async ({ page })
   expect(label.x).toBeCloseTo(-12);
   expect(label.y).toBeCloseTo(-5.5);
 
-  // With nothing selected the arrows pan again
+  // Escape closes an open dialog first and keeps the selection...
+  await page.keyboard.press('?');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.keyboard.press('ArrowRight');
+  map = await saveMap(page);
+  expect(map.layers[0].labels.at(-1)!.x).toBeCloseTo(-11.5);
+
+  // ...then clears it, and with nothing selected the arrows pan again
   await page.keyboard.press('Escape');
   await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(150);

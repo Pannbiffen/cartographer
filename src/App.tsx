@@ -478,17 +478,9 @@ export function App() {
       }
       if (e.altKey) return;
 
-      // Selection editing with the select tool
+      // Selection editing with the select tool (open dialogs take Escape first)
       if (key === 'escape') {
-        if (isExportOpen || isPreferencesOpen || isShareOpen || isShortcutsOpen || pendingReplace) {
-          setIsExportOpen(false);
-          setIsPreferencesOpen(false);
-          setIsShareOpen(false);
-          setIsShortcutsOpen(false);
-          setPendingReplace(null);
-        } else {
-          setSelection(null);
-        }
+        setSelection(null);
         return;
       }
       if (key === '?') {
@@ -550,11 +542,6 @@ export function App() {
     chooseTool,
     activeSelection,
     activeTool,
-    isExportOpen,
-    isPreferencesOpen,
-    isShareOpen,
-    isShortcutsOpen,
-    pendingReplace,
   ]);
 
   // Procedural generators replace the active layer's content
