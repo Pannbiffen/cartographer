@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import type { MapData } from '../types/map';
-import { exportToImage, exportToVtt, exportToPdf, triggerDownload } from '../core/export/imageExporter';
-import type { ImageFormat, PaperSize } from '../core/export/imageExporter';
+import { exportToImage, exportToVtt, triggerDownload } from '../core/export/imageExporter';
+import type { ImageFormat } from '../core/export/imageExporter';
+import type { PdfLayout, PaperSize } from '../core/export/pdfExporter';
 import { Dialog, DialogGroup } from './Dialog';
 import { BUTTON_CLASS, FIELD_CLASS } from './options';
 
@@ -17,6 +18,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
   const [copiedVtt, setCopiedVtt] = useState<boolean>(false);
   const [format, setFormat] = useState<ImageFormat>('png');
   const [paper, setPaper] = useState<PaperSize>('a4');
+  // The PDF library loads on first use, which can take a moment
+  const [pdfBusy, setPdfBusy] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -30,8 +33,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
     setTimeout(() => setCopiedVtt(false), 2500);
   };
 
-  const handleExportPdf = (layout: 'fit' | 'tiled') => {
-    exportToPdf(mapData, includeGrid, layout, paper);
+  const handleExportPdf = async (layout: PdfLayout) => {
+    setPdfBusy(true);
+    try {
+      const { exportToPdf } = await import('../core/export/pdfExporter');
+      exportToPdf(mapData, includeGrid, layout, paper);
+    } catch {
+      alert('Could not load the PDF exporter. Check your connection and try again.');
+    } finally {
+      setPdfBusy(false);
+    }
   };
 
   const handleExportJson = () => {
@@ -96,11 +107,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
           </select>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => handleExportPdf('fit')} className={`${BUTTON_CLASS} text-left`}>
+          <button
+            onClick={() => handleExportPdf('fit')}
+            disabled={pdfBusy}
+            className={`${BUTTON_CLASS} text-left`}>
             <div>Fit to one page</div>
             <div className="text-ui-muted">Overview handout</div>
           </button>
-          <button onClick={() => handleExportPdf('tiled')} className={`${BUTTON_CLASS} text-left`}>
+          <button
+            onClick={() => handleExportPdf('tiled')}
+            disabled={pdfBusy}
+            className={`${BUTTON_CLASS} text-left`}>
             <div>True scale (1&quot; squares)</div>
             <div className="text-ui-muted">Tiled for minis</div>
           </button>
