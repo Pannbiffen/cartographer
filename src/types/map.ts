@@ -9,6 +9,7 @@ export type ToolType =
   | 'stairs' 
   | 'prop' 
   | 'label'
+  | 'light'
   | 'eraser';
 
 export type DoorType = 'standard' | 'double' | 'secret' | 'portcullis' | 'archway';
@@ -29,7 +30,7 @@ export type WallStyle = 'bold' | 'fine' | 'rough';
 // Plain text, or a room number keyed in a circle or box
 export type LabelStyle = 'text' | 'circle' | 'box';
 
-export type SelectableKind = 'door' | 'stairs' | 'prop' | 'label';
+export type SelectableKind = 'door' | 'stairs' | 'prop' | 'label' | 'light';
 
 export interface Selection {
   kind: SelectableKind;
@@ -66,6 +67,20 @@ export interface PlacedProp {
   y: number; // grid y
   type: PropType;
   rotation: number; // 0, 90, 180, 270
+  light?: LightSettings; // torches only; missing means the default torch light
+}
+
+export interface LightSettings {
+  color: string; // #rrggbb
+  radius: number; // in cells
+  intensity: number; // 0 to 1: how much of the darkness it lifts at its centre
+}
+
+/** A light source on its own, shining from the centre of a cell */
+export interface PlacedLight extends LightSettings {
+  id: string;
+  x: number; // grid x
+  y: number; // grid y
 }
 
 export interface PlacedLabel {
@@ -87,6 +102,7 @@ export interface LayerContent {
   stairs: PlacedStairs[];
   props: PlacedProp[];
   labels: PlacedLabel[];
+  lights: PlacedLight[];
 }
 
 export interface MapLayer extends LayerContent {
@@ -108,6 +124,8 @@ export interface MapData {
   hatchLength: number; // pixels
   hatchStyle: HatchStyle;
   wallStyle: WallStyle;
+  lighting: boolean; // darken the map so lights and torches show
+  darkness: number; // 0 to 1, away from any light
   layers: MapLayer[]; // bottom to top; never empty
 }
 

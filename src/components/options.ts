@@ -4,6 +4,7 @@ import {
   DoorOpen,
   Eraser,
   Footprints,
+  Lightbulb,
   Milestone,
   MousePointer2,
   Paintbrush,
@@ -43,8 +44,14 @@ export const TOOLS: ToolInfo[] = [
   { id: 'stairs', label: 'Stairs', icon: Footprints, shortcut: 'S' },
   { id: 'prop', label: 'Dungeon Props', icon: Sparkles, shortcut: 'P' },
   { id: 'label', label: 'Text Label', icon: Type, shortcut: 'L' },
+  { id: 'light', label: 'Light', icon: Lightbulb, shortcut: 'I' },
   { id: 'eraser', label: 'Eraser', icon: Eraser, shortcut: 'E' },
 ];
+
+/** Tools that keep, and edit, the current selection */
+export function keepsSelection(tool: ToolType): boolean {
+  return tool === 'select' || tool === 'label' || tool === 'light';
+}
 
 export const THEME_NAMES: [ThemeType, string][] = [
   ['parchment', 'Parchment'],

@@ -15,7 +15,7 @@ import { MenuBar, type Menu } from './components/MenuBar';
 import { Toolbar } from './components/Toolbar';
 import { Toolbox } from './components/Toolbox';
 import { DockPanel } from './components/DockPanel';
-import { TOOLS } from './components/options';
+import { TOOLS, keepsSelection } from './components/options';
 import { MapCanvas } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
@@ -114,6 +114,8 @@ function createDefaultStarterMap(): MapData {
     hatchLength: 14,
     hatchStyle: 'dyson',
     wallStyle: 'bold',
+    lighting: false,
+    darkness: 0.75,
     layers: [
       newLayer('layer1', 'Dungeon', {
         rooms,
@@ -195,7 +197,7 @@ export function App() {
 
   const chooseTool = useCallback((tool: ToolType) => {
     setActiveTool(tool);
-    if (tool !== 'select' && tool !== 'label') setSelection(null);
+    if (!keepsSelection(tool)) setSelection(null);
   }, []);
   const [brushSize, setBrushSize] = useState<number>(1);
   const [selectedDoorType, setSelectedDoorType] = useState<DoorType>('standard');
@@ -415,7 +417,7 @@ export function App() {
         handleZoomOut();
         return;
       }
-      if (activeSelection && (activeTool === 'select' || activeTool === 'label')) {
+      if (activeSelection && keepsSelection(activeTool)) {
         if (key === 'delete' || key === 'backspace') {
           e.preventDefault();
           modifyMap((draft) => deleteObject(draft, activeSelection));
@@ -512,7 +514,7 @@ export function App() {
   const handleMoveLayer = (delta: 1 | -1) => modifyMap((draft) => moveLayer(draft, activeLayerId, delta));
   const activeLayerIndex = mapData.layers.indexOf(activeLayer);
 
-  const selectionEditable = activeSelection !== null && (activeTool === 'select' || activeTool === 'label');
+  const selectionEditable = activeSelection !== null && keepsSelection(activeTool);
   const menus: Menu[] = [
     {
       label: 'File',

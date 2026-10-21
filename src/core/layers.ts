@@ -2,7 +2,7 @@
 import type { LayerContent, MapData, MapLayer } from '../types/map';
 
 export function emptyContent(): LayerContent {
-  return { rooms: {}, floors: {}, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [] };
+  return { rooms: {}, floors: {}, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [], lights: [] };
 }
 
 export function newLayer(id: string, name: string, content: Partial<LayerContent> = {}): MapLayer {
@@ -33,6 +33,7 @@ export function cloneLayer(layer: MapLayer): MapLayer {
     stairs: [...layer.stairs],
     props: [...layer.props],
     labels: [...layer.labels],
+    lights: [...layer.lights],
   };
 }
 
@@ -106,6 +107,7 @@ function normalizeLayer(stored: StoredLayer, index: number): MapLayer {
     stairs: stored.stairs ?? [],
     props: stored.props ?? [],
     labels: stored.labels ?? [],
+    lights: stored.lights ?? [],
   };
 }
 

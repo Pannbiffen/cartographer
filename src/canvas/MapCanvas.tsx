@@ -15,6 +15,8 @@ import type {
 import { THEMES } from '../core/theme';
 import { MAX_ZOOM, MIN_ZOOM } from '../core/viewport';
 import { renderMap } from '../core/renderers/mapRenderer';
+import { renderLightMarkers } from '../core/renderers/lightingRenderer';
+import { DEFAULT_LIGHT } from '../core/lighting';
 import { nextRoomNumber } from '../core/renderers/labelRenderer';
 import {
   brushCells,
@@ -34,6 +36,7 @@ import {
   objectBounds,
   replaceDoor,
   replaceLabel,
+  replaceLight,
   replaceProp,
   replaceStairs,
 } from '../core/objects';
@@ -164,6 +167,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       maxY: Math.ceil((height - viewport.y) / viewport.zoom / gridSize) + 1,
     });
 
+    renderLightMarkers(ctx, mapData, viewport.zoom, theme.ink);
+
     // Live cursor & drag previews
     const hover = currentHoverRef.current;
     if (
@@ -171,7 +176,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       layerEditable &&
       !isPanningRef.current &&
       activeTool !== 'select' &&
-      activeTool !== 'label'
+      activeTool !== 'label' &&
+      activeTool !== 'light'
     ) {
       ctx.save();
       ctx.strokeStyle = theme.ink;
@@ -357,6 +363,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
               draft.doors = draft.doors.filter((d) => !doorTouchesCell(d, gx, gy));
               draft.stairs = draft.stairs.filter((s) => !stairsContainCell(s, gx, gy));
               draft.props = draft.props.filter((p) => p.x !== gx || p.y !== gy);
+              draft.lights = draft.lights.filter((l) => l.x !== gx || l.y !== gy);
               draft.labels = draft.labels.filter(
                 (l) => Math.floor(l.x) !== gx || Math.floor(l.y) !== gy
               );
@@ -419,6 +426,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       if (drag.sel.kind === 'stairs') {
         const s = draft.stairs.find((st) => st.id === drag.sel.id);
         if (s) replaceStairs(draft, { ...s, x, y });
+      } else if (drag.sel.kind === 'light') {
+        const l = draft.lights.find((li) => li.id === drag.sel.id);
+        if (l) replaceLight(draft, { ...l, x, y });
       } else {
         const p = draft.props.find((pr) => pr.id === drag.sel.id);
         if (p) replaceProp(draft, { ...p, x, y });
@@ -497,6 +507,28 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         });
       });
       onSelect({ kind: 'label', id, layerId: activeLayerId });
+    } else if (activeTool === 'light') {
+      // Clicking a light selects it for editing or dragging; elsewhere places one
+      const hit = hitTestObject(mapData, hover.worldX, hover.worldY);
+      if (hit?.kind === 'light') {
+        onSelect(hit);
+        strokeCountRef.current++;
+        moveDragRef.current = {
+          sel: hit,
+          startCell: { x: gx, y: gy },
+          startWorld: { x: hover.worldX, y: hover.worldY },
+          origin: { x: gx, y: gy },
+        };
+        return;
+      }
+      if (!layerEditable) return;
+      const id = newObjectId('light');
+      onModifyMap((draft) => {
+        withLayer(draft, activeLayerId, (layer) => layer.lights.push({ id, x: gx, y: gy, ...DEFAULT_LIGHT }));
+        // A light only shows on a darkened map
+        draft.lighting = true;
+      });
+      onSelect({ kind: 'light', id, layerId: activeLayerId });
     } else if (!layerEditable) {
       return;
     } else if (activeTool === 'room-rect' || activeTool === 'tunnel') {
@@ -563,6 +595,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       e.currentTarget.style.cursor = 'not-allowed';
     } else if (activeTool === 'label') {
       e.currentTarget.style.cursor = 'text';
+    } else if (activeTool === 'light') {
+      const overLight = hitTestObject(mapData, hover.worldX, hover.worldY)?.kind === 'light';
+      e.currentTarget.style.cursor = overLight ? 'move' : '';
     } else {
       e.currentTarget.style.cursor = '';
     }

@@ -11,6 +11,7 @@ import type {
   ThemeType,
 } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
+import { Slider } from './Slider';
 import { ArrowDown, ArrowUp, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
 import {
   DOOR_TYPES,
@@ -23,6 +24,7 @@ import {
   THEME_NAMES,
   TOOLS,
   WALL_STYLES,
+  keepsSelection,
   optionButtonClass,
 } from './options';
 import type { ModifyMap } from '../App';
@@ -58,32 +60,6 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
     <h2 className="px-2.5 py-1 bg-ui-sunken font-semibold text-ui-text border-b border-ui-border">{title}</h2>
     <div className="p-2.5 flex flex-col gap-2.5">{children}</div>
   </section>
-);
-
-const Slider: React.FC<{
-  label: string;
-  value: number;
-  display: string;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (value: number) => void;
-}> = ({ label, value, display, min, max, step = 1, onChange }) => (
-  <label className="flex flex-col gap-0.5">
-    <span className="flex justify-between">
-      <span>{label}</span>
-      <span className="tabular-nums text-ui-muted">{display}</span>
-    </span>
-    <input
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
-      className="w-full accent-ui-accent"
-    />
-  </label>
 );
 
 const Choices = <T extends string>({
@@ -288,7 +264,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         {activeTool === 'label' && (
           <Choices label="New labels" options={LABEL_STYLES} value={labelStyle} columns={3} onChange={onLabelStyleChange} />
         )}
-        {(activeTool === 'select' || activeTool === 'label') && (
+        {keepsSelection(activeTool) && (
           <SelectionInspector
             mapData={mapData}
             selection={selection}
@@ -299,7 +275,9 @@ export const DockPanel: React.FC<DockPanelProps> = ({
                 ? labelStyle === 'text'
                   ? 'Click the map to place a label, or click a label to edit or drag it.'
                   : 'Click the map to place the next room number (1, 2, 3...).'
-                : undefined
+                : activeTool === 'light'
+                  ? 'Click the map to place a light, or click a light to edit or drag it. Torch props shine too.'
+                  : undefined
             }
             onModifyMap={onModifyMap}
             onClearSelection={onClearSelection}
@@ -408,6 +386,27 @@ export const DockPanel: React.FC<DockPanelProps> = ({
           min={1}
           max={5}
           onChange={(v) => onModifyMap((draft) => { draft.hatchDensity = v; }, { coalesce: 'hatchDensity' })}
+        />
+      </Section>
+
+      <Section title="Lighting">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={mapData.lighting}
+            onChange={(e) => onModifyMap((draft) => { draft.lighting = e.target.checked; })}
+            className="accent-ui-accent"
+          />
+          <span>Darken map and show lights</span>
+        </label>
+        <Slider
+          label="Darkness"
+          value={mapData.darkness}
+          display={`${Math.round(mapData.darkness * 100)}%`}
+          min={0.2}
+          max={1}
+          step={0.05}
+          onChange={(v) => onModifyMap((draft) => { draft.darkness = v; }, { coalesce: 'darkness' })}
         />
       </Section>
 

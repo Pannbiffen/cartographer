@@ -2,6 +2,7 @@
 import type { MapData } from '../../types/map';
 import { extractWallSegments } from '../geometry/hatching';
 import { visibleLayers } from '../layers';
+import { mapLights } from '../lighting';
 
 export interface VttPoint {
   x: number;
@@ -97,20 +98,14 @@ export function exportUniversalVtt(
     }
   });
 
-  // Convert placed torches to VTT dynamic light sources
-  const lights: VttLight[] = layers
-    .flatMap((l) => l.props)
-    .filter((p) => p.type === 'torch')
-    .map((torch) => ({
-      position: {
-        x: torch.x - minX + 0.5,
-        y: torch.y - minY + 0.5,
-      },
-      range: 4, // 20ft torch radius in 5ft grid squares
-      color: 'ffffaa44',
-      intensity: 1.0,
-      shadows: true,
-    }));
+  // Placed lights and torches become VTT light sources, colour as AARRGGBB
+  const lights: VttLight[] = mapLights(mapData).map((light) => ({
+    position: { x: light.x - minX, y: light.y - minY },
+    range: light.radius,
+    color: `ff${light.color.slice(1)}`,
+    intensity: light.intensity,
+    shadows: true,
+  }));
 
   // Strip "data:image/png;base64," prefix if present
   const cleanImage = imageDataBase64.replace(/^data:image\/[a-z]+;base64,/, '');

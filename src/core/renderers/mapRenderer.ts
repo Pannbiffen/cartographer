@@ -13,6 +13,7 @@ import {
 import { renderDoor, renderStairs, renderProp } from './propsRenderer';
 import { renderLabel } from './labelRenderer';
 import { renderFloorTextures } from './floorRenderer';
+import { renderLighting } from './lightingRenderer';
 
 export interface GridRange {
   minX: number;
@@ -134,12 +135,14 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Ma
 /**
  * Draws all shown map layers in world coordinates (the caller sets up
  * pan/zoom and fills the background). Grid lines are drawn over `gridRange`
- * when given.
+ * when given. Pass `lighting: false` to leave out darkness and lights even
+ * when the map has them on (VTT exports light the map themselves).
  */
 export function renderMap(
   ctx: CanvasRenderingContext2D,
   mapData: MapData,
-  gridRange: GridRange | null
+  gridRange: GridRange | null,
+  { lighting = true }: { lighting?: boolean } = {}
 ) {
   const theme = THEMES[mapData.theme] || THEMES.parchment;
   const gridSize = mapData.gridSize;
@@ -171,6 +174,9 @@ export function renderMap(
     ctx.stroke();
     ctx.restore();
   }
+
+  // Darkness covers the grid too, but labels stay readable on top
+  if (lighting && mapData.lighting) renderLighting(ctx, mapData);
 
   // Labels of every layer sit above everything, including the grid
   for (const layer of layers) {

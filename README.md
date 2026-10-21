@@ -22,6 +22,7 @@
 - **Floor Textures**: Procedurally drawn flagstones, wooden planks, cobbles, tiles or dirt, chosen per room as you draw it.
 - **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
+- **Lighting**: Place lights with their own colour, radius and intensity; the rest of the map goes dark and walls cast shadows. Torches give off light too.
 - **Doors, Stairs & Props**: Doors snap to the nearest wall edge (standard, double, secret, portcullis, archway), stairs, pillars, chests, tables, altars, torches, barrels and sarcophagi.
 - **Procedural Generators**:
   - BSP Dungeon Generator (rooms + corridors)
@@ -29,7 +30,7 @@
   - Meandering river
 - **Export Capabilities**:
   - 🖼️ **Images**: PNG or WebP at 1x–4x resolution, with or without grid.
-  - 🎲 **Universal VTT (`.dd2vtt`)**: Line-of-sight walls, door portals and torch lights for Foundry VTT (via the Universal Battlemap Importer module), Fantasy Grounds Unity and other UVTT-compatible tools.
+  - 🎲 **Universal VTT (`.dd2vtt`)**: Line-of-sight walls, door portals and lights (placed lights and torches) for Foundry VTT (via the Universal Battlemap Importer module), Fantasy Grounds Unity and other UVTT-compatible tools.
   - 🖨️ **Printable PDF**: Fit the whole map on one page, or print at true scale (1 square = 1 inch) tiled across A4 or US Letter pages.
   - 💾 **Project Save/Load**: Save `.dndmap` JSON files locally and resume anytime.
 - **Zoom to Fit**: Maps open framed in the window, and `Ctrl + 0` brings the whole map back into view.
@@ -93,6 +94,7 @@ npm run preview
 | `S` | Stairs |
 | `P` | Props |
 | `L` | Text label |
+| `I` | Light |
 | `E` | Eraser |
 | `G` | Toggle grid |
 | `Ctrl + Z` / `Cmd + Z` | Undo |

@@ -1,10 +1,11 @@
-// Selectable map objects (doors, stairs, props, labels): hit testing, bounds and edits
+// Selectable map objects (doors, stairs, props, labels, lights): hit testing, bounds and edits
 import type {
   LayerContent,
   MapData,
   MapLayer,
   PlacedDoor,
   PlacedLabel,
+  PlacedLight,
   PlacedProp,
   PlacedStairs,
   Selection,
@@ -32,6 +33,9 @@ export function findProp(layer: LayerContent, id: string): PlacedProp | undefine
 export function findLabel(layer: LayerContent, id: string): PlacedLabel | undefined {
   return layer.labels.find((l) => l.id === id);
 }
+export function findLight(layer: LayerContent, id: string): PlacedLight | undefined {
+  return layer.lights.find((l) => l.id === id);
+}
 
 /** Label extent in grid units */
 function labelBounds(label: PlacedLabel, gridSize: number) {
@@ -45,19 +49,20 @@ function labelBounds(label: PlacedLabel, gridSize: number) {
 export function findSelected(
   map: MapData,
   sel: Selection | null
-): PlacedDoor | PlacedStairs | PlacedProp | PlacedLabel | undefined {
+): PlacedDoor | PlacedStairs | PlacedProp | PlacedLabel | PlacedLight | undefined {
   const layer = sel ? findLayer(map, sel.layerId) : undefined;
   if (!sel || !layer) return undefined;
   if (sel.kind === 'door') return findDoor(layer, sel.id);
   if (sel.kind === 'stairs') return findStairs(layer, sel.id);
   if (sel.kind === 'label') return findLabel(layer, sel.id);
+  if (sel.kind === 'light') return findLight(layer, sel.id);
   return findProp(layer, sel.id);
 }
 
 /**
  * Topmost object under a world position on a shown, unlocked layer. Labels
- * are drawn above every layer, so they are hit first; then doors, props and
- * stairs, from the top layer down.
+ * are drawn above every layer, so they are hit first; then doors, lights,
+ * props and stairs, from the top layer down.
  */
 export function hitTestObject(map: MapData, worldX: number, worldY: number): Selection | null {
   const layers = map.layers.filter(isLayerEditable).reverse();
@@ -101,6 +106,10 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
     if (door) return { kind: 'door', id: door.id, layerId };
   }
 
+  for (let i = layer.lights.length - 1; i >= 0; i--) {
+    const l = layer.lights[i];
+    if (l.x === gx && l.y === gy) return { kind: 'light', id: l.id, layerId };
+  }
   for (let i = layer.props.length - 1; i >= 0; i--) {
     const p = layer.props[i];
     if (p.x === gx && p.y === gy) return { kind: 'prop', id: p.id, layerId };
@@ -134,7 +143,7 @@ export function objectBounds(
     const l = findLabel(layer, sel.id);
     return l ? labelBounds(l, map.gridSize) : null;
   }
-  const p = findProp(layer, sel.id);
+  const p = sel.kind === 'light' ? findLight(layer, sel.id) : findProp(layer, sel.id);
   return p ? { x: p.x, y: p.y, w: 1, h: 1 } : null;
 }
 
@@ -169,6 +178,7 @@ export function deleteObject(draft: MapData, sel: Selection) {
   if (sel.kind === 'door') layer.doors = layer.doors.filter((d) => d.id !== sel.id);
   else if (sel.kind === 'stairs') layer.stairs = layer.stairs.filter((s) => s.id !== sel.id);
   else if (sel.kind === 'label') layer.labels = layer.labels.filter((l) => l.id !== sel.id);
+  else if (sel.kind === 'light') layer.lights = layer.lights.filter((l) => l.id !== sel.id);
   else layer.props = layer.props.filter((p) => p.id !== sel.id);
 }
 
@@ -184,4 +194,7 @@ export function replaceProp(layer: LayerContent, prop: PlacedProp) {
 }
 export function replaceLabel(layer: LayerContent, label: PlacedLabel) {
   layer.labels = layer.labels.map((l) => (l.id === label.id ? label : l));
+}
+export function replaceLight(layer: LayerContent, light: PlacedLight) {
+  layer.lights = layer.lights.map((l) => (l.id === light.id ? light : l));
 }

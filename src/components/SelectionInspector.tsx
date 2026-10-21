@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import type { MapData, PlacedLabel, PlacedStairs, Selection } from '../types/map';
+import type { LightSettings, MapData, PlacedLabel, PlacedStairs, Selection } from '../types/map';
 import {
   DOOR_TYPES,
   LABEL_SIZES,
@@ -16,15 +16,54 @@ import {
   deleteObject,
   findDoor,
   findLabel,
+  findLight,
   findProp,
   findStairs,
   replaceDoor,
   replaceLabel,
+  replaceLight,
   replaceProp,
   replaceStairs,
   rotateObject,
 } from '../core/objects';
 import { RotateCw, Trash2 } from 'lucide-react';
+import { Slider } from './Slider';
+import { LIGHT_RADIUS_RANGE, TORCH_LIGHT } from '../core/lighting';
+
+const LightControls: React.FC<{
+  light: LightSettings;
+  onChange: (changes: Partial<LightSettings>) => void;
+}> = ({ light, onChange }) => (
+  <>
+    <label className="flex items-center justify-between">
+      <span>Colour</span>
+      <input
+        type="color"
+        aria-label="Light colour"
+        value={light.color}
+        onChange={(e) => onChange({ color: e.target.value })}
+        className="h-6 w-12 bg-ui-field border border-ui-border rounded-sm"
+      />
+    </label>
+    <Slider
+      label="Radius"
+      value={light.radius}
+      display={`${light.radius} cells`}
+      min={LIGHT_RADIUS_RANGE.min}
+      max={LIGHT_RADIUS_RANGE.max}
+      onChange={(radius) => onChange({ radius })}
+    />
+    <Slider
+      label="Intensity"
+      value={light.intensity}
+      display={`${Math.round(light.intensity * 100)}%`}
+      min={0.1}
+      max={1}
+      step={0.05}
+      onChange={(intensity) => onChange({ intensity })}
+    />
+  </>
+);
 
 interface SelectionInspectorProps {
   mapData: MapData;
@@ -59,7 +98,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
       <p className="text-ui-muted leading-snug">
         {hint ?? (
           <>
-            Click a door, staircase, prop or label to select it. Drag to move,{' '}
+            Click a door, staircase, prop, label or light to select it. Drag to move,{' '}
             <kbd>R</kbd> to rotate,{' '}
             <kbd>Delete</kbd> to remove.
           </>
@@ -74,6 +113,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   const stairs = selection.kind === 'stairs' ? findStairs(layer, selection.id) : undefined;
   const prop = selection.kind === 'prop' ? findProp(layer, selection.id) : undefined;
   const label = selection.kind === 'label' ? findLabel(layer, selection.id) : undefined;
+  const light = selection.kind === 'light' ? findLight(layer, selection.id) : undefined;
   // Edits apply to the selected object's own layer
   const editLayer = (edit: Parameters<typeof withLayer>[2], options?: Parameters<ModifyMap>[1]) =>
     onModifyMap((draft) => withLayer(draft, layer.id, edit), options);
@@ -95,7 +135,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="font-medium capitalize">
-        Selected: {door ? `${door.type} door` : stairs ? 'stairs' : label ? 'label' : prop?.type}
+        Selected: {door ? `${door.type} door` : stairs ? 'stairs' : label ? 'label' : light ? 'light' : prop?.type}
       </div>
 
       {door && (
@@ -169,6 +209,28 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
         </div>
       )}
 
+      {prop?.type === 'torch' && (
+        <LightControls
+          light={prop.light ?? TORCH_LIGHT}
+          onChange={(changes) =>
+            editLayer((draft) => replaceProp(draft, { ...prop, light: { ...(prop.light ?? TORCH_LIGHT), ...changes } }), {
+              coalesce: `torch-${prop.id}-${Object.keys(changes).join()}`,
+            })
+          }
+        />
+      )}
+
+      {light && (
+        <LightControls
+          light={light}
+          onChange={(changes) =>
+            editLayer((draft) => replaceLight(draft, { ...light, ...changes }), {
+              coalesce: `light-${light.id}-${Object.keys(changes).join()}`,
+            })
+          }
+        />
+      )}
+
       {label && (
         <>
           <input
@@ -208,7 +270,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
       )}
 
       <div className="grid grid-cols-2 gap-1">
-        {!label && (
+        {!label && !light && (
           <button
             onClick={() => onModifyMap((draft) => rotateObject(draft, selection))}
             className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}

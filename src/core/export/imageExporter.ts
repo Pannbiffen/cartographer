@@ -80,7 +80,8 @@ export function renderOffscreenMap(
   mapData: MapData,
   bounds: BoundingBox,
   scale: number = 1,
-  includeGrid: boolean = true
+  includeGrid: boolean = true,
+  lighting: boolean = true
 ): HTMLCanvasElement {
   const gridSize = mapData.gridSize;
   const canvasWidth = bounds.width * gridSize * scale;
@@ -104,7 +105,7 @@ export function renderOffscreenMap(
   // Shift origin to min bounds
   ctx.translate(-bounds.minX * gridSize, -bounds.minY * gridSize);
 
-  renderMap(ctx, mapData, includeGrid ? bounds : null);
+  renderMap(ctx, mapData, includeGrid ? bounds : null, { lighting });
 
   ctx.restore();
   return canvas;
@@ -160,7 +161,8 @@ export function exportToImage(
  */
 export function exportToVtt(mapData: MapData) {
   const bounds = computeMapBounds(mapData, 1);
-  const canvas = renderOffscreenMap(mapData, bounds, 1, false);
+  // The VTT draws its own darkness from the exported lights
+  const canvas = renderOffscreenMap(mapData, bounds, 1, false, false);
   const dataUrl = canvas.toDataURL('image/png');
 
   const vttJson = exportUniversalVtt(
