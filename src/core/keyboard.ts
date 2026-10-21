@@ -30,3 +30,29 @@ export const ARROW_DIRECTIONS: Record<string, [number, number]> = {
   ArrowUp: [0, -1],
   ArrowDown: [0, 1],
 };
+
+/** Macs label shortcuts with Cmd and Option, and the app accepts Cmd for Ctrl */
+export const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
+// Mac modifier symbols, in the order macOS lists them
+const MAC_MODIFIERS: [string, string][] = [
+  ['Alt', '⌥'],
+  ['Shift', '⇧'],
+  ['Ctrl', '⌘'],
+];
+
+/**
+ * A shortcut label as written in the menus ("Ctrl+Alt+N", "Shift + arrows")
+ * for this platform: unchanged elsewhere, "⌥⌘N" and "⇧ + arrows" on a Mac.
+ */
+export function formatShortcut(shortcut: string, mac = IS_MAC): string {
+  if (!mac) return shortcut;
+  // Chords without spaces become a run of symbols, like macOS menus
+  if (!shortcut.includes(' ') && shortcut.length > 1 && shortcut.includes('+')) {
+    const parts = shortcut.split('+');
+    const key = parts.pop() || '+';
+    const symbols = MAC_MODIFIERS.filter(([name]) => parts.includes(name)).map(([, symbol]) => symbol);
+    return symbols.join('') + key;
+  }
+  return MAC_MODIFIERS.reduce((s, [name, symbol]) => s.replace(new RegExp(`\\b${name}\\b`), symbol), shortcut);
+}

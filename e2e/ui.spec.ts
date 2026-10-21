@@ -119,3 +119,21 @@ test('opening a project frames the new map', async ({ page }) => {
   // A tiny map is not blown up past 200%
   expect((await view(page)).zoom).toBe(2);
 });
+
+test('on a Mac, menus and the shortcuts dialog show ⌘ and ⌥', async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' }));
+  await openApp(page);
+  await page.getByRole('menuitem', { name: 'File' }).click();
+  await expect(page.getByRole('menuitem', { name: /^New/ })).toContainText('⌥⌘N');
+  await expect(page.getByRole('menuitem', { name: /^Save/ })).toContainText('⌘S');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Undo' })).toHaveAttribute('title', 'Undo (⌘Z)');
+
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
+  const row = (action: string) => dialog.locator('dt', { hasText: action }).locator('xpath=following-sibling::dd[1]');
+  await expect(row('Preferences')).toHaveText('⌘,');
+  await expect(row('Pan faster')).toHaveText('⇧ + arrows');
+  await expect(row('Rectangle Room')).toHaveText('R');
+  await expect(dialog).not.toContainText('On a Mac');
+});

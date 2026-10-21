@@ -1,6 +1,7 @@
 import React from 'react';
 import { Dialog, DialogGroup } from './Dialog';
 import type { Menu } from './MenuBar';
+import { formatShortcut } from '../core/keyboard';
 
 // Keys that only work on the map, so no menu item lists them
 const CANVAS_SHORTCUTS: [string, string][] = [
@@ -28,7 +29,7 @@ const ShortcutList: React.FC<{ rows: [string, string][] }> = ({ rows }) => (
     {rows.map(([action, keys], i) => (
       <React.Fragment key={i}>
         <dt>{action}</dt>
-        <dd className="text-ui-muted text-right whitespace-nowrap">{keys}</dd>
+        <dd className="text-ui-muted text-right whitespace-nowrap">{formatShortcut(keys)}</dd>
       </React.Fragment>
     ))}
   </dl>
@@ -56,7 +57,6 @@ export const ShortcutsDialog: React.FC<ShortcutsDialogProps> = ({ menus, onClose
           </div>
         ))}
       </div>
-      <p className="text-ui-muted">On a Mac, use Cmd for Ctrl and Option for Alt.</p>
     </Dialog>
   );
 };

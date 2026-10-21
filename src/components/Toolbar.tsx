@@ -11,6 +11,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { formatShortcut } from '../core/keyboard';
 
 interface ToolbarProps {
   canUndo: boolean;
@@ -62,23 +63,23 @@ const Separator = () => <div className="mx-1 h-5 w-px bg-ui-border" />;
 // Main toolbar with the most used File, Edit and View actions
 export const Toolbar: React.FC<ToolbarProps> = (props) => (
   <div role="toolbar" aria-label="Main toolbar" className="flex h-9 items-center gap-0.5 bg-ui border-b border-ui-border px-1.5">
-    <ToolbarButton icon={FilePlus} label="New" title="New map (Ctrl+Alt+N)" onClick={props.onNew} />
-    <ToolbarButton icon={FolderOpen} label="Open" title="Open project (Ctrl+O)" onClick={props.onOpen} showLabel />
-    <ToolbarButton icon={Save} label="Save" title="Save project (Ctrl+S)" onClick={props.onSave} showLabel />
-    <ToolbarButton icon={Download} label="Export" title="Export image, PDF or VTT (Ctrl+E)" onClick={props.onExport} showLabel />
+    <ToolbarButton icon={FilePlus} label="New" title={`New map (${formatShortcut('Ctrl+Alt+N')})`} onClick={props.onNew} />
+    <ToolbarButton icon={FolderOpen} label="Open" title={`Open project (${formatShortcut('Ctrl+O')})`} onClick={props.onOpen} showLabel />
+    <ToolbarButton icon={Save} label="Save" title={`Save project (${formatShortcut('Ctrl+S')})`} onClick={props.onSave} showLabel />
+    <ToolbarButton icon={Download} label="Export" title={`Export image, PDF or VTT (${formatShortcut('Ctrl+E')})`} onClick={props.onExport} showLabel />
     <Separator />
-    <ToolbarButton icon={Undo2} label="Undo" title="Undo (Ctrl+Z)" onClick={props.onUndo} disabled={!props.canUndo} />
-    <ToolbarButton icon={Redo2} label="Redo" title="Redo (Ctrl+Y)" onClick={props.onRedo} disabled={!props.canRedo} />
+    <ToolbarButton icon={Undo2} label="Undo" title={`Undo (${formatShortcut('Ctrl+Z')})`} onClick={props.onUndo} disabled={!props.canUndo} />
+    <ToolbarButton icon={Redo2} label="Redo" title={`Redo (${formatShortcut('Ctrl+Y')})`} onClick={props.onRedo} disabled={!props.canRedo} />
     <Separator />
     <ToolbarButton icon={ZoomOut} label="Zoom out" title="Zoom out (-)" onClick={props.onZoomOut} />
     <button
       onClick={props.onActualSize}
-      title="Actual size (Ctrl+1)"
+      title={`Actual size (${formatShortcut('Ctrl+1')})`}
       className="h-7 min-w-12 px-1 rounded-sm border border-transparent text-ui-text tabular-nums hover:border-ui-border hover:bg-ui-raised"
     >
       {Math.round(props.zoom * 100)}%
     </button>
     <ToolbarButton icon={ZoomIn} label="Zoom in" title="Zoom in (+)" onClick={props.onZoomIn} />
-    <ToolbarButton icon={Maximize} label="Zoom to fit" title="Zoom to fit (Ctrl+0)" onClick={props.onZoomToFit} />
+    <ToolbarButton icon={Maximize} label="Zoom to fit" title={`Zoom to fit (${formatShortcut('Ctrl+0')})`} onClick={props.onZoomToFit} />
   </div>
 );

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
+import { formatShortcut } from '../core/keyboard';
 
 export type MenuItem =
   | {
@@ -90,7 +91,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({ menus }) => {
                       <span className="flex-1 whitespace-nowrap">{item.label}</span>
                       {item.shortcut && (
                         <span className="pl-6 text-ui-muted group-enabled:group-hover:text-white/85 whitespace-nowrap">
-                          {item.shortcut}
+                          {formatShortcut(item.shortcut)}
                         </span>
                       )}
                     </button>
