@@ -41,6 +41,11 @@ const MAC_MODIFIERS: [string, string][] = [
   ['Ctrl', '⌘'],
 ];
 
+/** The label to show for a menu item: its Mac-specific one on a Mac, when it has one */
+export function menuShortcut(shortcut: string, macShortcut: string | undefined, mac = IS_MAC): string {
+  return formatShortcut(mac && macShortcut ? macShortcut : shortcut, mac);
+}
+
 /**
  * A shortcut label as written in the menus ("Ctrl+Alt+N", "Shift + arrows")
  * for this platform: unchanged elsewhere, "⌥⌘N" and "⇧ + arrows" on a Mac.

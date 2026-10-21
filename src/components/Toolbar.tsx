@@ -11,7 +11,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { formatShortcut } from '../core/keyboard';
+import { formatShortcut, menuShortcut } from '../core/keyboard';
 
 interface ToolbarProps {
   canUndo: boolean;
@@ -69,7 +69,7 @@ export const Toolbar: React.FC<ToolbarProps> = (props) => (
     <ToolbarButton icon={Download} label="Export" title={`Export image, PDF or VTT (${formatShortcut('Ctrl+E')})`} onClick={props.onExport} showLabel />
     <Separator />
     <ToolbarButton icon={Undo2} label="Undo" title={`Undo (${formatShortcut('Ctrl+Z')})`} onClick={props.onUndo} disabled={!props.canUndo} />
-    <ToolbarButton icon={Redo2} label="Redo" title={`Redo (${formatShortcut('Ctrl+Y')})`} onClick={props.onRedo} disabled={!props.canRedo} />
+    <ToolbarButton icon={Redo2} label="Redo" title={`Redo (${menuShortcut('Ctrl+Y', 'Ctrl+Shift+Z')})`} onClick={props.onRedo} disabled={!props.canRedo} />
     <Separator />
     <ToolbarButton icon={ZoomOut} label="Zoom out" title="Zoom out (-)" onClick={props.onZoomOut} />
     <button

@@ -128,11 +128,13 @@ test('on a Mac, menus and the shortcuts dialog show ⌘ and ⌥', async ({ page 
   await expect(page.getByRole('menuitem', { name: /^Save/ })).toContainText('⌘S');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Undo' })).toHaveAttribute('title', 'Undo (⌘Z)');
+  await expect(page.getByRole('button', { name: 'Redo' })).toHaveAttribute('title', 'Redo (⇧⌘Z)');
 
   await page.keyboard.press('?');
   const dialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
   const row = (action: string) => dialog.locator('dt', { hasText: action }).locator('xpath=following-sibling::dd[1]');
   await expect(row('Preferences')).toHaveText('⌘,');
+  await expect(row('Redo')).toHaveText('⇧⌘Z');
   await expect(row('Pan faster')).toHaveText('⇧ + arrows');
   await expect(row('Rectangle Room')).toHaveText('R');
   await expect(dialog).not.toContainText('On a Mac');

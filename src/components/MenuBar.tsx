@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
-import { formatShortcut } from '../core/keyboard';
+import { menuShortcut } from '../core/keyboard';
 
 export type MenuItem =
   | {
       label: string;
       onSelect: () => void;
       shortcut?: string;
+      // Shown instead of `shortcut` on a Mac, where the convention differs
+      macShortcut?: string;
       disabled?: boolean;
       // Shown with a check mark when true, an empty slot when false
       checked?: boolean;
@@ -135,7 +137,7 @@ const MenuItems: React.FC<{ items: MenuItem[]; onDone: () => void }> = ({ items,
         <span className="flex-1 truncate whitespace-nowrap">{item.label}</span>
         {item.shortcut && (
           <span className="pl-6 text-ui-muted group-enabled:group-hover:text-white/85 whitespace-nowrap">
-            {formatShortcut(item.shortcut)}
+            {menuShortcut(item.shortcut, item.macShortcut)}
           </span>
         )}
       </button>

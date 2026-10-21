@@ -747,7 +747,7 @@ export function App() {
       label: 'Edit',
       items: [
         { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: handleUndo, disabled: history.past.length === 0 },
-        { label: 'Redo', shortcut: 'Ctrl+Y', onSelect: handleRedo, disabled: history.future.length === 0 },
+        { label: 'Redo', shortcut: 'Ctrl+Y', macShortcut: 'Ctrl+Shift+Z', onSelect: handleRedo, disabled: history.future.length === 0 },
         'separator',
         { label: 'Copy', shortcut: 'Ctrl+C', disabled: !selectionEditable, onSelect: handleCopy },
         { label: 'Paste', shortcut: 'Ctrl+V', disabled: !clipboard || !activeLayerEditable, onSelect: handlePaste },

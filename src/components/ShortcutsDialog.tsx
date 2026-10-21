@@ -1,7 +1,7 @@
 import React from 'react';
 import { Dialog, DialogGroup } from './Dialog';
 import type { Menu } from './MenuBar';
-import { formatShortcut } from '../core/keyboard';
+import { IS_MAC, formatShortcut } from '../core/keyboard';
 
 // Keys that only work on the map, so no menu item lists them
 const CANVAS_SHORTCUTS: [string, string][] = [
@@ -41,7 +41,9 @@ export const ShortcutsDialog: React.FC<ShortcutsDialogProps> = ({ menus, onClose
     .map((menu) => ({
       title: menu.label,
       rows: menu.items.flatMap((item): [string, string][] =>
-        item !== 'separator' && 'shortcut' in item && item.shortcut ? [[item.label.replace(/…$/, ''), item.shortcut]] : []
+        item !== 'separator' && 'shortcut' in item && item.shortcut
+          ? [[item.label.replace(/…$/, ''), IS_MAC && item.macShortcut ? item.macShortcut : item.shortcut]]
+          : []
       ),
     }))
     .filter((g) => g.rows.length > 0);
