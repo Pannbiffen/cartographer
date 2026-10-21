@@ -213,6 +213,48 @@ export function nudgeObject(draft: MapData, sel: Selection, dx: number, dy: numb
   }
 }
 
+/** An object on the clipboard, with its kind so it can be pasted back */
+export type CopiedObject =
+  | { kind: 'door'; object: PlacedDoor }
+  | { kind: 'stairs'; object: PlacedStairs }
+  | { kind: 'prop'; object: PlacedProp }
+  | { kind: 'label'; object: PlacedLabel }
+  | { kind: 'light'; object: PlacedLight };
+
+export function copyObject(map: MapData, sel: Selection): CopiedObject | undefined {
+  const object = findSelected(map, sel);
+  return object && ({ kind: sel.kind, object } as CopiedObject);
+}
+
+/**
+ * The copy to paste onto a layer: a new id, one cell to the right. Doors move
+ * along their wall instead, past any door already there.
+ */
+export function offsetCopy(layer: LayerContent, copied: CopiedObject): CopiedObject {
+  const id = newObjectId(copied.kind);
+  if (copied.kind === 'door') {
+    const d = copied.object;
+    const [dx, dy] = d.orientation === 'horizontal' ? [1, 0] : [0, 1];
+    const taken = (x: number, y: number) =>
+      layer.doors.some((o) => o.x === x && o.y === y && o.orientation === d.orientation);
+    let [x, y] = [d.x + dx, d.y + dy];
+    while (taken(x, y)) [x, y] = [x + dx, y + dy];
+    return { kind: 'door', object: { ...d, id, x, y } };
+  }
+  return { ...copied, object: { ...copied.object, id, x: copied.object.x + 1 } } as CopiedObject;
+}
+
+/** Adds an object (from offsetCopy) on top of a layer's others of its kind */
+export function addObject(draft: MapData, layerId: string, copied: CopiedObject) {
+  const layer = findLayer(draft, layerId);
+  if (!layer) return;
+  if (copied.kind === 'door') layer.doors = [...layer.doors, copied.object];
+  else if (copied.kind === 'stairs') layer.stairs = [...layer.stairs, copied.object];
+  else if (copied.kind === 'prop') layer.props = [...layer.props, copied.object];
+  else if (copied.kind === 'label') layer.labels = [...layer.labels, copied.object];
+  else layer.lights = [...layer.lights, copied.object];
+}
+
 // Draft layers hold shallow copies, so objects are replaced rather than mutated
 export function replaceDoor(layer: LayerContent, door: PlacedDoor) {
   layer.doors = layer.doors.map((d) => (d.id === door.id ? door : d));

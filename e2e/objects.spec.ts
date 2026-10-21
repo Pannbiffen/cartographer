@@ -104,6 +104,47 @@ test('arrow keys nudge the selected object instead of panning', async ({ page })
   expect((await view(page)).x).not.toEqual(before.x);
 });
 
+test('duplicate, copy and paste objects', async ({ page }) => {
+  await openApp(page);
+  await page.getByRole('menuitem', { name: 'Edit' }).click();
+  await expect(page.getByRole('menuitem', { name: /^Paste/ })).toBeDisabled();
+  await page.keyboard.press('Escape');
+
+  // Ctrl+D copies the altar one cell to the right and selects the copy
+  await page.keyboard.press('v');
+  await clickCell(page, 9, 1);
+  await page.keyboard.press('Control+d');
+  await page.keyboard.press('ArrowDown');
+  let map = await saveMap(page);
+  const altar = map.layers[0].props.find((p) => p.id === 'p3')!;
+  const copies = () => map.layers.flatMap((l) => l.props).filter((p) => p.type === altar.type && p.id !== 'p3');
+  expect(altar).toMatchObject({ x: 9, y: 1 });
+  expect(copies()).toMatchObject([{ x: 10, y: 2, rotation: altar.rotation }]);
+
+  // Each paste steps on from the last one; Edit > Paste lands on the active layer
+  await page.keyboard.press('Control+c');
+  await page.keyboard.press('Control+v');
+  await page.getByRole('menuitem', { name: 'Layer' }).click();
+  await page.getByRole('menuitem', { name: 'New Layer' }).click();
+  await page.getByRole('menuitem', { name: 'Edit' }).click();
+  await page.getByRole('menuitem', { name: /^Paste/ }).click();
+  map = await saveMap(page);
+  expect(copies().map((p) => [p.x, p.y])).toEqual([[10, 2], [11, 2], [12, 2]]);
+  expect(map.layers.at(-1)!.props).toMatchObject([{ x: 12, y: 2 }]);
+
+  // Doors are copied along their wall; the copy is one undo step
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+  const door = await gridPoint(page, 6.05, 1.5);
+  await page.mouse.click(door.x, door.y);
+  await page.keyboard.press('Control+d');
+  map = await saveMap(page);
+  const d2 = map.layers[0].doors.find((d) => d.id === 'd2')!;
+  expect(map.layers[0].doors.filter((d) => d.x === d2.x && d.orientation === d2.orientation && d.y === 2)).toHaveLength(1);
+  await page.keyboard.press('Control+z');
+  expect((await saveMap(page)).layers[0].doors).toHaveLength(map.layers[0].doors.length - 1);
+});
+
 test('labels can be placed, typed, resized and dragged', async ({ page }) => {
   await openApp(page);
   await page.keyboard.press('l');

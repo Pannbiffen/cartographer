@@ -10,6 +10,7 @@ import type {
   ShapeMode,
   ViewportTransform,
   MapHistoryState,
+  MapLayer,
   Selection,
 } from './types/map';
 import { MenuBar, type Menu } from './components/MenuBar';
@@ -33,7 +34,16 @@ import { ARROW_DIRECTIONS, focusUsesArrows, isTypingInField } from './core/keybo
 import { clearAutosave, loadAutosave, saveAutosave } from './core/autosave';
 import { applyPreferences, loadPreferences, savePreferences, type Preferences } from './core/preferences';
 import { clearLocalData } from './core/storage';
-import { deleteObject, findSelected, nudgeObject, rotateObject } from './core/objects';
+import {
+  addObject,
+  copyObject,
+  deleteObject,
+  findSelected,
+  nudgeObject,
+  offsetCopy,
+  rotateObject,
+  type CopiedObject,
+} from './core/objects';
 import {
   addLayer,
   cloneLayer,
@@ -437,6 +447,32 @@ export function App() {
     });
   }, [modifyMap]);
 
+  // Copy, paste and duplicate map objects. A paste lands one cell along from
+  // the copy and becomes the next one copied, so pasting again keeps stepping.
+  const [clipboard, setClipboard] = useState<CopiedObject | null>(null);
+  const selectionEditable = activeSelection !== null && keepsSelection(activeTool);
+  const placeCopy = useCallback(
+    (copied: CopiedObject, layer: MapLayer) => {
+      const copy = offsetCopy(layer, copied);
+      modifyMap((draft) => addObject(draft, layer.id, copy));
+      select({ kind: copy.kind, id: copy.object.id, layerId: layer.id });
+      if (!keepsSelection(activeTool)) setActiveTool('select');
+      return copy;
+    },
+    [modifyMap, select, activeTool]
+  );
+  const handleCopy = useCallback(() => {
+    if (selectionEditable) setClipboard(copyObject(mapData, activeSelection) ?? null);
+  }, [selectionEditable, mapData, activeSelection]);
+  const handlePaste = useCallback(() => {
+    if (clipboard && activeLayerEditable) setClipboard(placeCopy(clipboard, activeLayer));
+  }, [clipboard, activeLayerEditable, activeLayer, placeCopy]);
+  const handleDuplicate = useCallback(() => {
+    const copied = selectionEditable && copyObject(mapData, activeSelection);
+    const layer = activeSelection && findLayer(mapData, activeSelection.layerId);
+    if (copied && layer) placeCopy(copied, layer);
+  }, [selectionEditable, mapData, activeSelection, placeCopy]);
+
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -473,6 +509,16 @@ export function App() {
         } else if (key === 's') {
           e.preventDefault();
           handleSaveJson();
+        } else if (key === 'c' && selectionEditable) {
+          e.preventDefault();
+          handleCopy();
+        } else if (key === 'v' && clipboard) {
+          e.preventDefault();
+          handlePaste();
+        } else if (key === 'd') {
+          // Also keeps the browser from bookmarking the page
+          e.preventDefault();
+          handleDuplicate();
         }
         return;
       }
@@ -542,6 +588,11 @@ export function App() {
     chooseTool,
     activeSelection,
     activeTool,
+    selectionEditable,
+    clipboard,
+    handleCopy,
+    handlePaste,
+    handleDuplicate,
   ]);
 
   // Procedural generators replace the active layer's content
@@ -601,7 +652,6 @@ export function App() {
   const handleMoveLayer = (delta: 1 | -1) => modifyMap((draft) => moveLayer(draft, activeLayerId, delta));
   const activeLayerIndex = mapData.layers.indexOf(activeLayer);
 
-  const selectionEditable = activeSelection !== null && keepsSelection(activeTool);
   const menus: Menu[] = [
     {
       label: 'File',
@@ -619,6 +669,10 @@ export function App() {
       items: [
         { label: 'Undo', shortcut: 'Ctrl+Z', onSelect: handleUndo, disabled: history.past.length === 0 },
         { label: 'Redo', shortcut: 'Ctrl+Y', onSelect: handleRedo, disabled: history.future.length === 0 },
+        'separator',
+        { label: 'Copy', shortcut: 'Ctrl+C', disabled: !selectionEditable, onSelect: handleCopy },
+        { label: 'Paste', shortcut: 'Ctrl+V', disabled: !clipboard || !activeLayerEditable, onSelect: handlePaste },
+        { label: 'Duplicate', shortcut: 'Ctrl+D', disabled: !selectionEditable, onSelect: handleDuplicate },
         'separator',
         {
           label: 'Rotate Selection',
