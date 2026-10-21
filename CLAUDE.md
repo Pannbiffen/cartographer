@@ -12,17 +12,18 @@ Inspired by Dungeon Scrawl: match its features, never copy its code, art or asse
 - Visual check: run a one-off Playwright script from the scratchpad (`import { chromium } from '<repo>/node_modules/playwright/index.mjs'`) against `npx vite --port 5175`, and look at the screenshot. Stop the server with `pkill -f "vite --port 517[5]"`; a plain pattern also matches, and kills, the shell running pkill.
 
 ## Code map
-- `src/App.tsx`: map state, undo history (`modifyMap` with `coalesce` keys so one stroke/drag = one undo step), keyboard shortcuts, menu definitions, autosave. A new shortcut goes in the keydown handler, the matching menu item's `shortcut` label and the README table; Escape closes open dialogs there too.
+- `src/App.tsx`: map state, undo history (`modifyMap` with `coalesce` keys so one stroke/drag = one undo step), keyboard shortcuts, menu definitions, autosave. Anything that replaces the whole map (New, Open, share links) goes through `confirmReplace` + `replaceMap`, which ask first while the map differs from `savedMap` (the last map saved to or opened from a file). A new shortcut goes in the keydown handler, the matching menu item's `shortcut` label and the README table; Escape closes open dialogs there too.
 - `src/components/`: app chrome: `MenuBar` (menus are defined in `App.tsx`), `Toolbar`, `Toolbox`, `DockPanel` (right-hand properties), `Dialog` (shared modal shell) used by `ExportModal` and `PreferencesDialog`. Shared tool list, theme names and button/field classes in `options.ts`; colour tokens (`bg-ui`, `border-ui-border`, ...) in `src/index.css`, light by default and overridden per `data-ui-theme`/`data-accent` on `<html>`; never hard-code chrome colours. Size chrome in rem (Tailwind defaults), not px, so the interface-size preference scales it.
 - `src/core/preferences.ts`: per-user settings (also read by the pre-paint script in `index.html`). `src/core/storage.ts`: all localStorage access, keys prefixed `cartographer.`; go through it so "Reset all local data" clears new keys too.
-- `src/core/viewport.ts`: zoom limits, map bounds and zoom-to-fit.
+- `src/core/viewport.ts`: zoom limits, `zoomAbout`, wheel zoom speed, map bounds and zoom-to-fit. Arrow-key panning is `src/canvas/useKeyboardPan.ts`.
+- `src/core/newMap.ts`: blank maps and the new-map look kept in preferences. `src/core/share.ts`: share links (deflated map JSON in the `#map=1:` fragment).
 - `src/canvas/MapCanvas.tsx`: pointer input, tools, previews.
 - `src/core/renderers/mapRenderer.ts`: the single renderer used by canvas and all exports. Floor patterns in `floorRenderer.ts` (laid out in world space so cells join up); darkness and wall-shadowed lights in `lightingRenderer.ts`, with light sources (placed lights + torches) gathered by `src/core/lighting.ts`.
 - `src/core/layers.ts`: map content lives in `map.layers` (bottom to top); map-wide settings stay on `MapData`. Edit a layer in a mutator with `withLayer(draft, id, ...)`; tools use the active layer and skip hidden/locked ones. Loading goes through `normalizeLoadedMap`, which also upgrades version 1 files (content at the top level).
 - `src/core/objects.ts`: doors/stairs/props/labels/lights: hit testing, selection (carries its `layerId`), edits. Replace objects; never mutate them (history shares them).
 - `src/core/tools/toolGeometry.ts`: brush, tunnel and door-edge geometry.
 - `src/core/geometry/region.ts`: free-form floor. A layer's `shapes` and `cuts` (polygons in grid units, via `polygon-clipping`) merge with its cells into one outline (`layerFloor`, cached) that walls, hatching, lighting (`combinedWalls`) and VTT use; cell-only layers skip it. Edit them only through `applyShape`/`uncutCells`/`eraseShapesInCells`, which keep shapes and cuts from overlapping, and replace the arrays rather than mutating them. `hex.ts`: hex grid maths; hex corners come from a shared lattice so neighbouring hexes merge exactly.
-- `src/core/export/`: PNG/WebP, tiled PDF, Universal VTT.
+- `src/core/export/`: PNG/WebP, tiled PDF, Universal VTT. `pdfExporter.ts` (jsPDF) is loaded with `import()` on first use; keep heavy, rarely used libraries out of the main bundle the same way.
 
 ## Workflow
 - Work on a branch per batch (`fix/...`, `feat/...`). Make one commit per logical change with a `fix:`/`feat:`/`docs:`/`chore:` prefix. Ask before merging to `main` or pushing.

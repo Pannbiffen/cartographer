@@ -35,6 +35,7 @@
   - 🎲 **Universal VTT (`.dd2vtt`)**: Line-of-sight walls, door portals and lights (placed lights and torches) for Foundry VTT (via the Universal Battlemap Importer module), Fantasy Grounds Unity and other UVTT-compatible tools.
   - 🖨️ **Printable PDF**: Fit the whole map on one page, or print at true scale (1 square = 1 inch) tiled across A4 or US Letter pages.
   - 💾 **Project Save/Load**: Save `.dndmap` JSON files locally and resume anytime.
+  - 🔗 **Share Links**: File > Share Link puts a compressed copy of the map in a link. Friends who open it get their own copy to view, edit or save; nothing is uploaded anywhere.
 - **Navigation**: Maps open framed in the window and `Ctrl + 0` brings the whole map back into view. Pan with the arrow keys or by dragging, and zoom with the wheel or a trackpad at the speed you set in Preferences.
 - **New Maps**: File > New starts a blank map with the style, hatching and grid you pick in Preferences (or copied from the open map), and asks before discarding changes you haven't saved to a file.
 - **Autosave**: Your current map is kept in this browser and restored when you reopen the page. Save a `.dndmap` file to back it up or move it to another device.

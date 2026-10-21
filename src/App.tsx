@@ -21,6 +21,7 @@ import { MapCanvas } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
+import { ShareDialog } from './components/ShareDialog';
 import {
   generateBspDungeon,
   generateCaveSystem,
@@ -49,6 +50,7 @@ import {
 } from './core/layers';
 import { fitViewport, zoomAbout } from './core/viewport';
 import { createBlankMap, mapLook } from './core/newMap';
+import { clearShareFragment, isShareFragment, readShareFragment } from './core/share';
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -247,6 +249,7 @@ export function App() {
 
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState<boolean>(false);
+  const [isShareOpen, setIsShareOpen] = useState<boolean>(false);
   const [hoverCoord, setHoverCoord] = useState<{ gx: number; gy: number } | null>(null);
 
   // Modify map state with an immer-style draft mutator. The state updater
@@ -360,6 +363,31 @@ export function App() {
     [requestFit, resetMap]
   );
 
+  // Opening a share link, on load or pasted into an open tab, offers its map.
+  // The link is read asynchronously, so it goes through the latest callback.
+  const offerSharedMap = useRef<(map: MapData) => void>(() => {});
+  useEffect(() => {
+    offerSharedMap.current = (map) =>
+      confirmReplace(`Open shared map “${map.title || 'Untitled map'}”`, () => replaceMap(map));
+  }, [confirmReplace, replaceMap]);
+  useEffect(() => {
+    const openSharedMap = async () => {
+      const hash = window.location.hash;
+      if (!isShareFragment(hash)) return;
+      clearShareFragment();
+      try {
+        const parsed = await readShareFragment(hash);
+        if (!isMapLike(parsed)) throw new Error('Not a map');
+        offerSharedMap.current(normalizeLoadedMap(parsed, createDefaultStarterMap()));
+      } catch {
+        alert('This share link is damaged or incomplete. Ask for the link again, or for a .dndmap file.');
+      }
+    };
+    openSharedMap();
+    window.addEventListener('hashchange', openSharedMap);
+    return () => window.removeEventListener('hashchange', openSharedMap);
+  }, []);
+
   const handleNewMap = useCallback(() => {
     confirmReplace('Start a new map', () => replaceMap(createBlankMap(preferences.newMap)));
   }, [confirmReplace, replaceMap, preferences.newMap]);
@@ -435,9 +463,10 @@ export function App() {
 
       // Selection editing with the select tool
       if (key === 'escape') {
-        if (isExportOpen || isPreferencesOpen || pendingReplace) {
+        if (isExportOpen || isPreferencesOpen || isShareOpen || pendingReplace) {
           setIsExportOpen(false);
           setIsPreferencesOpen(false);
+          setIsShareOpen(false);
           setPendingReplace(null);
         } else {
           setSelection(null);
@@ -491,6 +520,7 @@ export function App() {
     activeTool,
     isExportOpen,
     isPreferencesOpen,
+    isShareOpen,
     pendingReplace,
   ]);
 
@@ -559,6 +589,7 @@ export function App() {
         { label: 'New', shortcut: 'Ctrl+Alt+N', onSelect: handleNewMap },
         { label: 'Open…', shortcut: 'Ctrl+O', onSelect: () => fileInputRef.current?.click() },
         { label: 'Save', shortcut: 'Ctrl+S', onSelect: handleSaveJson },
+        { label: 'Share Link…', onSelect: () => setIsShareOpen(true) },
         'separator',
         { label: 'Export…', shortcut: 'Ctrl+E', onSelect: () => setIsExportOpen(true) },
       ],
@@ -770,6 +801,8 @@ export function App() {
         onSaveProject={handleSaveJson}
         onClose={() => setIsExportOpen(false)}
       />
+
+      {isShareOpen && <ShareDialog mapData={mapData} onClose={() => setIsShareOpen(false)} />}
 
       {pendingReplace && (
         <UnsavedChangesDialog
