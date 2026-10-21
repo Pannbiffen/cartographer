@@ -5,11 +5,9 @@ export interface WallSegment {
   y1: number;
   x2: number;
   y2: number;
+  // Unit vector pointing away from the floor
   normalX: number;
   normalY: number;
-  gx: number;
-  gy: number;
-  side: 'top' | 'right' | 'bottom' | 'left';
 }
 
 export function extractWallSegments(
@@ -37,9 +35,6 @@ export function extractWallSegments(
         y2: y,
         normalX: 0,
         normalY: -1,
-        gx,
-        gy,
-        side: 'top',
       });
     }
     // Bottom
@@ -51,9 +46,6 @@ export function extractWallSegments(
         y2: y + gridSize,
         normalX: 0,
         normalY: 1,
-        gx,
-        gy,
-        side: 'bottom',
       });
     }
     // Left
@@ -65,9 +57,6 @@ export function extractWallSegments(
         y2: y + gridSize,
         normalX: -1,
         normalY: 0,
-        gx,
-        gy,
-        side: 'left',
       });
     }
     // Right
@@ -79,9 +68,6 @@ export function extractWallSegments(
         y2: y + gridSize,
         normalX: 1,
         normalY: 0,
-        gx,
-        gy,
-        side: 'right',
       });
     }
   }
@@ -128,13 +114,9 @@ export function renderDysonHatching(
       const jitter = (pseudoRandom(px, py, 11) - 0.5) * 2;
       const lenJitter = hatchLength + (pseudoRandom(px, py, 99) - 0.5) * 4;
 
-      // 45 degree outward diagonal hatching angle based on normal
-      let angle = Math.atan2(seg.normalY, seg.normalX) + Math.PI / 4;
-      if (seg.side === 'top' || seg.side === 'bottom') {
-        angle = Math.atan2(seg.normalY, seg.normalX) + (seg.normalY < 0 ? 0.65 : -0.65);
-      } else {
-        angle = Math.atan2(seg.normalY, seg.normalX) + (seg.normalX < 0 ? -0.65 : 0.65);
-      }
+      // Strokes lean off the outward normal, turned the same way all round
+      const turn = seg.normalX - seg.normalY >= 0 ? 0.65 : -0.65;
+      const angle = Math.atan2(seg.normalY, seg.normalX) + turn;
 
       const endX = px + Math.cos(angle) * lenJitter + jitter;
       const endY = py + Math.sin(angle) * lenJitter + jitter;
@@ -150,11 +132,17 @@ export function renderDysonHatching(
 /** Adds the area within `width` of any wall to the current path, with round corners */
 function bandPath(ctx: CanvasRenderingContext2D, segments: WallSegment[], width: number) {
   for (const seg of segments) {
-    if (seg.y1 === seg.y2) {
-      ctx.rect(Math.min(seg.x1, seg.x2), seg.y1 - width, Math.abs(seg.x2 - seg.x1), width * 2);
-    } else {
-      ctx.rect(seg.x1 - width, Math.min(seg.y1, seg.y2), width * 2, Math.abs(seg.y2 - seg.y1));
-    }
+    // A strip either side of the wall, always wound the same way so that
+    // overlapping strips don't cancel out under the non-zero fill rule
+    const nx = seg.normalX * width;
+    const ny = seg.normalY * width;
+    const flip = (seg.x2 - seg.x1) * ny - (seg.y2 - seg.y1) * nx < 0;
+    const [ax, ay, bx, by] = flip ? [seg.x2, seg.y2, seg.x1, seg.y1] : [seg.x1, seg.y1, seg.x2, seg.y2];
+    ctx.moveTo(ax - nx, ay - ny);
+    ctx.lineTo(bx - nx, by - ny);
+    ctx.lineTo(bx + nx, by + ny);
+    ctx.lineTo(ax + nx, ay + ny);
+    ctx.closePath();
     for (const [x, y] of [[seg.x1, seg.y1], [seg.x2, seg.y2]]) {
       ctx.moveTo(x + width, y);
       ctx.arc(x, y, width, 0, Math.PI * 2);
@@ -302,16 +290,16 @@ export function extractWaterSegments(
     const y = gy * gridSize;
 
     if (!water[`${gx},${gy - 1}`]) {
-      segments.push({ x1: x, y1: y, x2: x + gridSize, y2: y, normalX: 0, normalY: -1, gx, gy, side: 'top' });
+      segments.push({ x1: x, y1: y, x2: x + gridSize, y2: y, normalX: 0, normalY: -1 });
     }
     if (!water[`${gx},${gy + 1}`]) {
-      segments.push({ x1: x, y1: y + gridSize, x2: x + gridSize, y2: y + gridSize, normalX: 0, normalY: 1, gx, gy, side: 'bottom' });
+      segments.push({ x1: x, y1: y + gridSize, x2: x + gridSize, y2: y + gridSize, normalX: 0, normalY: 1 });
     }
     if (!water[`${gx - 1},${gy}`]) {
-      segments.push({ x1: x, y1: y, x2: x, y2: y + gridSize, normalX: -1, normalY: 0, gx, gy, side: 'left' });
+      segments.push({ x1: x, y1: y, x2: x, y2: y + gridSize, normalX: -1, normalY: 0 });
     }
     if (!water[`${gx + 1},${gy}`]) {
-      segments.push({ x1: x + gridSize, y1: y, x2: x + gridSize, y2: y + gridSize, normalX: 1, normalY: 0, gx, gy, side: 'right' });
+      segments.push({ x1: x + gridSize, y1: y, x2: x + gridSize, y2: y + gridSize, normalX: 1, normalY: 0 });
     }
   }
 

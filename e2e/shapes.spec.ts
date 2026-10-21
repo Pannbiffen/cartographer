@@ -1,0 +1,123 @@
+import { test, expect, type Page } from '@playwright/test';
+import { openApp, gridPoint, saveMap, trackErrors } from './helpers';
+
+// The starter map leaves rows y >= 8 and the block x -15..-8, y -8..0 empty
+
+async function clickAt(page: Page, gx: number, gy: number) {
+  const p = await gridPoint(page, gx, gy);
+  await page.mouse.click(p.x, p.y);
+}
+
+async function dragFrom(page: Page, from: [number, number], to: [number, number]) {
+  const a = await gridPoint(page, ...from);
+  const b = await gridPoint(page, ...to);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 6 });
+  await page.mouse.up();
+}
+
+async function topLayer(page: Page) {
+  const map = await saveMap(page);
+  return map.layers[map.layers.length - 1];
+}
+
+test('the polygon tool adds a free-form room, undone in one step', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await page.keyboard.press('n');
+  // A triangle with a diagonal wall, closed on its first corner
+  await clickAt(page, -14, -7);
+  await clickAt(page, -9, -7);
+  await clickAt(page, -14, -2);
+  await clickAt(page, -14, -7);
+
+  const layer = await topLayer(page);
+  expect(layer.shapes).toHaveLength(1);
+  const corners = layer.shapes[0][0];
+  expect(corners).toContainEqual([-9, -7]);
+  expect(corners).toContainEqual([-14, -2]);
+
+  await page.keyboard.press('Control+z');
+  expect((await topLayer(page)).shapes).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
+test('Enter finishes a path and Escape abandons one', async ({ page }) => {
+  await openApp(page);
+  await page.keyboard.press('h');
+  await clickAt(page, -14.5, -7.5);
+  await clickAt(page, -10.5, -3.5);
+  await page.keyboard.press('Escape');
+  expect((await topLayer(page)).shapes).toHaveLength(0);
+
+  await clickAt(page, -14.5, -7.5);
+  await clickAt(page, -10.5, -3.5);
+  await clickAt(page, -8.5, -3.5);
+  await page.keyboard.press('Enter');
+  const layer = await topLayer(page);
+  expect(layer.shapes).toHaveLength(1);
+  // Square ends reach half a cell past the end points
+  const xs = layer.shapes[0][0].map(([x]) => x);
+  expect(Math.max(...xs)).toBeCloseTo(-8, 5);
+});
+
+test('a circle cut carves into a room, and painting cells over it fills back', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await page.keyboard.press('c');
+  await page.getByRole('button', { name: 'cut', exact: true }).click();
+  // Centred on the corner of the starter map's middle room
+  await dragFrom(page, [0, 2], [0, 4]);
+  let layer = await topLayer(page);
+  expect(layer.cuts).toHaveLength(1);
+  // A click without a drag adds nothing
+  await clickAt(page, 0, 2);
+  expect((await topLayer(page)).cuts).toHaveLength(1);
+
+  // The room brush takes back the cells it paints from the cut
+  await page.keyboard.press('b');
+  await page.locator('input[type=range]').first().fill('5');
+  await clickAt(page, 0.5, 2.5);
+  layer = await topLayer(page);
+  const area = layer.cuts.reduce((sum, polygon) => sum + ringArea(polygon[0]), 0);
+  expect(area).toBeLessThan(Math.PI * 4 - 1);
+
+  // Lights cast shadows from the new outline without errors
+  await page.getByRole('checkbox', { name: 'Darken map and show lights' }).check();
+  expect(errors).toEqual([]);
+});
+
+// The centre of pointy hex (-10, -4), in the empty block
+const HEX_Y = 0.5 - 2 * Math.sqrt(3);
+
+test('on a hex grid the room brush and eraser work in whole hexes', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await page.getByLabel('Grid shape').selectOption('hex-pointy');
+  await page.keyboard.press('b');
+  await clickAt(page, -11.5, HEX_Y);
+  let layer = await topLayer(page);
+  expect(layer.shapes).toHaveLength(1);
+  // One hexagon: six corners and the closing point
+  expect(layer.shapes[0][0]).toHaveLength(7);
+  expect(ringArea(layer.shapes[0][0])).toBeCloseTo(Math.sqrt(3) / 2, 5);
+
+  await page.keyboard.press('e');
+  await clickAt(page, -11.5, HEX_Y);
+  layer = await topLayer(page);
+  expect(layer.shapes).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
+test('the grid shape is saved with the map', async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel('Grid shape').selectOption('hex-flat');
+  expect((await saveMap(page)).gridType).toBe('hex-flat');
+});
+
+function ringArea(ring: [number, number][]): number {
+  let sum = 0;
+  for (let i = 0; i < ring.length - 1; i++) sum += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+  return Math.abs(sum / 2);
+}

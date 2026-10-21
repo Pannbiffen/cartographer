@@ -16,7 +16,13 @@ export interface Segment {
 /** Joins wall edges that continue each other along one line into single segments */
 export function mergeWallSegments(walls: WallSegment[]): Segment[] {
   const rows = new Map<string, [number, number][]>();
+  const merged: Segment[] = [];
   for (const w of walls) {
+    // Slanted walls (from free-form shapes) are kept as they are
+    if (w.x1 !== w.x2 && w.y1 !== w.y2) {
+      merged.push({ x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2 });
+      continue;
+    }
     const horizontal = w.y1 === w.y2;
     const key = horizontal ? `h${w.y1}` : `v${w.x1}`;
     const span: [number, number] = horizontal
@@ -27,7 +33,6 @@ export function mergeWallSegments(walls: WallSegment[]): Segment[] {
     else rows.set(key, [span]);
   }
 
-  const merged: Segment[] = [];
   for (const [key, spans] of rows) {
     const at = Number(key.slice(1));
     const horizontal = key[0] === 'h';

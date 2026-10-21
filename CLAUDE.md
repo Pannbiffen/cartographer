@@ -21,6 +21,7 @@ Inspired by Dungeon Scrawl: match its features, never copy its code, art or asse
 - `src/core/layers.ts`: map content lives in `map.layers` (bottom to top); map-wide settings stay on `MapData`. Edit a layer in a mutator with `withLayer(draft, id, ...)`; tools use the active layer and skip hidden/locked ones. Loading goes through `normalizeLoadedMap`, which also upgrades version 1 files (content at the top level).
 - `src/core/objects.ts`: doors/stairs/props/labels/lights: hit testing, selection (carries its `layerId`), edits. Replace objects; never mutate them (history shares them).
 - `src/core/tools/toolGeometry.ts`: brush, tunnel and door-edge geometry.
+- `src/core/geometry/region.ts`: free-form floor. A layer's `shapes` and `cuts` (polygons in grid units, via `polygon-clipping`) merge with its cells into one outline (`layerFloor`, cached) that walls, hatching, lighting (`combinedWalls`) and VTT use; cell-only layers skip it. Edit them only through `applyShape`/`uncutCells`/`eraseShapesInCells`, which keep shapes and cuts from overlapping, and replace the arrays rather than mutating them. `hex.ts`: hex grid maths; hex corners come from a shared lattice so neighbouring hexes merge exactly.
 - `src/core/export/`: PNG/WebP, tiled PDF, Universal VTT.
 
 ## Workflow

@@ -1,6 +1,6 @@
 // Universal VTT (.dd2vtt) Exporter
 import type { MapData } from '../../types/map';
-import { extractWallSegments } from '../geometry/hatching';
+import { combinedWalls } from '../geometry/region';
 import { visibleLayers } from '../layers';
 import { mapLights } from '../lighting';
 
@@ -51,8 +51,7 @@ export function exportUniversalVtt(
 
   // Walls outline the floor of every shown layer together
   const layers = visibleLayers(mapData);
-  const rooms = Object.assign({}, ...layers.map((l) => l.rooms));
-  const rawSegments = extractWallSegments(rooms, gridSize);
+  const rawSegments = combinedWalls(layers, gridSize);
 
   // Convert wall segments to grid units relative to (minX, minY)
   const lineOfSight: [VttPoint, VttPoint][] = rawSegments.map((seg) => [

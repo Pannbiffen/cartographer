@@ -3,6 +3,9 @@ export type ToolType =
   | 'room-brush' 
   | 'room-rect' 
   | 'tunnel' 
+  | 'polygon'
+  | 'circle'
+  | 'path'
   | 'water' 
   | 'foliage' 
   | 'door' 
@@ -27,6 +30,11 @@ export type HatchStyle = 'dyson' | 'crosshatch' | 'stipple' | 'shadow' | 'none';
 
 export type WallStyle = 'bold' | 'fine' | 'rough';
 
+export type GridType = 'square' | 'hex-pointy' | 'hex-flat';
+
+// Whether a free-form shape adds floor or carves it away
+export type ShapeMode = 'add' | 'cut';
+
 // Plain text, or a room number keyed in a circle or box
 export type LabelStyle = 'text' | 'circle' | 'box';
 
@@ -37,6 +45,13 @@ export interface Selection {
   id: string;
   layerId: string;
 }
+
+/** A point in grid units */
+export type Pair = [number, number];
+/** A closed outline in grid units; the last point joins back to the first */
+export type Ring = Pair[];
+/** An outline followed by any holes in it */
+export type Polygon = Ring[];
 
 export interface GridCoord {
   x: number;
@@ -95,6 +110,10 @@ export interface PlacedLabel {
 /** Everything drawn on one layer */
 export interface LayerContent {
   rooms: { [key: string]: boolean }; // "x,y" => true for carved floor cells
+  // Free-form floor (polygons, circles, paths, hexes) merged with the cells,
+  // and areas carved back out of both. Replaced on edit, never mutated.
+  shapes: Polygon[];
+  cuts: Polygon[];
   floors: { [key: string]: FloorTexture }; // "x,y" => pattern on a floor cell; missing = plain
   water: { [key: string]: boolean }; // "x,y" => true for water cells
   foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
@@ -119,6 +138,7 @@ export interface MapData {
   gridSize: number; // pixels per grid cell (e.g. 40)
   theme: ThemeType;
   showGrid: boolean;
+  gridType: GridType; // the hex grids span `gridSize` from flat side to flat side
   gridOpacity: number;
   hatchDensity: number; // 1 to 5
   hatchLength: number; // pixels

@@ -2,7 +2,7 @@
 import type { LayerContent, MapData, MapLayer } from '../types/map';
 
 export function emptyContent(): LayerContent {
-  return { rooms: {}, floors: {}, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [], lights: [] };
+  return { rooms: {}, shapes: [], cuts: [], floors: {}, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [], lights: [] };
 }
 
 export function newLayer(id: string, name: string, content: Partial<LayerContent> = {}): MapLayer {
@@ -21,7 +21,8 @@ export function newLayerId(): string {
   return `layer_${crypto.randomUUID().slice(0, 8)}`;
 }
 
-/** A layer's own copy of every collection, so a draft can be edited freely */
+/** A layer's own copy of every collection, so a draft can be edited freely
+ * (shapes and cuts are replaced whole, so they keep being shared) */
 export function cloneLayer(layer: MapLayer): MapLayer {
   return {
     ...layer,
@@ -100,6 +101,8 @@ function normalizeLayer(stored: StoredLayer, index: number): MapLayer {
     ...newLayer(stored.id ?? `layer${index + 1}`, stored.name ?? `Layer ${index + 1}`),
     ...stored,
     rooms: stored.rooms ?? {},
+    shapes: stored.shapes ?? [],
+    cuts: stored.cuts ?? [],
     floors: stored.floors ?? {},
     water: stored.water ?? {},
     foliage: stored.foliage ?? {},

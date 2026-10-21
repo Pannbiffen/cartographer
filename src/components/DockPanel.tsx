@@ -5,9 +5,11 @@ import type {
   PropType,
   FoliageType,
   FloorTexture,
+  GridType,
   LabelStyle,
   MapData,
   Selection,
+  ShapeMode,
   ThemeType,
 } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
@@ -18,6 +20,7 @@ import {
   BUTTON_CLASS,
   FIELD_CLASS,
   FLOOR_TEXTURES,
+  GRID_TYPES,
   HATCH_STYLES,
   LABEL_STYLES,
   PROP_TYPES,
@@ -29,6 +32,7 @@ import {
 } from './options';
 import type { ModifyMap } from '../App';
 import { findLayer, withLayer } from '../core/layers';
+import { isHexGrid } from '../core/geometry/hex';
 
 interface DockPanelProps {
   activeTool: ToolType;
@@ -44,6 +48,8 @@ interface DockPanelProps {
   onFloorTextureChange: (texture: FloorTexture) => void;
   labelStyle: LabelStyle;
   onLabelStyleChange: (style: LabelStyle) => void;
+  shapeMode: ShapeMode;
+  onShapeModeChange: (mode: ShapeMode) => void;
   selection: Selection | null;
   onClearSelection: () => void;
   mapData: MapData;
@@ -240,6 +246,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onFloorTextureChange,
   labelStyle,
   onLabelStyleChange,
+  shapeMode,
+  onShapeModeChange,
   selection,
   onClearSelection,
   mapData,
@@ -254,13 +262,32 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   const usesBrushSize =
     activeTool === 'room-brush' ||
     activeTool === 'tunnel' ||
+    activeTool === 'path' ||
     activeTool === 'water' ||
     activeTool === 'foliage' ||
     activeTool === 'eraser';
 
+  // On a hex grid the room brush and eraser work in whole hexes
+  const hexBrush = isHexGrid(mapData.gridType) && (activeTool === 'room-brush' || activeTool === 'eraser');
+  const brushWidth = 2 * brushSize - 1;
+  const shapeHint: Partial<Record<ToolType, string>> = {
+    polygon:
+      'Click to place corners. Click the first corner, double-click or press Enter to finish. Backspace takes back a corner, Esc cancels.',
+    circle: 'Drag from the centre out to the edge.',
+    path: 'Click points along the way; double-click or press Enter to finish. Backspace takes back a point, Esc cancels.',
+  };
+
   return (
     <aside aria-label="Properties" className="w-64 shrink-0 bg-ui border-l border-ui-border overflow-y-auto text-ui-text">
       <Section title={toolLabel}>
+        {shapeHint[activeTool] && (
+          <>
+            <Choices label="Mode" options={['add', 'cut'] as ShapeMode[]} value={shapeMode} columns={2} onChange={onShapeModeChange} />
+            <p className="text-ui-muted leading-snug">
+              {shapeHint[activeTool]} Points snap to the grid; hold Shift to place them freely.
+            </p>
+          </>
+        )}
         {activeTool === 'label' && (
           <Choices label="New labels" options={LABEL_STYLES} value={labelStyle} columns={3} onChange={onLabelStyleChange} />
         )}
@@ -286,16 +313,27 @@ export const DockPanel: React.FC<DockPanelProps> = ({
 
         {usesBrushSize && (
           <Slider
-            label="Brush size"
+            label={activeTool === 'path' ? 'Path width' : 'Brush size'}
             value={brushSize}
-            display={`${brushSize}×${brushSize}`}
+            display={
+              activeTool === 'path'
+                ? `${brushSize} ${brushSize === 1 ? 'cell' : 'cells'}`
+                : hexBrush
+                  ? `${brushWidth} ${brushWidth === 1 ? 'hex' : 'hexes'} across`
+                  : `${brushSize}×${brushSize}`
+            }
             min={1}
             max={5}
             onChange={onBrushSizeChange}
           />
         )}
 
-        {(activeTool === 'room-brush' || activeTool === 'room-rect' || activeTool === 'tunnel') && (
+        {hexBrush && (
+          <p className="text-ui-muted leading-snug">
+            {activeTool === 'eraser' ? 'Erases' : 'Paints plain floor in'} whole hexes on the hex grid.
+          </p>
+        )}
+        {((activeTool === 'room-brush' && !hexBrush) || activeTool === 'room-rect' || activeTool === 'tunnel') && (
           <Choices label="Floor" options={FLOOR_TEXTURES} value={floorTexture} columns={2} onChange={onFloorTextureChange} />
         )}
 
@@ -411,6 +449,12 @@ export const DockPanel: React.FC<DockPanelProps> = ({
       </Section>
 
       <Section title="Grid">
+        <Picker
+          label="Grid shape"
+          options={GRID_TYPES}
+          value={mapData.gridType}
+          onChange={(v: GridType) => onModifyMap((draft) => { draft.gridType = v; })}
+        />
         <label className="flex items-center gap-2">
           <input
             type="checkbox"

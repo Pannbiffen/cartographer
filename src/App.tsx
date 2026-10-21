@@ -7,6 +7,7 @@ import type {
   FoliageType,
   FloorTexture,
   LabelStyle,
+  ShapeMode,
   ViewportTransform,
   MapHistoryState,
   Selection,
@@ -109,6 +110,7 @@ function createDefaultStarterMap(): MapData {
     gridSize: 40,
     theme: 'parchment',
     showGrid: true,
+    gridType: 'square',
     gridOpacity: 0.22,
     hatchDensity: 3,
     hatchLength: 14,
@@ -205,6 +207,7 @@ export function App() {
   const [selectedFoliageType, setSelectedFoliageType] = useState<FoliageType>('tree');
   const [floorTexture, setFloorTexture] = useState<FloorTexture>('plain');
   const [labelStyle, setLabelStyle] = useState<LabelStyle>('text');
+  const [shapeMode, setShapeMode] = useState<ShapeMode>('add');
 
   const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, zoom: 1 });
   // Canvas size in CSS pixels, known after its first layout
@@ -651,6 +654,7 @@ export function App() {
             selectedFoliageType={selectedFoliageType}
             floorTexture={floorTexture}
             labelStyle={labelStyle}
+            shapeMode={shapeMode}
             activeLayerId={activeLayerId}
             viewport={viewport}
             onViewportChange={setViewport}
@@ -677,6 +681,8 @@ export function App() {
             onFloorTextureChange={setFloorTexture}
             labelStyle={labelStyle}
             onLabelStyleChange={setLabelStyle}
+            shapeMode={shapeMode}
+            onShapeModeChange={setShapeMode}
             selection={activeSelection}
             onClearSelection={() => setSelection(null)}
             mapData={mapData}

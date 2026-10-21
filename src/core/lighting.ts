@@ -26,8 +26,3 @@ export function mapLights(map: MapData): MapLight[] {
   }
   return lights;
 }
-
-/** The floor of every shown layer together, which is what blocks light */
-export function combinedRooms(map: MapData): { [key: string]: boolean } {
-  return Object.assign({}, ...visibleLayers(map).map((l) => l.rooms));
-}

@@ -4,10 +4,13 @@ import {
   DoorOpen,
   Eraser,
   Footprints,
+  Circle,
   Lightbulb,
   Milestone,
   MousePointer2,
   Paintbrush,
+  Pentagon,
+  Spline,
   Sparkles,
   Square,
   Trees,
@@ -17,6 +20,7 @@ import {
 import type {
   DoorType,
   FloorTexture,
+  GridType,
   HatchStyle,
   LabelStyle,
   PlacedStairs,
@@ -38,6 +42,9 @@ export const TOOLS: ToolInfo[] = [
   { id: 'room-brush', label: 'Room Brush', icon: Paintbrush, shortcut: 'B' },
   { id: 'room-rect', label: 'Rectangle Room', icon: Square, shortcut: 'R' },
   { id: 'tunnel', label: 'Corridor / Tunnel', icon: Milestone, shortcut: 'T' },
+  { id: 'polygon', label: 'Polygon Room', icon: Pentagon, shortcut: 'N' },
+  { id: 'circle', label: 'Circle Room', icon: Circle, shortcut: 'C' },
+  { id: 'path', label: 'Free Path', icon: Spline, shortcut: 'H' },
   { id: 'water', label: 'Water', icon: Waves, shortcut: 'W' },
   { id: 'foliage', label: 'Foliage & Terrain', icon: Trees, shortcut: 'F' },
   { id: 'door', label: 'Door / Portal', icon: DoorOpen, shortcut: 'D' },
@@ -72,6 +79,12 @@ export const WALL_STYLES: [WallStyle, string][] = [
   ['bold', 'Bold ink'],
   ['fine', 'Fine ink'],
   ['rough', 'Rough pen'],
+];
+
+export const GRID_TYPES: [GridType, string][] = [
+  ['square', 'Square'],
+  ['hex-pointy', 'Hex, pointy top'],
+  ['hex-flat', 'Hex, flat top'],
 ];
 
 export const DOOR_TYPES: DoorType[] = ['standard', 'double', 'secret', 'portcullis', 'archway'];

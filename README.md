@@ -19,6 +19,8 @@
 - **Room Numbers**: Keyed-dungeon markers in a circle or box that count up (1, 2, 3...) as you place them.
 - **Layers**: Split a map into layers (dungeon, water, terrain, objects...) that can be shown or hidden, locked, reordered, renamed and faded. Tools draw on the active layer; hidden layers are left out of exports.
 - **Room Tools**: Freehand room brush, click-drag rectangle rooms, and click-drag L-shaped corridors.
+- **Free-form Shapes**: Polygon rooms with diagonal walls, circular rooms and winding paths of any width, snapped to the grid (hold `Shift` to place freely). Each one adds floor or cuts it away, and merges with everything else: walls, hatching, light shadows and VTT walls follow the new outline.
+- **Hex Grid**: Show a pointy- or flat-top hex grid instead of squares. The room brush and eraser then work in whole hexes, and shapes snap to hex centres and corners.
 - **Floor Textures**: Procedurally drawn flagstones, wooden planks, cobbles, tiles or dirt, chosen per room as you draw it.
 - **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
@@ -88,6 +90,10 @@ npm run preview
 | `B` | Room brush |
 | `R` | Rectangle room |
 | `T` | Corridor / tunnel |
+| `N` | Polygon room |
+| `C` | Circle room |
+| `H` | Free path |
+| `Enter` / `Backspace` / `Esc` (while drawing a polygon or path) | Finish / remove last point / cancel |
 | `W` | Water |
 | `F` | Foliage & terrain |
 | `D` | Door |

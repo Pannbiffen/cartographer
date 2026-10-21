@@ -9,7 +9,10 @@ import type {
   FloorTexture,
   GridCoord,
   LabelStyle,
+  Pair,
+  Polygon,
   Selection,
+  ShapeMode,
   ViewportTransform,
 } from '../types/map';
 import { THEMES } from '../core/theme';
@@ -41,6 +44,25 @@ import {
   replaceStairs,
 } from '../core/objects';
 import { findLayer, isLayerEditable, withLayer } from '../core/layers';
+import {
+  applyShape,
+  circlePolygon,
+  eraseShapesInCells,
+  pathPolygon,
+  polygonFromPoints,
+  uncutCells,
+} from '../core/geometry/region';
+import {
+  hexAt,
+  hexCenter,
+  hexKey,
+  hexLine,
+  hexPolygon,
+  hexesWithin,
+  isHexGrid,
+  snapToHex,
+  type Hex,
+} from '../core/geometry/hex';
 import type { ModifyMap } from '../App';
 
 interface MapCanvasProps {
@@ -53,6 +75,8 @@ interface MapCanvasProps {
   // Texture laid by the room tools
   floorTexture: FloorTexture;
   labelStyle: LabelStyle;
+  // Whether the polygon, circle and path tools add floor or cut it away
+  shapeMode: ShapeMode;
   // Layer the drawing tools edit
   activeLayerId: string;
   viewport: ViewportTransform;
@@ -89,6 +113,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedFoliageType,
   floorTexture,
   labelStyle,
+  shapeMode,
   activeLayerId,
   viewport,
   onViewportChange,
@@ -105,6 +130,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   // Start cell of a click-drag shape (rectangle room or tunnel)
   const dragStartRef = useRef<GridCoord | null>(null);
   const currentHoverRef = useRef<HoverState | null>(null);
+  // Corners placed so far by the polygon or path tool, in grid units
+  const shapePointsRef = useRef<Pair[] | null>(null);
+  // Centre of the circle being dragged out
+  const circleCentreRef = useRef<Pair | null>(null);
+  // Shift places shape points off the grid
+  const freePlacementRef = useRef<boolean>(false);
+  // Hex under the pointer during a hex-grid brush stroke
+  const lastHexRef = useRef<Hex | null>(null);
   const strokeCountRef = useRef<number>(0);
   // Object being dragged with the select tool, and where the drag began
   const moveDragRef = useRef<{
@@ -119,6 +152,20 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     (edit: Parameters<typeof withLayer>[2], options?: Parameters<ModifyMap>[1]) =>
       onModifyMap((draft) => withLayer(draft, activeLayerId, edit), options),
     [onModifyMap, activeLayerId]
+  );
+  const hexGrid = isHexGrid(mapData.gridType) ? mapData.gridType : null;
+  const hexBrush = hexGrid !== null && (activeTool === 'room-brush' || activeTool === 'eraser');
+
+  // Where a shape point would go: on the nearest half cell, or hex centre or corner
+  const snapPoint = useCallback(
+    (hover: HoverState): Pair => {
+      const x = hover.worldX / mapData.gridSize;
+      const y = hover.worldY / mapData.gridSize;
+      if (freePlacementRef.current) return [x, y];
+      if (isHexGrid(mapData.gridType)) return snapToHex(mapData.gridType, x, y);
+      return [Math.round(x * 2) / 2, Math.round(y * 2) / 2];
+    },
+    [mapData.gridSize, mapData.gridType]
   );
   const spaceHeldRef = useRef<boolean>(false);
   const [isSpaceHeld, setIsSpaceHeld] = useState<boolean>(false);
@@ -188,7 +235,49 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const here = { x: hover.gx, y: hover.gy };
       const dragStart = dragStartRef.current;
 
-      if (activeTool === 'door') {
+      if (isShapeTool(activeTool)) {
+        if (shapeMode === 'cut') ctx.fillStyle = PREVIEW_FILLS.eraser!;
+        const point = snapPoint(hover);
+        const points = shapePointsRef.current;
+        const centre = circleCentreRef.current;
+        let preview: Polygon[] = [];
+        if (activeTool === 'circle' && centre) {
+          preview = [circlePolygon(centre[0], centre[1], circleRadius(centre, point, freePlacementRef.current))];
+        } else if (activeTool === 'polygon' && points) {
+          preview = [[[...points, point]]];
+        } else if (activeTool === 'path' && points) {
+          preview = pathPolygon([...points, point], brushSize);
+        }
+        ctx.beginPath();
+        for (const polygon of preview) {
+          for (const ring of polygon) {
+            ring.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x * gridSize, y * gridSize) : ctx.lineTo(x * gridSize, y * gridSize)));
+            ctx.closePath();
+          }
+        }
+        ctx.fill('evenodd');
+        ctx.stroke();
+        // Corners placed so far, and where the next one would go
+        ctx.setLineDash([]);
+        ctx.fillStyle = theme.ink;
+        ctx.beginPath();
+        for (const [x, y] of [...(points ?? []), ...(centre ? [centre] : []), point]) {
+          ctx.moveTo(x * gridSize + 3, y * gridSize);
+          ctx.arc(x * gridSize, y * gridSize, 3, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      } else if (hexGrid && hexBrush) {
+        ctx.beginPath();
+        const centre = hexAt(hexGrid, hover.worldX / gridSize, hover.worldY / gridSize);
+        for (const h of hexesWithin(centre, brushSize)) {
+          hexPolygon(hexGrid, h)[0].forEach(([x, y], i) =>
+            i === 0 ? ctx.moveTo(x * gridSize, y * gridSize) : ctx.lineTo(x * gridSize, y * gridSize)
+          );
+          ctx.closePath();
+        }
+        ctx.fill();
+        ctx.stroke();
+      } else if (activeTool === 'door') {
         // Highlight the wall edge the door will snap to
         const edge = nearestDoorEdge(hover.worldX, hover.worldY, gridSize);
         const x = edge.x * gridSize;
@@ -246,7 +335,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
 
     ctx.restore();
-  }, [mapData, activeTool, brushSize, viewport, selection, layerEditable]);
+  }, [mapData, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, snapPoint, hexGrid, hexBrush]);
 
   // Keep the canvas backing store matched to its on-screen size
   const drawRef = useRef(drawMap);
@@ -340,6 +429,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       }
       editLayer(
         (draft) => {
+          if (activeTool === 'room-brush') uncutCells(draft, [...cells.values()]);
+          if (activeTool === 'eraser') eraseShapesInCells(draft, [...cells.values()]);
           for (const { x: gx, y: gy } of cells.values()) {
             const key = `${gx},${gy}`;
 
@@ -358,15 +449,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             } else if (activeTool === 'eraser') {
               delete draft.rooms[key];
               delete draft.floors[key];
-              delete draft.water[key];
-              delete draft.foliage[key];
-              draft.doors = draft.doors.filter((d) => !doorTouchesCell(d, gx, gy));
-              draft.stairs = draft.stairs.filter((s) => !stairsContainCell(s, gx, gy));
-              draft.props = draft.props.filter((p) => p.x !== gx || p.y !== gy);
-              draft.lights = draft.lights.filter((l) => l.x !== gx || l.y !== gy);
-              draft.labels = draft.labels.filter(
-                (l) => Math.floor(l.x) !== gx || Math.floor(l.y) !== gy
-              );
+              eraseCellContents(draft, gx, gy);
             }
           }
         },
@@ -375,6 +458,78 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     },
     [activeTool, brushSize, selectedFoliageType, floorTexture, editLayer]
   );
+
+  // On a hex grid the room brush and eraser lay or cut whole hexes
+  const applyHexBrush = useCallback(
+    (centers: Hex[]) => {
+      if (!hexGrid) return;
+      const hexes = new Map<string, Hex>();
+      for (const center of centers) {
+        for (const h of hexesWithin(center, brushSize)) hexes.set(hexKey(h), h);
+      }
+      const shape = [...hexes.values()].map((h) => hexPolygon(hexGrid, h));
+      editLayer(
+        (draft) => {
+          applyShape(draft, shape, activeTool === 'eraser' ? 'cut' : 'add');
+          if (activeTool !== 'eraser') return;
+          // Water, plants and objects go with the cells centred in the hexes
+          for (const h of hexes.values()) {
+            const [cx, cy] = hexCenter(hexGrid, h);
+            for (let gy = Math.floor(cy) - 1; gy <= Math.floor(cy) + 1; gy++) {
+              for (let gx = Math.floor(cx) - 1; gx <= Math.floor(cx) + 1; gx++) {
+                if (hexKey(hexAt(hexGrid, gx + 0.5, gy + 0.5)) === hexKey(h)) eraseCellContents(draft, gx, gy);
+              }
+            }
+          }
+        },
+        { coalesce: `stroke-${strokeCountRef.current}` }
+      );
+    },
+    [hexGrid, activeTool, brushSize, editLayer]
+  );
+
+  // Adds the finished polygon or path to the active layer, or cuts it out
+  const finishShape = useCallback(() => {
+    const points = shapePointsRef.current;
+    shapePointsRef.current = null;
+    if (!points) return;
+    const shape =
+      activeTool === 'path' ? pathPolygon(points, brushSize) : polygonFromPoints(points);
+    if (shape.length > 0) editLayer((draft) => applyShape(draft, shape, shapeMode));
+    drawRef.current();
+  }, [activeTool, brushSize, shapeMode, editLayer]);
+  const finishShapeRef = useRef(finishShape);
+  useEffect(() => {
+    finishShapeRef.current = finishShape;
+  }, [finishShape]);
+
+  // Switching tools drops a half-drawn shape
+  useEffect(() => {
+    shapePointsRef.current = null;
+    circleCentreRef.current = null;
+  }, [activeTool]);
+
+  // Enter finishes a polygon or path, Backspace takes back its last corner
+  // and Escape abandons it
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const points = shapePointsRef.current;
+      if (!points || isTypingInField()) return;
+      if (e.key === 'Enter') {
+        finishShapeRef.current();
+      } else if (e.key === 'Escape') {
+        shapePointsRef.current = null;
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        shapePointsRef.current = points.length > 1 ? points.slice(0, -1) : null;
+      } else {
+        return;
+      }
+      drawRef.current();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Moves the dragged object: doors re-snap to the nearest wall edge, stairs
   // and props shift by whole cells from where the drag started
@@ -531,6 +686,34 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       onSelect({ kind: 'light', id, layerId: activeLayerId });
     } else if (!layerEditable) {
       return;
+    } else if (activeTool === 'polygon' || activeTool === 'path') {
+      freePlacementRef.current = e.shiftKey;
+      const point = snapPoint(hover);
+      const points = shapePointsRef.current;
+      const near = (p: Pair | undefined) => !!p && Math.hypot(p[0] - point[0], p[1] - point[1]) < 0.15;
+      if (!points) {
+        shapePointsRef.current = [point];
+      } else if (
+        // Clicking the last corner again (a double-click) finishes the shape,
+        // as does closing a polygon on its first corner
+        near(points[points.length - 1]) ||
+        (activeTool === 'polygon' && points.length >= 3 && near(points[0]))
+      ) {
+        finishShape();
+      } else {
+        shapePointsRef.current = [...points, point];
+      }
+      drawMap();
+    } else if (activeTool === 'circle') {
+      freePlacementRef.current = e.shiftKey;
+      circleCentreRef.current = snapPoint(hover);
+      drawMap();
+    } else if (hexGrid && hexBrush) {
+      isDrawingRef.current = true;
+      strokeCountRef.current++;
+      const h = hexAt(hexGrid, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize);
+      lastHexRef.current = h;
+      applyHexBrush([h]);
     } else if (activeTool === 'room-rect' || activeTool === 'tunnel') {
       dragStartRef.current = { x: gx, y: gy };
       drawMap();
@@ -604,10 +787,17 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const prev = currentHoverRef.current;
     const cellChanged = !prev || prev.gx !== hover.gx || prev.gy !== hover.gy;
     currentHoverRef.current = hover;
+    if (isShapeTool(activeTool)) freePlacementRef.current = e.shiftKey;
 
+    if (hexGrid && hexBrush && isDrawingRef.current) {
+      const h = hexAt(hexGrid, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize);
+      const last = lastHexRef.current;
+      if (last && hexKey(last) !== hexKey(h)) applyHexBrush(hexLine(last, h));
+      lastHexRef.current = h;
+    }
     if (cellChanged) {
       onHoverCoord?.({ gx: hover.gx, gy: hover.gy });
-      if (isDrawingRef.current && prev) {
+      if (isDrawingRef.current && prev && !hexBrush) {
         applyBrush(lineCells({ x: prev.gx, y: prev.gy }, { x: hover.gx, y: hover.gy }));
       }
     }
@@ -630,9 +820,18 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const cells =
         activeTool === 'tunnel' ? tunnelCells(start, here, brushSize) : rectCells(start, here);
       editLayer((draft) => {
+        uncutCells(draft, cells);
         for (const c of cells) carveFloor(draft, `${c.x},${c.y}`, floorTexture);
       });
     }
+    const centre = circleCentreRef.current;
+    // A click without a drag places nothing
+    const dragged = centre && end && Math.hypot(end.worldX / mapData.gridSize - centre[0], end.worldY / mapData.gridSize - centre[1]) >= 0.25;
+    if (centre && end && dragged) {
+      const radius = circleRadius(centre, snapPoint(end), freePlacementRef.current);
+      editLayer((draft) => applyShape(draft, [circlePolygon(centre[0], centre[1], radius)], shapeMode));
+    }
+    circleCentreRef.current = null;
     dragStartRef.current = null;
     moveDragRef.current = null;
     isDrawingRef.current = false;
@@ -644,6 +843,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (
       isDrawingRef.current ||
       dragStartRef.current ||
+      circleCentreRef.current ||
       moveDragRef.current ||
       isPanningRef.current
     ) {
@@ -683,6 +883,28 @@ function carveFloor(layer: LayerContent, key: string, texture: FloorTexture) {
   layer.rooms[key] = true;
   if (texture === 'plain') delete layer.floors[key];
   else layer.floors[key] = texture;
+}
+
+/** Clears everything but floor from a cell: water, plants and objects in it */
+function eraseCellContents(layer: LayerContent, gx: number, gy: number) {
+  const key = `${gx},${gy}`;
+  delete layer.water[key];
+  delete layer.foliage[key];
+  layer.doors = layer.doors.filter((d) => !doorTouchesCell(d, gx, gy));
+  layer.stairs = layer.stairs.filter((s) => !stairsContainCell(s, gx, gy));
+  layer.props = layer.props.filter((p) => p.x !== gx || p.y !== gy);
+  layer.lights = layer.lights.filter((l) => l.x !== gx || l.y !== gy);
+  layer.labels = layer.labels.filter((l) => Math.floor(l.x) !== gx || Math.floor(l.y) !== gy);
+}
+
+function isShapeTool(tool: ToolType): boolean {
+  return tool === 'polygon' || tool === 'circle' || tool === 'path';
+}
+
+/** A circle's radius out to `edge`, in half cells unless placed freely */
+function circleRadius(centre: Pair, edge: Pair, free: boolean): number {
+  const r = Math.hypot(edge[0] - centre[0], edge[1] - centre[1]);
+  return free ? Math.max(0.1, r) : Math.max(0.5, Math.round(r * 2) / 2);
 }
 
 function usesBrush(tool: ToolType): boolean {

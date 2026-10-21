@@ -14,6 +14,8 @@ import { renderDoor, renderStairs, renderProp } from './propsRenderer';
 import { renderLabel } from './labelRenderer';
 import { renderFloorTextures } from './floorRenderer';
 import { renderLighting } from './lightingRenderer';
+import { floorPath, floorSegments, hasShapes, layerFloor } from '../geometry/region';
+import { hexGridPath, isHexGrid } from '../geometry/hex';
 
 export interface GridRange {
   minX: number;
@@ -69,7 +71,11 @@ function drawWithOpacity(
 function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: MapData) {
   const theme = THEMES[mapData.theme] || THEMES.parchment;
   const gridSize = mapData.gridSize;
-  const wallSegments = extractWallSegments(layer.rooms, gridSize);
+  // Cells alone are quick to outline; free-form shapes need merging with them
+  const floor = hasShapes(layer) ? floorPath(layerFloor(layer), gridSize) : null;
+  const wallSegments = floor
+    ? floorSegments(layerFloor(layer), gridSize)
+    : extractWallSegments(layer.rooms, gridSize);
 
   // 1. Exterior hatching goes down first so floors cover any strokes that
   //    stray into neighbouring rooms
@@ -89,8 +95,17 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Ma
 
   // 2. Floors and their textures
   ctx.fillStyle = theme.floor;
-  fillCells(ctx, layer.rooms, gridSize);
-  renderFloorTextures(ctx, layer.rooms, layer.floors, gridSize, theme.ink);
+  if (floor) {
+    ctx.fill(floor, 'evenodd');
+    // Textured cells stop where a cut crosses them
+    ctx.save();
+    ctx.clip(floor, 'evenodd');
+    renderFloorTextures(ctx, layer.rooms, layer.floors, gridSize, theme.ink);
+    ctx.restore();
+  } else {
+    fillCells(ctx, layer.rooms, gridSize);
+    renderFloorTextures(ctx, layer.rooms, layer.floors, gridSize, theme.ink);
+  }
 
   // 3. Water sits on top of floors (pools inside rooms) and terrain
   if (Object.keys(layer.water).length > 0) {
@@ -163,13 +178,26 @@ export function renderMap(
     ctx.globalAlpha = mapData.gridOpacity;
 
     ctx.beginPath();
-    for (let x = gridRange.minX; x <= gridRange.maxX + 1; x++) {
-      ctx.moveTo(x * gridSize, gridRange.minY * gridSize);
-      ctx.lineTo(x * gridSize, (gridRange.maxY + 1) * gridSize);
-    }
-    for (let y = gridRange.minY; y <= gridRange.maxY + 1; y++) {
-      ctx.moveTo(gridRange.minX * gridSize, y * gridSize);
-      ctx.lineTo((gridRange.maxX + 1) * gridSize, y * gridSize);
+    if (isHexGrid(mapData.gridType)) {
+      // Kept to the range, as exports clip to it anyway
+      ctx.rect(
+        gridRange.minX * gridSize,
+        gridRange.minY * gridSize,
+        (gridRange.maxX - gridRange.minX + 1) * gridSize,
+        (gridRange.maxY - gridRange.minY + 1) * gridSize
+      );
+      ctx.clip();
+      ctx.beginPath();
+      hexGridPath(ctx, mapData.gridType, gridSize, gridRange.minX, gridRange.minY, gridRange.maxX + 1, gridRange.maxY + 1);
+    } else {
+      for (let x = gridRange.minX; x <= gridRange.maxX + 1; x++) {
+        ctx.moveTo(x * gridSize, gridRange.minY * gridSize);
+        ctx.lineTo(x * gridSize, (gridRange.maxY + 1) * gridSize);
+      }
+      for (let y = gridRange.minY; y <= gridRange.maxY + 1; y++) {
+        ctx.moveTo(gridRange.minX * gridSize, y * gridSize);
+        ctx.lineTo((gridRange.maxX + 1) * gridSize, y * gridSize);
+      }
     }
     ctx.stroke();
     ctx.restore();

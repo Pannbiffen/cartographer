@@ -1,6 +1,7 @@
 import type { MapData, Selection, ViewportTransform } from '../types/map';
 import { objectBounds } from './objects';
 import { visibleLayers } from './layers';
+import { shapeBounds } from './geometry/region';
 
 export const MIN_ZOOM = 0.2;
 export const MAX_ZOOM = 4;
@@ -30,6 +31,8 @@ export function mapBounds(map: MapData): { x: number; y: number; w: number; h: n
         include(x, y, 1, 1);
       }
     }
+    const shapes = shapeBounds(layer);
+    if (shapes) include(shapes.minX, shapes.minY, shapes.maxX - shapes.minX, shapes.maxY - shapes.minY);
     const layerId = layer.id;
     const objects: Selection[] = [
       ...layer.doors.map((d) => ({ kind: 'door' as const, id: d.id, layerId })),

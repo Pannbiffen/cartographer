@@ -1,9 +1,9 @@
 // Darkness and light: every light lifts the darkness within its radius,
 // except where walls block it, and tints what it reaches with its colour
 import type { MapData, MapLayer } from '../../types/map';
-import { extractWallSegments } from '../geometry/hatching';
+import { combinedWalls } from '../geometry/region';
 import { mergeWallSegments, visibilityPolygon, type Point, type Segment } from '../geometry/visibility';
-import { combinedRooms, mapLights, type MapLight } from '../lighting';
+import { mapLights, type MapLight } from '../lighting';
 import { visibleLayers } from '../layers';
 
 // Walls and light shapes for the last map drawn; maps are replaced on every
@@ -18,7 +18,7 @@ let cache: {
 function lightShape(map: MapData, light: MapLight): Point[] {
   const g = map.gridSize;
   if (!cache || cache.layers !== map.layers || cache.gridSize !== g) {
-    const walls = mergeWallSegments(extractWallSegments(combinedRooms(map), g));
+    const walls = mergeWallSegments(combinedWalls(visibleLayers(map), g));
     cache = { layers: map.layers, gridSize: g, walls, shapes: new Map() };
   }
   const key = `${light.x},${light.y},${light.radius}`;

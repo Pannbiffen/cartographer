@@ -5,6 +5,7 @@ import { renderMap } from '../renderers/mapRenderer';
 import { jsPDF } from 'jspdf';
 import { exportUniversalVtt } from './vttExporter';
 import { visibleLayers } from '../layers';
+import { shapeBounds } from '../geometry/region';
 
 export interface BoundingBox {
   minX: number;
@@ -26,6 +27,12 @@ export function computeMapBounds(mapData: MapData, margin: number = 2): Bounding
         const [x, y] = key.split(',').map(Number);
         coords.push({ x, y });
       }
+    }
+    // Cells reaching the shape's edges, as coordinates name whole cells
+    const shapes = shapeBounds(layer);
+    if (shapes) {
+      coords.push({ x: Math.floor(shapes.minX), y: Math.floor(shapes.minY) });
+      coords.push({ x: Math.ceil(shapes.maxX) - 1, y: Math.ceil(shapes.maxY) - 1 });
     }
     for (const door of layer.doors) {
       coords.push({ x: door.x, y: door.y });
