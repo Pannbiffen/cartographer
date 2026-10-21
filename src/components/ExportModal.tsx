@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { MapData } from '../types/map';
-import { exportToImage, exportToVtt, triggerDownload } from '../core/export/imageExporter';
+import { exportToImage, exportToVtt } from '../core/export/imageExporter';
 import type { ImageFormat } from '../core/export/imageExporter';
 import type { PdfLayout, PaperSize } from '../core/export/pdfExporter';
 import { Dialog, DialogGroup } from './Dialog';
@@ -9,10 +9,11 @@ import { BUTTON_CLASS, FIELD_CLASS } from './options';
 interface ExportModalProps {
   mapData: MapData;
   isOpen: boolean;
+  onSaveProject: () => void;
   onClose: () => void;
 }
 
-export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClose }) => {
+export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onSaveProject, onClose }) => {
   const [scale, setScale] = useState<number>(2);
   const [includeGrid, setIncludeGrid] = useState<boolean>(true);
   const [copiedVtt, setCopiedVtt] = useState<boolean>(false);
@@ -43,13 +44,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
     } finally {
       setPdfBusy(false);
     }
-  };
-
-  const handleExportJson = () => {
-    const jsonStr = JSON.stringify(mapData, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const cleanTitle = mapData.title.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'map';
-    triggerDownload(blob, `${cleanTitle}.dndmap`);
   };
 
   return (
@@ -137,7 +131,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onClo
       </DialogGroup>
 
       <div className="flex justify-between">
-        <button onClick={handleExportJson} className={BUTTON_CLASS}>
+        <button onClick={onSaveProject} className={BUTTON_CLASS}>
           Save project (.dndmap)
         </button>
         <button onClick={onClose} className={BUTTON_CLASS}>

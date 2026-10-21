@@ -36,6 +36,7 @@
   - 🖨️ **Printable PDF**: Fit the whole map on one page, or print at true scale (1 square = 1 inch) tiled across A4 or US Letter pages.
   - 💾 **Project Save/Load**: Save `.dndmap` JSON files locally and resume anytime.
 - **Navigation**: Maps open framed in the window and `Ctrl + 0` brings the whole map back into view. Pan with the arrow keys or by dragging, and zoom with the wheel or a trackpad at the speed you set in Preferences.
+- **New Maps**: File > New starts a blank map with the style, hatching and grid you pick in Preferences (or copied from the open map), and asks before discarding changes you haven't saved to a file.
 - **Autosave**: Your current map is kept in this browser and restored when you reopen the page. Save a `.dndmap` file to back it up or move it to another device.
 - **Undo/Redo**: Up to 100 steps; each brush stroke or slider drag is a single step.
 - **100% Client-Side & Static**: Hosted on GitHub Pages with no tracking and no accounts.
@@ -106,6 +107,7 @@ npm run preview
 | `G` | Toggle grid |
 | `Ctrl + Z` / `Cmd + Z` | Undo |
 | `Ctrl + Y` / `Cmd + Shift + Z` | Redo |
+| `Ctrl + Alt + N` / `Cmd + Option + N` | New map |
 | `Ctrl + O` / `Cmd + O` | Open project |
 | `Ctrl + S` / `Cmd + S` | Save project (`.dndmap`) |
 | `Ctrl + E` / `Cmd + E` | Export |

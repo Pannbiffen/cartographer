@@ -2,6 +2,7 @@ import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   Download,
+  FilePlus,
   FolderOpen,
   Maximize,
   Redo2,
@@ -15,6 +16,7 @@ interface ToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   zoom: number;
+  onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
   onExport: () => void;
@@ -60,6 +62,7 @@ const Separator = () => <div className="mx-1 h-5 w-px bg-ui-border" />;
 // Main toolbar with the most used File, Edit and View actions
 export const Toolbar: React.FC<ToolbarProps> = (props) => (
   <div role="toolbar" aria-label="Main toolbar" className="flex h-9 items-center gap-0.5 bg-ui border-b border-ui-border px-1.5">
+    <ToolbarButton icon={FilePlus} label="New" title="New map (Ctrl+Alt+N)" onClick={props.onNew} />
     <ToolbarButton icon={FolderOpen} label="Open" title="Open project (Ctrl+O)" onClick={props.onOpen} showLabel />
     <ToolbarButton icon={Save} label="Save" title="Save project (Ctrl+S)" onClick={props.onSave} showLabel />
     <ToolbarButton icon={Download} label="Export" title="Export image, PDF or VTT (Ctrl+E)" onClick={props.onExport} showLabel />

@@ -20,6 +20,7 @@ import { TOOLS, keepsSelection } from './components/options';
 import { MapCanvas } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
+import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
 import {
   generateBspDungeon,
   generateCaveSystem,
@@ -47,6 +48,7 @@ import {
   withLayer,
 } from './core/layers';
 import { fitViewport, zoomAbout } from './core/viewport';
+import { createBlankMap, mapLook } from './core/newMap';
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -158,9 +160,11 @@ export interface ModifyMapOptions {
 export type ModifyMap = (mutator: (draft: MapData) => void, options?: ModifyMapOptions) => void;
 
 // Resume the autosaved map if there is one, otherwise show the starter dungeon
-function initialMap(): MapData {
+function initialMap(): { map: MapData; resumed: boolean } {
   const saved = loadAutosave();
-  return saved ? normalizeLoadedMap(saved, createDefaultStarterMap()) : createDefaultStarterMap();
+  return saved
+    ? { map: normalizeLoadedMap(saved, createDefaultStarterMap()), resumed: true }
+    : { map: createDefaultStarterMap(), resumed: false };
 }
 
 /** Cells of one terrain kind across all layers */
@@ -169,12 +173,26 @@ function countCells(map: MapData, kind: 'rooms' | 'water' | 'foliage'): number {
 }
 
 export function App() {
+  const [initial] = useState(initialMap);
   const [history, setHistory] = useState<MapHistoryState>(() => ({
     past: [],
-    present: initialMap(),
+    present: initial.map,
     future: [],
   }));
   const mapData = history.present;
+  // The map as last saved to or opened from a file. A resumed autosave may
+  // never have been saved, so it counts as unsaved.
+  const [savedMap, setSavedMap] = useState<MapData | null>(() => (initial.resumed ? null : initial.map));
+  const unsaved = mapData !== savedMap;
+  // Replacing the map (New, Open) waits for an answer while it has unsaved changes
+  const [pendingReplace, setPendingReplace] = useState<{ action: string; run: () => void } | null>(null);
+  const confirmReplace = useCallback(
+    (action: string, run: () => void) => {
+      if (unsaved) setPendingReplace({ action, run });
+      else run();
+    },
+    [unsaved]
+  );
   const lastCoalesceRef = useRef<string | null>(null);
 
   const [activeTool, setActiveTool] = useState<ToolType>('room-brush');
@@ -328,7 +346,23 @@ export function App() {
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const cleanTitle = mapData.title.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'map';
     triggerDownload(blob, `${cleanTitle}.dndmap`);
+    setSavedMap(mapData);
   }, [mapData]);
+
+  // A replacing map starts its own history, framed in the window
+  const replaceMap = useCallback(
+    (map: MapData) => {
+      requestFit();
+      resetMap(map);
+      setSavedMap(map);
+      setSelection(null);
+    },
+    [requestFit, resetMap]
+  );
+
+  const handleNewMap = useCallback(() => {
+    confirmReplace('Start a new map', () => replaceMap(createBlankMap(preferences.newMap)));
+  }, [confirmReplace, replaceMap, preferences.newMap]);
 
   const handleLoadJson = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -339,8 +373,8 @@ export function App() {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (isMapLike(parsed)) {
-          requestFit();
-          resetMap(normalizeLoadedMap(parsed, createDefaultStarterMap()));
+          const map = normalizeLoadedMap(parsed, createDefaultStarterMap());
+          confirmReplace(`Open “${file.name}”`, () => replaceMap(map));
         } else {
           alert('Invalid project file format.');
         }
@@ -365,7 +399,11 @@ export function App() {
 
       const key = e.key.toLowerCase();
       if (e.ctrlKey || e.metaKey) {
-        if (key === 'o') {
+        // Ctrl+N alone would open a browser window. e.code, as Alt changes e.key on macOS.
+        if (e.altKey && e.code === 'KeyN') {
+          e.preventDefault();
+          handleNewMap();
+        } else if (key === 'o') {
           e.preventDefault();
           fileInputRef.current?.click();
         } else if (key === ',') {
@@ -397,9 +435,10 @@ export function App() {
 
       // Selection editing with the select tool
       if (key === 'escape') {
-        if (isExportOpen || isPreferencesOpen) {
+        if (isExportOpen || isPreferencesOpen || pendingReplace) {
           setIsExportOpen(false);
           setIsPreferencesOpen(false);
+          setPendingReplace(null);
         } else {
           setSelection(null);
         }
@@ -440,6 +479,7 @@ export function App() {
     handleUndo,
     handleRedo,
     handleSaveJson,
+    handleNewMap,
     handleZoomIn,
     handleZoomOut,
     handleActualSize,
@@ -451,6 +491,7 @@ export function App() {
     activeTool,
     isExportOpen,
     isPreferencesOpen,
+    pendingReplace,
   ]);
 
   // Procedural generators replace the active layer's content
@@ -515,6 +556,7 @@ export function App() {
     {
       label: 'File',
       items: [
+        { label: 'New', shortcut: 'Ctrl+Alt+N', onSelect: handleNewMap },
         { label: 'Open…', shortcut: 'Ctrl+O', onSelect: () => fileInputRef.current?.click() },
         { label: 'Save', shortcut: 'Ctrl+S', onSelect: handleSaveJson },
         'separator',
@@ -616,6 +658,7 @@ export function App() {
         canUndo={history.past.length > 0}
         canRedo={history.future.length > 0}
         zoom={viewport.zoom}
+        onNew={handleNewMap}
         onOpen={() => fileInputRef.current?.click()}
         onSave={handleSaveJson}
         onExport={() => setIsExportOpen(true)}
@@ -715,6 +758,7 @@ export function App() {
         <PreferencesDialog
           preferences={preferences}
           onChange={changePreferences}
+          currentLook={mapLook(mapData)}
           onResetLocalData={handleResetLocalData}
           onClose={() => setIsPreferencesOpen(false)}
         />
@@ -723,8 +767,26 @@ export function App() {
       <ExportModal
         mapData={mapData}
         isOpen={isExportOpen}
+        onSaveProject={handleSaveJson}
         onClose={() => setIsExportOpen(false)}
       />
+
+      {pendingReplace && (
+        <UnsavedChangesDialog
+          action={pendingReplace.action}
+          mapTitle={mapData.title}
+          onSaveFirst={() => {
+            handleSaveJson();
+            pendingReplace.run();
+            setPendingReplace(null);
+          }}
+          onDiscard={() => {
+            pendingReplace.run();
+            setPendingReplace(null);
+          }}
+          onCancel={() => setPendingReplace(null)}
+        />
+      )}
     </div>
   );
 }

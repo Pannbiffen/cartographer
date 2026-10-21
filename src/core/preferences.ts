@@ -1,6 +1,7 @@
 // Per-user settings, kept in this browser and separate from any map
 import { readStored, writeStored } from './storage';
 import type { ZoomSpeed } from './viewport';
+import { DEFAULT_NEW_MAP, type NewMapDefaults } from './newMap';
 
 export type UiTheme = 'dark' | 'light' | 'system';
 export type AccentColor = 'blue' | 'green' | 'orange' | 'purple';
@@ -13,6 +14,8 @@ export interface Preferences {
   autosave: boolean;
   showPanel: boolean;
   zoomSpeed: ZoomSpeed;
+  // The look File > New starts a map with
+  newMap: NewMapDefaults;
 }
 
 // index.html reads the same key and defaults to avoid a flash of the wrong theme
@@ -25,11 +28,18 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autosave: true,
   showPanel: true,
   zoomSpeed: 'normal',
+  newMap: DEFAULT_NEW_MAP,
 };
 
 export function loadPreferences(): Preferences {
-  const stored = readStored(PREFERENCES_KEY);
-  return { ...DEFAULT_PREFERENCES, ...(stored && typeof stored === 'object' ? stored : {}) };
+  const raw = readStored(PREFERENCES_KEY);
+  const stored: Partial<Preferences> = raw && typeof raw === 'object' ? raw : {};
+  // Settings added later fall back to their defaults
+  return {
+    ...DEFAULT_PREFERENCES,
+    ...stored,
+    newMap: { ...DEFAULT_NEW_MAP, ...stored.newMap },
+  };
 }
 
 export function savePreferences(prefs: Preferences) {

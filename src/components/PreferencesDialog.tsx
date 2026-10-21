@@ -1,12 +1,24 @@
 import React, { useState } from 'react';
 import type { AccentColor, Preferences, UiSize, UiTheme } from '../core/preferences';
 import type { ZoomSpeed } from '../core/viewport';
+import { DEFAULT_NEW_MAP, type NewMapDefaults } from '../core/newMap';
 import { Dialog, DialogGroup } from './Dialog';
-import { BUTTON_CLASS, optionButtonClass } from './options';
+import { Slider } from './Slider';
+import {
+  BUTTON_CLASS,
+  FIELD_CLASS,
+  GRID_TYPES,
+  HATCH_STYLES,
+  THEME_NAMES,
+  WALL_STYLES,
+  optionButtonClass,
+} from './options';
 
 interface PreferencesDialogProps {
   preferences: Preferences;
   onChange: (changes: Partial<Preferences>) => void;
+  // The open map's look, offered as the new-map defaults
+  currentLook: NewMapDefaults;
   onResetLocalData: () => void;
   onClose: () => void;
 }
@@ -65,6 +77,31 @@ function Choice<T extends string>({
   );
 }
 
+function Select<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: [T, string][];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <label className="grid grid-cols-[7rem_1fr] items-center gap-3">
+      <span>{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value as T)} className={FIELD_CLASS}>
+        {options.map(([id, name]) => (
+          <option key={id} value={id}>
+            {name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 const Check: React.FC<{ label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }> = ({
   label,
   hint,
@@ -88,10 +125,13 @@ const Check: React.FC<{ label: string; hint: string; checked: boolean; onChange:
 export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
   preferences,
   onChange,
+  currentLook,
   onResetLocalData,
   onClose,
 }) => {
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const newMap = preferences.newMap;
+  const changeNewMap = (changes: Partial<NewMapDefaults>) => onChange({ newMap: { ...newMap, ...changes } });
 
   return (
     <Dialog title="Preferences" onClose={onClose}>
@@ -122,7 +162,7 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
 
       <DialogGroup title="Behaviour">
         <Choice
-          label="Wheel zoom speed"
+          label="Wheel zoom"
           options={ZOOM_SPEEDS}
           value={preferences.zoomSpeed}
           onChange={(zoomSpeed) => onChange({ zoomSpeed })}
@@ -139,6 +179,73 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
           checked={preferences.showPanel}
           onChange={(showPanel) => onChange({ showPanel })}
         />
+      </DialogGroup>
+
+      <DialogGroup title="New maps">
+        <p className="text-ui-muted">File &gt; New starts a blank map with this look.</p>
+        <Select label="Map style" options={THEME_NAMES} value={newMap.theme} onChange={(theme) => changeNewMap({ theme })} />
+        <Select
+          label="Wall style"
+          options={WALL_STYLES}
+          value={newMap.wallStyle}
+          onChange={(wallStyle) => changeNewMap({ wallStyle })}
+        />
+        <Select
+          label="Hatching"
+          options={HATCH_STYLES}
+          value={newMap.hatchStyle}
+          onChange={(hatchStyle) => changeNewMap({ hatchStyle })}
+        />
+        <Select
+          label="Grid shape"
+          options={GRID_TYPES}
+          value={newMap.gridType}
+          onChange={(gridType) => changeNewMap({ gridType })}
+        />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          <Slider
+            label="Hatching width"
+            value={newMap.hatchLength}
+            display={`${newMap.hatchLength}px`}
+            min={6}
+            max={24}
+            onChange={(hatchLength) => changeNewMap({ hatchLength })}
+          />
+          <Slider
+            label="Hatching density"
+            value={newMap.hatchDensity}
+            display={String(newMap.hatchDensity)}
+            min={1}
+            max={5}
+            onChange={(hatchDensity) => changeNewMap({ hatchDensity })}
+          />
+          <Slider
+            label="Grid opacity"
+            value={newMap.gridOpacity}
+            display={`${Math.round(newMap.gridOpacity * 100)}%`}
+            min={0.05}
+            max={0.8}
+            step={0.05}
+            onChange={(gridOpacity) => changeNewMap({ gridOpacity })}
+          />
+          <label className="flex items-center gap-2 self-end">
+            <input
+              type="checkbox"
+              checked={newMap.showGrid}
+              onChange={(e) => changeNewMap({ showGrid: e.target.checked })}
+              className="accent-ui-accent"
+            />
+            <span>Show battle grid</span>
+          </label>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button onClick={() => onChange({ newMap: DEFAULT_NEW_MAP })} className={BUTTON_CLASS}>
+            Restore defaults
+          </button>
+          <button onClick={() => onChange({ newMap: currentLook })} className={BUTTON_CLASS}>
+            Use the current map’s look
+          </button>
+        </div>
       </DialogGroup>
 
       <DialogGroup title="Local data">

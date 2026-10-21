@@ -1,0 +1,49 @@
+// The look a blank map starts with, chosen in Preferences
+import type { MapData } from '../types/map';
+import { newLayer, newLayerId } from './layers';
+
+export type NewMapDefaults = Pick<
+  MapData,
+  'theme' | 'wallStyle' | 'hatchStyle' | 'hatchLength' | 'hatchDensity' | 'gridType' | 'showGrid' | 'gridOpacity'
+>;
+
+export const NEW_MAP_KEYS: (keyof NewMapDefaults)[] = [
+  'theme',
+  'wallStyle',
+  'hatchStyle',
+  'hatchLength',
+  'hatchDensity',
+  'gridType',
+  'showGrid',
+  'gridOpacity',
+];
+
+export const DEFAULT_NEW_MAP: NewMapDefaults = {
+  theme: 'parchment',
+  wallStyle: 'bold',
+  hatchStyle: 'dyson',
+  hatchLength: 14,
+  hatchDensity: 3,
+  gridType: 'square',
+  showGrid: true,
+  gridOpacity: 0.22,
+};
+
+/** The new-map settings of an existing map, e.g. to reuse its look */
+export function mapLook(map: MapData): NewMapDefaults {
+  return Object.fromEntries(NEW_MAP_KEYS.map((key) => [key, map[key]])) as unknown as NewMapDefaults;
+}
+
+/** An empty map with one layer */
+export function createBlankMap(defaults: NewMapDefaults): MapData {
+  return {
+    version: 2,
+    title: 'Untitled map',
+    gridSize: 40,
+    ...DEFAULT_NEW_MAP,
+    ...defaults,
+    lighting: false,
+    darkness: 0.75,
+    layers: [newLayer(newLayerId(), 'Layer 1')],
+  };
+}

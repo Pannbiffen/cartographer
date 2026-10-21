@@ -69,7 +69,7 @@ test('wheel zoom follows the scroll distance and the zoom speed preference', asy
   await page.getByRole('menuitem', { name: 'Edit' }).click();
   await page.getByRole('menuitem', { name: /Preferences/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Preferences' });
-  await dialog.getByRole('radiogroup', { name: 'Wheel zoom speed' }).getByRole('radio', { name: 'Fast' }).click();
+  await dialog.getByRole('radiogroup', { name: 'Wheel zoom' }).getByRole('radio', { name: 'Fast' }).click();
   await page.keyboard.press('Escape');
 
   const fast = await zoomAfterWheel(page, -100);
