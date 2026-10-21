@@ -3,6 +3,7 @@ name: Test and deploy Cartographer
 # Every push runs the checks; only main deploys to GitHub Pages, and only once they pass
 on:
   push:
+    branches: ['**']
   workflow_dispatch:
 
 permissions:
