@@ -22,6 +22,7 @@ import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
 import { ShareDialog } from './components/ShareDialog';
+import { ShortcutsDialog } from './components/ShortcutsDialog';
 import {
   generateBspDungeon,
   generateCaveSystem,
@@ -252,6 +253,7 @@ export function App() {
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState<boolean>(false);
   const [isShareOpen, setIsShareOpen] = useState<boolean>(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
   const [hoverCoord, setHoverCoord] = useState<{ gx: number; gy: number } | null>(null);
 
   // Modify map state with an immer-style draft mutator. The state updater
@@ -465,14 +467,19 @@ export function App() {
 
       // Selection editing with the select tool
       if (key === 'escape') {
-        if (isExportOpen || isPreferencesOpen || isShareOpen || pendingReplace) {
+        if (isExportOpen || isPreferencesOpen || isShareOpen || isShortcutsOpen || pendingReplace) {
           setIsExportOpen(false);
           setIsPreferencesOpen(false);
           setIsShareOpen(false);
+          setIsShortcutsOpen(false);
           setPendingReplace(null);
         } else {
           setSelection(null);
         }
+        return;
+      }
+      if (key === '?') {
+        setIsShortcutsOpen(true);
         return;
       }
       if (key === '+' || key === '=') {
@@ -533,6 +540,7 @@ export function App() {
     isExportOpen,
     isPreferencesOpen,
     isShareOpen,
+    isShortcutsOpen,
     pendingReplace,
   ]);
 
@@ -682,6 +690,8 @@ export function App() {
     {
       label: 'Help',
       items: [
+        { label: 'Keyboard Shortcuts', shortcut: '?', onSelect: () => setIsShortcutsOpen(true) },
+        'separator',
         {
           label: 'Source Code on GitHub',
           onSelect: () => window.open('https://github.com/Pannbiffen/cartographer', '_blank', 'noopener'),
@@ -815,6 +825,8 @@ export function App() {
       />
 
       {isShareOpen && <ShareDialog mapData={mapData} onClose={() => setIsShareOpen(false)} />}
+
+      {isShortcutsOpen && <ShortcutsDialog menus={menus} onClose={() => setIsShortcutsOpen(false)} />}
 
       {pendingReplace && (
         <UnsavedChangesDialog

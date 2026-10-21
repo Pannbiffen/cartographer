@@ -5,10 +5,12 @@ interface DialogProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  // Room for two columns of content
+  wide?: boolean;
 }
 
 // A modal window with a title bar; clicking outside it closes it
-export const Dialog: React.FC<DialogProps> = ({ title, onClose, children }) => (
+export const Dialog: React.FC<DialogProps> = ({ title, onClose, children, wide }) => (
   <div
     className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
     onPointerDown={(e) => e.target === e.currentTarget && onClose()}
@@ -16,7 +18,7 @@ export const Dialog: React.FC<DialogProps> = ({ title, onClose, children }) => (
     <div
       role="dialog"
       aria-label={title}
-      className="w-full max-w-[34rem] max-h-full overflow-y-auto bg-ui border border-ui-border shadow-xl text-ui-text"
+      className={`w-full ${wide ? 'max-w-[48rem]' : 'max-w-[34rem]'} max-h-full overflow-y-auto bg-ui border border-ui-border shadow-xl text-ui-text`}
     >
       <div className="flex items-center justify-between h-7 pl-3 pr-1 bg-ui-sunken border-b border-ui-border">
         <h2 className="font-semibold">{title}</h2>

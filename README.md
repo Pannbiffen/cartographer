@@ -114,6 +114,7 @@ npm run preview
 | `Ctrl + S` / `Cmd + S` | Save project (`.dndmap`) |
 | `Ctrl + E` / `Cmd + E` | Export |
 | `Ctrl + ,` / `Cmd + ,` | Preferences |
+| `?` | Keyboard shortcuts (also under Help) |
 
 ---
 

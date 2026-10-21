@@ -33,6 +33,24 @@ test('menus run commands and show their state', async ({ page }) => {
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
+test('the keyboard shortcuts dialog lists menu, tool and map shortcuts', async ({ page }) => {
+  await openApp(page);
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
+  await expect(dialog).toBeVisible();
+  // Read from the menus (File, Tools) plus the map-only keys
+  const row = (action: string) => dialog.locator('dt', { hasText: action }).locator('xpath=following-sibling::dd[1]');
+  await expect(row('Save')).toHaveText('Ctrl+S');
+  await expect(row('Rectangle Room')).toHaveText('R');
+  await expect(row('Remove last point')).toHaveText('Backspace');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await page.getByRole('menuitem', { name: 'Help' }).click();
+  await page.getByRole('menuitem', { name: /Keyboard Shortcuts/ }).click();
+  await expect(dialog).toBeVisible();
+});
+
 test('the properties panel can be hidden from the View menu', async ({ page }) => {
   await openApp(page);
   const canvasWidth = async () => (await page.locator('canvas').boundingBox())!.width;
