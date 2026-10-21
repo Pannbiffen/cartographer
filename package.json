@@ -1,6 +1,7 @@
 {
   "name": "cartographer",
   "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
   "description": "Free and open-source web tool for creating D&D battlemaps and dungeon maps",
   "homepage": "https://pannbiffen.github.io/cartographer/",
   "type": "module",

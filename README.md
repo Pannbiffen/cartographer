@@ -5,7 +5,7 @@
 
 [![Deploy Cartographer to GitHub Pages](https://github.com/Pannbiffen/cartographer/actions/workflows/deploy.yml/badge.svg)](https://github.com/Pannbiffen/cartographer/actions/workflows/deploy.yml)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-blue?style=flat&logo=github)](https://pannbiffen.github.io/cartographer/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 ---
 
@@ -122,4 +122,4 @@ npm run preview
 ---
 
 ## 📜 License
-Distributed under the MIT License. Built with passion for tabletop RPG Game Masters and players worldwide.
+Distributed under the GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later); see [LICENSE](LICENSE). You may use, change and share Cartographer freely, but if you distribute it or run a modified version for others over a network, you must offer them its source code under the same license. Built with passion for tabletop RPG Game Masters and players worldwide.
