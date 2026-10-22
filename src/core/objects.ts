@@ -214,6 +214,18 @@ export function nudgeObject(draft: MapData | LevelMap, sel: Selection, dx: numbe
   }
 }
 
+/** Switches a door's or prop's type, or a label's style */
+export function retypeObject(draft: MapData | LevelMap, sel: Selection, type: string) {
+  const layer = findLayer(draft, sel.layerId);
+  if (!layer) return;
+  const door = sel.kind === 'door' ? findDoor(layer, sel.id) : undefined;
+  const prop = sel.kind === 'prop' ? findProp(layer, sel.id) : undefined;
+  const label = sel.kind === 'label' ? findLabel(layer, sel.id) : undefined;
+  if (door) replaceDoor(layer, { ...door, type: type as PlacedDoor['type'] });
+  if (prop) replaceProp(layer, { ...prop, type: type as PlacedProp['type'] });
+  if (label) replaceLabel(layer, { ...label, style: type as PlacedLabel['style'] });
+}
+
 /** An object on the clipboard, with its kind so it can be pasted back */
 export type CopiedObject =
   | { kind: 'door'; object: PlacedDoor }

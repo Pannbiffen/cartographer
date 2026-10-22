@@ -14,13 +14,14 @@ import type {
   MapLayer,
   Selection,
 } from './types/map';
-import { MenuBar, type Menu } from './components/MenuBar';
+import { MenuBar, type Menu, type MenuItem } from './components/MenuBar';
+import { ContextMenu } from './components/ContextMenu';
 import { Toolbar } from './components/Toolbar';
 import { Toolbox } from './components/Toolbox';
 import { DockPanel } from './components/DockPanel';
 import { MapSettingsDrawer } from './components/MapSettingsDrawer';
-import { TOOLS, keepsSelection } from './components/options';
-import { MapCanvas } from './canvas/MapCanvas';
+import { DOOR_TYPES, FLOOR_TEXTURES, LABEL_STYLES, PROP_TYPES, TOOLS, keepsSelection } from './components/options';
+import { MapCanvas, type CanvasMenuRequest } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
@@ -55,6 +56,7 @@ import {
   findStairs,
   nudgeObject,
   offsetCopy,
+  retypeObject,
   rotateObject,
   type CopiedObject,
 } from './core/objects';
@@ -610,12 +612,56 @@ export function App() {
   const handlePaste = useCallback((at?: { x: number; y: number }) => {
     if (clipboard && activeLayerEditable) setClipboard(placeCopy(clipboard, activeLayer, at));
   }, [clipboard, activeLayerEditable, activeLayer, placeCopy]);
+  const rotateSelection = () => {
+    if (activeSelection) modifyMap((draft) => rotateObject(draft, activeSelection));
+  };
+  const deleteSelection = () => {
+    if (!activeSelection) return;
+    modifyMap((draft) => deleteObject(draft, activeSelection));
+    setSelection(null);
+  };
   const handleDuplicate = useCallback(() => {
     const copied = selectionEditable && copyObject(levelMap, activeSelection);
     const layer = activeSelection && findLayer(levelMap, activeSelection.layerId);
     if (copied && layer) placeCopy(copied, layer);
   }, [selectionEditable, levelMap, activeSelection, placeCopy]);
 
+  // Right-click menu on the map: actions for the object under the pointer,
+  // or for the spot clicked. Right-clicking an object selects it.
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    at: { x: number; y: number };
+    onObject: boolean;
+    fromKeyboard?: boolean;
+  } | null>(null);
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const openContextMenu = ({ clientX, clientY, at, hit }: CanvasMenuRequest) => {
+    if (hit) {
+      if (!keepsSelection(activeTool)) setActiveTool('select');
+      select(hit);
+    }
+    setContextMenu({ x: clientX, y: clientY, at, onObject: !!hit });
+  };
+  // Shift+F10 or the menu key: at the selection, else the pointer, else the middle of the map
+  const openKeyboardMenu = useCallback(() => {
+    const rect = mainRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const selected = selectionEditable ? findSelected(levelMap, activeSelection) : undefined;
+    const centre = { x: (rect.width / 2 - viewport.x) / viewport.zoom / mapData.gridSize, y: (rect.height / 2 - viewport.y) / viewport.zoom / mapData.gridSize };
+    const at = selected
+      ? activeSelection?.kind === 'label' ? { x: selected.x, y: selected.y } : { x: selected.x + 0.5, y: selected.y + 0.5 }
+      : (pointerRef.current ?? centre);
+    const cell = mapData.gridSize * viewport.zoom;
+    setContextMenu({
+      x: rect.left + viewport.x + at.x * cell,
+      y: rect.top + viewport.y + at.y * cell,
+      at,
+      onObject: !!selected,
+      fromKeyboard: true,
+    });
+  }, [selectionEditable, levelMap, activeSelection, viewport, mapData.gridSize]);
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -666,6 +712,12 @@ export function App() {
         return;
       }
       if (e.altKey) return;
+
+      if ((key === 'f10' && e.shiftKey) || key === 'contextmenu') {
+        e.preventDefault();
+        openKeyboardMenu();
+        return;
+      }
 
       // Selection editing with the select tool (open dialogs take Escape first)
       if (key === 'escape') {
@@ -745,6 +797,7 @@ export function App() {
     handlePaste,
     handleDuplicate,
     goToNextLevel,
+    openKeyboardMenu,
   ]);
 
   // Procedural generators replace the active layer's content
@@ -886,17 +939,13 @@ export function App() {
           label: 'Rotate Selection',
           shortcut: 'R',
           disabled: !selectionEditable,
-          onSelect: () => activeSelection && modifyMap((draft) => rotateObject(draft, activeSelection)),
+          onSelect: rotateSelection,
         },
         {
           label: 'Delete Selection',
           shortcut: 'Del',
           disabled: !selectionEditable,
-          onSelect: () => {
-            if (!activeSelection) return;
-            modifyMap((draft) => deleteObject(draft, activeSelection));
-            setSelection(null);
-          },
+          onSelect: deleteSelection,
         },
         'separator',
         { label: 'Clear Map…', onSelect: handleClearMap },
@@ -997,6 +1046,76 @@ export function App() {
     },
   ];
 
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const choices = <T extends string | number>(
+    label: string,
+    options: T[],
+    value: T,
+    onChange: (value: T) => void,
+    name: (option: T) => string = (o) => capitalize(String(o))
+  ): MenuItem => ({
+    label,
+    submenu: options.map((option) => ({ label: name(option), checked: option === value, onSelect: () => onChange(option) })),
+  });
+  const selectedObject = selectionEditable ? findSelected(levelMap, activeSelection) : undefined;
+  // The selected object's type (or a label's style): submenu title, choices and current one
+  const retypeSpec: [string, string[], string] | null =
+    !selectedObject ? null
+    : activeSelection?.kind === 'door' && 'type' in selectedObject ? ['Door Type', DOOR_TYPES, selectedObject.type]
+    : activeSelection?.kind === 'prop' && 'type' in selectedObject ? ['Prop', PROP_TYPES, selectedObject.type]
+    : 'style' in selectedObject ? ['Label Style', LABEL_STYLES, selectedObject.style ?? 'text']
+    : null;
+  const retype = (type: string) => activeSelection && modifyMap((draft) => retypeObject(draft, activeSelection, type));
+  const objectMenu: MenuItem[] = !activeSelection || !selectedObject
+    ? []
+    : [
+        ...(activeSelection.kind === 'label' || activeSelection.kind === 'light'
+          ? []
+          : [{ label: 'Rotate', shortcut: 'R', onSelect: rotateSelection }]),
+        { label: 'Duplicate', shortcut: 'Ctrl+D', onSelect: handleDuplicate },
+        { label: 'Copy', shortcut: 'Ctrl+C', onSelect: handleCopy },
+        ...(retypeSpec
+          ? [{
+              label: retypeSpec[0],
+              submenu: retypeSpec[1].map((type) => ({
+                label: capitalize(type),
+                checked: type === retypeSpec[2],
+                onSelect: () => retype(type),
+              })),
+            }]
+          : []),
+        'separator',
+        { label: 'Delete', shortcut: 'Del', onSelect: deleteSelection },
+      ];
+  const brushTool = ['room-brush', 'tunnel', 'path', 'water', 'foliage', 'eraser'].includes(activeTool);
+  const toolSettings: MenuItem[] = [
+    ...(activeTool === 'door' ? [choices('Door Type', DOOR_TYPES, selectedDoorType, setSelectedDoorType)] : []),
+    ...(activeTool === 'prop' ? [choices('Prop', PROP_TYPES, selectedPropType, setSelectedPropType)] : []),
+    ...(activeTool === 'foliage'
+      ? [choices('Plant / Terrain', ['tree', 'bush', 'rock'] as FoliageType[], selectedFoliageType, setSelectedFoliageType)]
+      : []),
+    ...(activeTool === 'label' ? [choices('Label Style', LABEL_STYLES, labelStyle, setLabelStyle)] : []),
+    ...(brushTool ? [choices(activeTool === 'path' ? 'Path Width' : 'Brush Size', [1, 2, 3, 4, 5], brushSize, setBrushSize)] : []),
+    ...(activeTool === 'room-brush' || activeTool === 'room-rect' || activeTool === 'tunnel'
+      ? [choices('Floor', FLOOR_TEXTURES, floorTexture, setFloorTexture)]
+      : []),
+    ...(activeTool === 'polygon' || activeTool === 'circle' || activeTool === 'path'
+      ? [choices('Mode', ['add', 'cut'] as ShapeMode[], shapeMode, setShapeMode)]
+      : []),
+  ];
+  const mapMenu: MenuItem[] = [
+    {
+      label: 'Paste Here',
+      shortcut: 'Ctrl+V',
+      disabled: !clipboard || !activeLayerEditable,
+      onSelect: () => contextMenu && handlePaste(contextMenu.at),
+    },
+    ...(toolSettings.length ? ['separator' as const, ...toolSettings] : []),
+    'separator',
+    { label: 'Zoom to Fit', shortcut: 'Ctrl+0', onSelect: handleZoomToFit },
+    { label: 'Show Grid', shortcut: 'G', checked: mapData.showGrid, onSelect: toggleGrid },
+  ];
+
   return (
     <div className="w-screen h-screen flex flex-col bg-ui text-ui-text overflow-hidden select-none">
       <MenuBar menus={menus} />
@@ -1028,7 +1147,7 @@ export function App() {
         <Toolbox activeTool={activeTool} onSelectTool={chooseTool} />
 
         <div className="flex flex-col flex-1 min-w-0">
-          <main className="relative flex-1 min-h-0 overflow-hidden">
+          <main ref={mainRef} className="relative flex-1 min-h-0 overflow-hidden">
             <MapCanvas
               mapData={levelMap}
               activeTool={activeTool}
@@ -1050,6 +1169,7 @@ export function App() {
               selection={activeSelection}
               onSelect={select}
               onTakeStairs={takeStairs}
+              onOpenMenu={openContextMenu}
             />
           </main>
 
@@ -1157,6 +1277,17 @@ export function App() {
             })
           }
           onClose={() => setIsMyMapsOpen(false)}
+        />
+      )}
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          label={contextMenu.onObject && selectedObject ? 'Object' : 'Map'}
+          items={contextMenu.onObject && selectedObject ? objectMenu : mapMenu}
+          autoFocus={contextMenu.fromKeyboard}
+          onClose={closeContextMenu}
         />
       )}
 

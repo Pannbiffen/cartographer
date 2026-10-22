@@ -88,7 +88,7 @@ const ITEM_CLASS =
   'group flex w-full items-center gap-2 px-2 py-1 text-left text-ui-text enabled:hover:bg-ui-accent enabled:hover:text-white disabled:text-ui-muted/60';
 
 // The items of one open menu or submenu; onDone closes the whole menu
-const MenuItems: React.FC<{ items: MenuItem[]; onDone: () => void }> = ({ items, onDone }) => {
+export const MenuItems: React.FC<{ items: MenuItem[]; onDone: () => void }> = ({ items, onDone }) => {
   const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
   return items.map((item, j) => {
     if (item === 'separator') return <div key={j} role="separator" className="my-1 border-t border-ui-border" />;

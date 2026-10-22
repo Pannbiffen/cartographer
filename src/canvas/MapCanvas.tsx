@@ -95,7 +95,20 @@ interface MapCanvasProps {
   onSelect: (selection: Selection | null) => void;
   // Double-clicking stairs with the select tool goes to the level they lead to
   onTakeStairs?: (stairs: Selection) => void;
+  // Right-click or long-press: where (screen and grid units) and the object there
+  onOpenMenu?: (menu: CanvasMenuRequest) => void;
 }
+
+export interface CanvasMenuRequest {
+  clientX: number;
+  clientY: number;
+  at: { x: number; y: number };
+  hit: Selection | null;
+}
+
+// How long a touch must stay put to open the menu, and how far it may wander
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 8;
 
 interface HoverState {
   gx: number;
@@ -133,6 +146,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   selection,
   onSelect,
   onTakeStairs,
+  onOpenMenu,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isPanningRef = useRef<boolean>(false);
@@ -150,6 +164,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   // Hex under the pointer during a hex-grid brush stroke
   const lastHexRef = useRef<Hex | null>(null);
   const strokeCountRef = useRef<number>(0);
+  const longPressRef = useRef<{ timer: number; x: number; y: number } | null>(null);
+  // When a long-press last opened the menu, so the browser's own contextmenu event after it is ignored
+  const longPressOpenedRef = useRef(0);
   // Object being dragged with the select tool, and where the drag began
   const moveDragRef = useRef<{
     sel: Selection;
@@ -601,10 +618,44 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     return screenToGrid(e.clientX - rect.left, e.clientY - rect.top);
   };
 
+  const openMenuAt = (canvas: HTMLCanvasElement, clientX: number, clientY: number) => {
+    const rect = canvas.getBoundingClientRect();
+    const { worldX, worldY } = screenToGrid(clientX - rect.left, clientY - rect.top);
+    onOpenMenu?.({
+      clientX,
+      clientY,
+      at: { x: worldX / mapData.gridSize, y: worldY / mapData.gridSize },
+      hit: hitTestObject(mapData, worldX, worldY),
+    });
+  };
+  const cancelLongPress = () => {
+    if (longPressRef.current) window.clearTimeout(longPressRef.current.timer);
+    longPressRef.current = null;
+  };
+  useEffect(() => () => window.clearTimeout(longPressRef.current?.timer), []);
+
   // Pointer Handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     // Keep receiving moves and the release even if the pointer leaves the canvas
     e.currentTarget.setPointerCapture(e.pointerId);
+
+    // Holding a finger still opens the menu, ending whatever the touch started
+    if (e.pointerType === 'touch' && onOpenMenu) {
+      cancelLongPress();
+      const canvas = e.currentTarget;
+      const { clientX, clientY } = e;
+      const timer = window.setTimeout(() => {
+        longPressRef.current = null;
+        longPressOpenedRef.current = Date.now();
+        isDrawingRef.current = false;
+        dragStartRef.current = null;
+        circleCentreRef.current = null;
+        moveDragRef.current = null;
+        openMenuAt(canvas, clientX, clientY);
+        drawMap();
+      }, LONG_PRESS_MS);
+      longPressRef.current = { timer, x: clientX, y: clientY };
+    }
 
     // Middle click, Space + drag or Alt + drag pans
     if (e.button === 1 || (e.button === 0 && (spaceHeldRef.current || e.altKey))) {
@@ -761,6 +812,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const press = longPressRef.current;
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > LONG_PRESS_SLOP) cancelLongPress();
     if (isPanningRef.current) {
       onViewportChange({
         ...viewport,
@@ -811,6 +864,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    cancelLongPress();
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
@@ -885,7 +939,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           const hit = hitTestObject(mapData, worldX, worldY);
           if (hit?.kind === 'stairs') onTakeStairs(hit);
         }}
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          if (Date.now() - longPressOpenedRef.current > 1000) openMenuAt(e.currentTarget, e.clientX, e.clientY);
+        }}
       />
     </div>
   );

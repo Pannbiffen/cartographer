@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openApp, dragCells, gridPoint, saveMap, view } from './helpers';
+import { openApp, cellCenter, dragCells, gridPoint, saveMap, view } from './helpers';
 
 test('menus run commands and show their state', async ({ page }) => {
   await openApp(page);
@@ -210,4 +210,71 @@ test('on a Mac, menus and the shortcuts dialog show ⌘ and ⌥', async ({ page 
   await expect(row('Pan faster')).toHaveText('⇧ + arrows');
   await expect(row('Rectangle Room')).toHaveText('R');
   await expect(dialog).not.toContainText('On a Mac');
+});
+
+test('right-clicking the map opens a menu for what is under the pointer', async ({ page }) => {
+  await openApp(page);
+  const altar = await cellCenter(page, 9, 1);
+  const props = async () => (await saveMap(page)).levels[0].layers[0].props.filter((p) => p.id === 'p3' || p.id.startsWith('prop_'));
+
+  // On an object: selects it (switching to the select tool) and offers its actions
+  await page.mouse.click(altar.x, altar.y, { button: 'right' });
+  const objectMenu = page.getByRole('menu', { name: 'Object' });
+  await expect(objectMenu).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true');
+  await objectMenu.getByRole('menuitem', { name: 'Prop' }).hover();
+  await page.getByRole('menuitemcheckbox', { name: 'Chest' }).click();
+  await expect(objectMenu).toHaveCount(0);
+  expect(await props()).toMatchObject([{ id: 'p3', type: 'chest' }]);
+
+  await page.mouse.click(altar.x, altar.y, { button: 'right' });
+  await objectMenu.getByRole('menuitem', { name: /^Copy/ }).click();
+
+  // On empty map: Paste Here puts the copy where the menu was opened
+  const spot = await cellCenter(page, 14, 3);
+  await page.mouse.click(spot.x, spot.y, { button: 'right' });
+  const mapMenu = page.getByRole('menu', { name: 'Map' });
+  await mapMenu.getByRole('menuitem', { name: /Paste Here/ }).click();
+  expect((await props()).map((p) => [p.type, p.x, p.y])).toEqual([['chest', 9, 1], ['chest', 14, 3]]);
+
+  // Show Grid toggles; a click on the map only closes the menu
+  const empty = await cellCenter(page, 14, -2);
+  await page.mouse.click(empty.x, empty.y, { button: 'right' });
+  await mapMenu.getByRole('menuitemcheckbox', { name: /Show Grid/ }).click();
+  expect((await saveMap(page)).showGrid).toBe(false);
+  await page.keyboard.press('e');
+  await page.mouse.click(empty.x, empty.y, { button: 'right' });
+  await expect(mapMenu.getByRole('menuitem', { name: 'Brush Size' })).toBeVisible();
+  await page.mouse.click(altar.x, altar.y);
+  await expect(mapMenu).toHaveCount(0);
+  expect((await props()).map((p) => [p.x, p.y])).toEqual([[9, 1], [14, 3]]);
+
+  // Escape closes the menu but keeps the selection
+  await page.keyboard.press('v');
+  await page.mouse.click(altar.x, altar.y, { button: 'right' });
+  await page.keyboard.press('Escape');
+  await expect(objectMenu).toHaveCount(0);
+  await expect(page.getByText('Selected: chest')).toBeVisible();
+
+  // Shift+F10 opens it from the keyboard, at the selection; arrows move, Enter picks
+  await page.keyboard.press('Shift+F10');
+  await expect(objectMenu.getByRole('menuitem', { name: /^Rotate/ })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(objectMenu.getByRole('menuitem', { name: /^Duplicate/ })).toBeFocused();
+  await page.keyboard.press('Enter');
+  expect((await props()).map((p) => [p.x, p.y])).toEqual([[9, 1], [14, 3], [10, 1]]);
+  await expect(objectMenu).toHaveCount(0);
+});
+
+test('a long press opens the menu on a touch screen', async ({ page }) => {
+  await openApp(page);
+  const altar = await cellCenter(page, 9, 1);
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type: 'touchStart' | 'touchEnd', points: { x: number; y: number }[]) =>
+    cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
+  await touch('touchStart', [altar]);
+  await page.waitForTimeout(700);
+  await expect(page.getByRole('menu', { name: 'Object' })).toBeVisible();
+  await touch('touchEnd', []);
+  await expect(page.getByRole('menu', { name: 'Object' })).toBeVisible();
 });

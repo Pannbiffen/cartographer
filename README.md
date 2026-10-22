@@ -15,7 +15,7 @@
 - **Preferences** (Edit > Preferences): dark (default), light or system UI theme, accent colour, interface size, autosave on/off, and a reset that wipes everything stored in this browser.
 - **Pen & Parchment Aesthetic**: Four themes (Parchment, Blueprint, Slate, Monochrome), bold, fine or rough pen walls, and pen-stroke, crosshatch, stipple or soft-shadow hatching outside them.
 - **Style Presets**: Save a map's look (style, walls, hatching, grid) under a name in the map settings drawer, apply it to any map in one click, and export or import presets as a `.json` file to share them with friends.
-- **Select & Edit**: Select doors, stairs, props and labels to move (drag or arrow keys), rotate, retype, duplicate, copy and paste, or delete them.
+- **Select & Edit**: Select doors, stairs, props and labels to move (drag or arrow keys), rotate, retype, duplicate, copy and paste, or delete them. Right-click (or long-press) an object or an empty spot for a menu of what you can do there.
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.
 - **Room Numbers**: Keyed-dungeon markers in a circle or box that count up (1, 2, 3...) as you place them.
 - **Layers**: Split a map into layers (dungeon, water, terrain, objects...) that can be shown or hidden, locked, reordered, renamed and faded. Tools draw on the active layer; hidden layers are left out of exports.
@@ -117,6 +117,7 @@ npm run preview
 | `Ctrl + C` / `Cmd + C` | Copy the selected object |
 | `Ctrl + V` / `Cmd + V` | Paste it under the pointer (or one cell along), on the active layer |
 | `Ctrl + D` / `Cmd + D` | Duplicate the selected object |
+| Right-click / long-press / `Shift + F10` | Menu for the object or spot under the pointer (or the selection) |
 | `Ctrl + Alt + N` / `Cmd + Option + N` | New map |
 | `Ctrl + O` / `Cmd + O` | Open project |
 | `Ctrl + S` / `Cmd + S` | Save project (`.dndmap`) |
