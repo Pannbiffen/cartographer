@@ -332,6 +332,13 @@ export function App() {
       flushAutosaveRef.current = null;
     };
   }, [mapData, mapId, unsaved, pristineMap, preferences.autosave]);
+  // Closing or reloading the tab stores a pending save too. pagehide also
+  // fires on mobile, where beforeunload often doesn't.
+  useEffect(() => {
+    const flush = () => flushAutosaveRef.current?.();
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, []);
 
   // With autosave off, closing or reloading the tab would lose work not
   // saved to a file, so the browser asks first

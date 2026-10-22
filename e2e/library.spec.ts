@@ -61,6 +61,16 @@ test('edits made just before switching maps are kept', async ({ page }) => {
   await expect(page.getByLabel('Map title')).toHaveValue('Quick Edit');
 });
 
+test('the last edit is kept when the tab is reloaded at once', async ({ page }) => {
+  await openApp(page);
+  await drawMap(page, 'Before');
+  // No waiting for the autosave: leaving the page stores the map first
+  await page.getByLabel('Map title').fill('Reloaded');
+  await page.reload();
+  await openApp(page);
+  await expect(page.getByLabel('Map title')).toHaveValue('Reloaded');
+});
+
 test('My Maps opens, renames, duplicates and deletes maps', async ({ page }) => {
   const errors = trackErrors(page);
   await openApp(page);

@@ -116,3 +116,17 @@ test('resetting local data asks first, then restores defaults', async ({ page })
   dialog = await openPreferences(page);
   await expect(dialog.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true');
 });
+
+test('resetting local data right after an edit does not store the map again', async ({ page }) => {
+  await openApp(page);
+  // No waiting for the autosave, so it is still pending at the reset
+  await dragCells(page, [-15, 8], [-5, 8]);
+  const dialog = await openPreferences(page);
+  await dialog.getByRole('button', { name: /Reset all local data/ }).click();
+  await Promise.all([
+    page.waitForEvent('load'),
+    dialog.getByRole('button', { name: 'Delete and reload' }).click(),
+  ]);
+  await openApp(page);
+  expect((await stats(page)).rooms).toBe(194);
+});
