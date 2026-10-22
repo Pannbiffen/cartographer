@@ -234,3 +234,41 @@ async function cellColour(page: Page, gx: number, gy: number) {
     p
   );
 }
+
+test('lights on the level below show through it, faded with it, but not on this level\'s floors', async ({ page }) => {
+  await openApp(page);
+  // A red light in the Grand Hall
+  await page.keyboard.press('i');
+  await clickCell(page, -2, 4);
+  await page.getByLabel('Light colour').fill('#ff0000');
+  await page.keyboard.press('Escape');
+
+  // A level above with one small room over part of the light
+  await page.getByRole('button', { name: 'New above' }).click();
+  await page.getByRole('checkbox', { name: 'Show level below' }).check();
+  await page.keyboard.press('r');
+  await dragCells(page, [0, 3], [1, 5]);
+  const redness = async (gx: number, gy: number) => {
+    const [r, g] = (await cellColour(page, gx, gy)).split(',').map(Number);
+    return r - g;
+  };
+  const open = await redness(-1, 4);
+  const covered = await redness(0, 4);
+  // Stronger with the level below
+  const opacity = page.getByLabel('Level below opacity');
+  await opacity.fill('0.8');
+  expect(await redness(-1, 4)).toBeGreaterThan(open + 3);
+  await opacity.fill('0.3');
+  expect(await redness(-1, 4)).toBe(open);
+
+  // Without the light, the open spot is less red and the covered one the same
+  await page.keyboard.press('PageDown');
+  await page.keyboard.press('v');
+  await clickCell(page, -2, 4);
+  await expect(page.getByText('Selected: light')).toBeVisible();
+  await page.keyboard.press('Delete');
+  await page.keyboard.press('PageUp');
+  await expect(page.getByTestId('current-level')).toHaveText('Level 2');
+  expect(await redness(-1, 4)).toBeLessThan(open - 3);
+  expect(await redness(0, 4)).toBe(covered);
+});

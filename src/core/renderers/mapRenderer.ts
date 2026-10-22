@@ -13,7 +13,7 @@ import {
 import { renderDoor, renderStairs, renderProp } from './propsRenderer';
 import { renderLabel } from './labelRenderer';
 import { renderFloorTextures, renderGround } from './floorRenderer';
-import { renderLighting } from './lightingRenderer';
+import { renderLightGlow, renderLighting } from './lightingRenderer';
 import { floorPath, floorSegments, hasShapes, layerFloor } from '../geometry/region';
 import { hexGridPath, isHexGrid } from '../geometry/hex';
 import { thinWallSegments } from '../geometry/walls';
@@ -160,13 +160,20 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
  * when given. Pass `lighting: false` to leave out darkness and lights even
  * when the map has them on (VTT exports light the map themselves),
  * `labels: false` to leave out the text, and `ground: false` to leave out an
- * outdoor map's ground (drawn first with `renderMapGround`).
+ * outdoor map's ground (drawn first with `renderMapGround`). `lightsBelow`
+ * are the faint levels drawn underneath (`renderGhostLevel`), whose lights
+ * then show where those levels do.
  */
 export function renderMap(
   ctx: CanvasRenderingContext2D,
   mapData: LevelMap,
   gridRange: GridRange | null,
-  { lighting = true, labels = true, ground = true }: { lighting?: boolean; labels?: boolean; ground?: boolean } = {}
+  {
+    lighting = true,
+    labels = true,
+    ground = true,
+    lightsBelow = [],
+  }: { lighting?: boolean; labels?: boolean; ground?: boolean; lightsBelow?: { map: LevelMap; opacity: number }[] } = {}
 ) {
   const theme = THEMES[mapData.theme] || THEMES.parchment;
   const gridSize = mapData.gridSize;
@@ -215,7 +222,25 @@ export function renderMap(
   }
 
   // Darkness covers the grid too, but labels stay readable on top
-  if (lighting && mapData.lighting) renderLighting(ctx, mapData);
+  if (lighting && mapData.lighting) {
+    renderLighting(ctx, mapData);
+    // Over this level's darkness, which would all but hide them, but kept
+    // off its floors like the rest of the faint level
+    for (const below of lightsBelow) {
+      drawWithOpacity(ctx, below.opacity, (glowCtx) => {
+        renderLightGlow(glowCtx, below.map);
+        // The scratch canvas is shared, so its compositing is put back after
+        glowCtx.save();
+        glowCtx.globalCompositeOperation = 'destination-out';
+        glowCtx.fillStyle = '#000';
+        for (const layer of layers) {
+          if (hasShapes(layer)) glowCtx.fill(floorPath(layerFloor(layer), gridSize), 'evenodd');
+          else fillCells(glowCtx, layer.rooms, gridSize);
+        }
+        glowCtx.restore();
+      });
+    }
+  }
 
   // Labels of every layer sit above everything, including the grid
   for (const layer of labels ? layers : []) {

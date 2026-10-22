@@ -6,20 +6,17 @@ import { mergeWallSegments, visibilityPolygon, type Point, type Segment } from '
 import { mapLights, type MapLight } from '../lighting';
 import { visibleLayers } from '../layers';
 
-// Walls and light shapes for the last map drawn; maps are replaced on every
-// edit, so the layer list identifies the content
-let cache: {
-  layers: MapLayer[];
-  gridSize: number;
-  walls: Segment[];
-  shapes: Map<string, Point[]>;
-} | null = null;
+// Walls and light shapes per level drawn (the active one and the faint ones
+// below); maps are replaced on every edit, so the layer list identifies the content
+const caches = new WeakMap<MapLayer[], { gridSize: number; walls: Segment[]; shapes: Map<string, Point[]> }>();
 
 function lightShape(map: LevelMap, light: MapLight): Point[] {
   const g = map.gridSize;
-  if (!cache || cache.layers !== map.layers || cache.gridSize !== g) {
+  let cache = caches.get(map.layers);
+  if (!cache || cache.gridSize !== g) {
     const walls = mergeWallSegments(combinedWalls(visibleLayers(map), g));
-    cache = { layers: map.layers, gridSize: g, walls, shapes: new Map() };
+    cache = { gridSize: g, walls, shapes: new Map() };
+    caches.set(map.layers, cache);
   }
   const key = `${light.x},${light.y},${light.radius}`;
   let shape = cache.shapes.get(key);
@@ -83,7 +80,18 @@ export function renderLighting(ctx: CanvasRenderingContext2D, map: LevelMap) {
   }
 
   // Coloured glow first, so the darkness on top dims it near the edges too
-  for (const light of lights) {
+  renderLightGlow(ctx, map);
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(darkCanvas, 0, 0);
+  ctx.restore();
+}
+
+/** Each light's coloured glow, stopped by walls, without lifting any darkness */
+export function renderLightGlow(ctx: CanvasRenderingContext2D, map: LevelMap) {
+  const g = map.gridSize;
+  for (const light of mapLights(map)) {
     const cx = light.x * g;
     const cy = light.y * g;
     const r = light.radius * g;
@@ -96,11 +104,6 @@ export function renderLighting(ctx: CanvasRenderingContext2D, map: LevelMap) {
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     ctx.restore();
   }
-
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(darkCanvas, 0, 0);
-  ctx.restore();
 }
 
 /**

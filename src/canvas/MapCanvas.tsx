@@ -291,7 +291,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         minY: Math.floor(-viewport.y / viewport.zoom / gridSize) - 1,
         maxX: Math.ceil((width - viewport.x) / viewport.zoom / gridSize) + 1,
         maxY: Math.ceil((height - viewport.y) / viewport.zoom / gridSize) + 1,
-      }, { ground: false });
+      }, { ground: false, lightsBelow: levelsBelow });
       renderLightMarkers(mapCtx, mapData, viewport.zoom, theme.ink);
       mapCtx.restore();
       cache.key = key;
