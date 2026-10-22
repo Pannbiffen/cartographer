@@ -60,7 +60,7 @@ interface DockPanelProps {
   levels: MapLevel[];
   activeLevelId: string;
   onSelectLevel: (id: string) => void;
-  onAddLevel: () => void;
+  onAddLevel: (where: 'above' | 'below') => void;
   onDeleteLevel: () => void;
   onMoveLevel: (delta: 1 | -1) => void;
   // The levels below drawn faintly under the active one, and how strongly
@@ -160,10 +160,15 @@ const LevelsSection: React.FC<
         })}
       </ul>
 
-      <div className="grid grid-cols-4 gap-1">
-        <button aria-label="New level" title="New level" onClick={onAddLevel} className={ICON_BUTTON_CLASS}>
-          <Plus className="w-3.5 h-3.5" />
+      <div className="grid grid-cols-2 gap-1">
+        <button onClick={() => onAddLevel('above')} className={BUTTON_CLASS}>
+          New above
         </button>
+        <button onClick={() => onAddLevel('below')} className={BUTTON_CLASS}>
+          New below
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-1">
         <button
           aria-label="Move level up"
           title="Move level up"

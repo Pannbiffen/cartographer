@@ -883,9 +883,9 @@ export function App() {
   const activeLayerIndex = activeLevel.layers.indexOf(activeLayer);
 
   // Levels
-  const handleAddLevel = () => {
+  const handleAddLevel = (where: 'above' | 'below') => {
     const level = newLevel(newLevelId(), nextLevelName(mapData));
-    modifyMap((draft) => addLevel(draft, level, activeLevelId));
+    modifyMap((draft) => addLevel(draft, level, activeLevelId, where));
     goToLevel(level.id);
   };
   const handleDeleteLevel = () => {
@@ -1015,7 +1015,8 @@ export function App() {
     {
       label: 'Level',
       items: [
-        { label: 'New Level', onSelect: handleAddLevel },
+        { label: 'New Level Above', onSelect: () => handleAddLevel('above') },
+        { label: 'New Level Below', onSelect: () => handleAddLevel('below') },
         { label: 'Delete Level', disabled: mapData.levels.length <= 1, onSelect: handleDeleteLevel },
         'separator',
         {

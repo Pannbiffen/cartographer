@@ -292,7 +292,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
               onTake={() => onTakeStairs(selection)}
             />
           ) : (
-            <p className="text-ui-muted leading-snug">Add a level (Level &gt; New Level) to link these stairs to it.</p>
+            <p className="text-ui-muted leading-snug">Add a level (Level &gt; New Level Above) to link these stairs to it.</p>
           )}
         </>
       )}

@@ -40,10 +40,11 @@ export function nextLevelName(map: MapData): string {
   return `Level ${n}`;
 }
 
-/** Inserts a level just after level `afterId` (or at the end) */
-export function addLevel(draft: MapData, level: MapLevel, afterId: string) {
-  const index = draft.levels.findIndex((l) => l.id === afterId);
-  draft.levels.splice(index === -1 ? draft.levels.length : index + 1, 0, level);
+/** Inserts a level just above (after) or below (before) level `nextToId`, or at the top */
+export function addLevel(draft: MapData, level: MapLevel, nextToId: string, where: 'above' | 'below' = 'above') {
+  const index = draft.levels.findIndex((l) => l.id === nextToId);
+  if (index === -1) draft.levels.push(level);
+  else draft.levels.splice(where === 'above' ? index + 1 : index, 0, level);
 }
 
 /** Removes a level; the last remaining level is kept. Stairs leading to it lead nowhere. */

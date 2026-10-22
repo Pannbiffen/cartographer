@@ -1,13 +1,31 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openApp, cellCenter, clickCell, dragCells, saveMap, stats } from './helpers';
 
+test('a new level goes above or below the active one, undone in one step', async ({ page }) => {
+  await openApp(page);
+  const levels = page.getByRole('list', { name: 'Levels' });
+  await page.getByRole('button', { name: 'New below' }).click();
+  await expect(levels.getByRole('listitem')).toHaveText(['Level 1', 'Level 2']);
+  await expect(levels.getByRole('button', { pressed: true })).toHaveText('Level 2');
+  expect((await saveMap(page)).levels.map((l) => l.name)).toEqual(['Level 2', 'Level 1']);
+
+  await page.getByRole('menuitem', { name: 'Level' }).click();
+  await page.getByRole('menuitem', { name: 'New Level Above' }).click();
+  await expect(levels.getByRole('listitem')).toHaveText(['Level 1', 'Level 3', 'Level 2']);
+  await expect(levels.getByRole('button', { pressed: true })).toHaveText('Level 3');
+  expect((await saveMap(page)).levels.map((l) => l.name)).toEqual(['Level 2', 'Level 3', 'Level 1']);
+
+  await page.keyboard.press('Control+z');
+  expect((await saveMap(page)).levels.map((l) => l.name)).toEqual(['Level 2', 'Level 1']);
+});
+
 test('levels keep their own layers, and can be switched, renamed, reordered and deleted with undo', async ({ page }) => {
   await openApp(page);
   const levels = page.getByRole('list', { name: 'Levels' });
   const starterRooms = (await stats(page)).rooms;
   await expect(page.getByTestId('current-level')).toBeHidden();
 
-  await page.getByRole('button', { name: 'New level' }).click();
+  await page.getByRole('button', { name: 'New above' }).click();
   await expect(page.getByTestId('current-level')).toHaveText('Level 2');
   await expect(levels.getByRole('button', { pressed: true })).toHaveText('Level 2');
   expect((await stats(page)).rooms).toBe(0);
@@ -56,10 +74,10 @@ test('stairs link levels; taking them opens the other level at the stairs leadin
   await openApp(page);
   await page.keyboard.press('v');
   await clickCell(page, 0, -10);
-  await expect(page.getByText('Add a level (Level > New Level)')).toBeVisible();
+  await expect(page.getByText('Add a level (Level > New Level Above)')).toBeVisible();
 
   await page.getByRole('menuitem', { name: 'Level' }).click();
-  await page.getByRole('menuitem', { name: 'New Level' }).click();
+  await page.getByRole('menuitem', { name: 'New Level Above' }).click();
   await page.getByLabel('Level name').fill('Catacombs');
   await page.keyboard.press('Enter');
   // Stairs on the new level, leading back up
@@ -131,7 +149,7 @@ test('the level below shows faintly, at a chosen opacity, from the View menu or 
   // A floor cell of level 1; level 2 is empty there
   const map = await saveMap(page);
   const [gx, gy] = Object.keys(map.levels[0].layers[0].rooms)[0].split(',').map(Number);
-  await page.getByRole('button', { name: 'New level' }).click();
+  await page.getByRole('button', { name: 'New above' }).click();
   await expect(page.getByTestId('current-level')).toHaveText('Level 2');
   const empty = await pixel(gx, gy);
 
@@ -183,10 +201,10 @@ test('further levels below show fainter by a step each, down to none', async ({ 
   const [gx, gy] = Object.keys(map.levels[0].layers[0].rooms)[0].split(',').map(Number);
 
   // Level 1 has floor at the cell; levels 2 and 3 above it are empty
-  await page.getByRole('button', { name: 'New level' }).click();
+  await page.getByRole('button', { name: 'New above' }).click();
   await page.getByRole('checkbox', { name: 'Show level below' }).check();
   await expect(furtherBelow).toBeHidden();
-  await page.getByRole('button', { name: 'New level' }).click();
+  await page.getByRole('button', { name: 'New above' }).click();
   await expect(page.getByTestId('current-level')).toHaveText('Level 3');
   await page.getByRole('slider', { name: 'Level below opacity' }).fill('0.3');
   const empty = await pixel(gx, gy);
