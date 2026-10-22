@@ -68,7 +68,8 @@ export function keepsSelection(tool: ToolType): boolean {
 /** Tools that lay floor (or re-texture it), in the floor texture picked in the panel */
 export function laysFloor(tool: ToolType, shapeMode: ShapeMode): boolean {
   if (tool === 'polygon' || tool === 'circle' || tool === 'path') return shapeMode === 'add';
-  return tool === 'room-brush' || tool === 'room-rect' || tool === 'tunnel' || tool === 'fill';
+  // Walls that close off an area make it a room
+  return tool === 'room-brush' || tool === 'room-rect' || tool === 'tunnel' || tool === 'fill' || tool === 'wall';
 }
 
 export const THEME_NAMES: [ThemeType, string][] = [

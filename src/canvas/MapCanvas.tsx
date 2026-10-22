@@ -73,6 +73,7 @@ import {
   snapToHex,
   type Hex,
 } from '../core/geometry/hex';
+import { enclosedByStroke } from '../core/tools/enclose';
 import { edgeKey, edgePath, nearestCorner, wallKey, wallTouchesCell } from '../core/geometry/walls';
 import type { ModifyMap } from '../App';
 
@@ -180,8 +181,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const freePlacementRef = useRef<boolean>(false);
   // Hex under the pointer during a hex-grid brush stroke
   const lastHexRef = useRef<Hex | null>(null);
-  // Corner the wall stroke has reached, and whether it erases (Shift held)
-  const wallStrokeRef = useRef<{ corner: Pair; erase: boolean } | null>(null);
+  // Corner the wall stroke has reached, whether it erases (Shift held), and
+  // the edges it has run along
+  const wallStrokeRef = useRef<{ corner: Pair; erase: boolean; edges: [Pair, Pair][] } | null>(null);
   const wallEraseRef = useRef<boolean>(false);
   const strokeCountRef = useRef<number>(0);
   const longPressRef = useRef<{ timer: number; x: number; y: number } | null>(null);
@@ -592,10 +594,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     [hexGrid, activeTool, brushSize, floorTexture, editLayer]
   );
 
-  // Adds walls along the grid edges between two corners, or erases those there
+  // Adds walls along grid edges, or erases those there
   const traceWalls = useCallback(
-    (from: Pair, to: Pair, erase: boolean) => {
-      const edges = edgePath(mapData.gridType, from, to);
+    (edges: [Pair, Pair][], erase: boolean) => {
       if (edges.length === 0) return;
       editLayer(
         (draft) => {
@@ -613,8 +614,25 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         { coalesce: `stroke-${strokeCountRef.current}` }
       );
     },
-    [mapData.gridType, editLayer]
+    [editLayer]
   );
+
+  // Makes whatever a finished wall stroke closed off into floor, in the same undo step
+  const finishWallStroke = (edges: [Pair, Pair][]) => {
+    const { cells, hexes } = enclosedByStroke(mapData.gridType, visibleLayers(mapData), edges);
+    if (cells.length === 0 && hexes.length === 0) return;
+    editLayer(
+      (draft) => {
+        if (hexGrid && hexes.length > 0) {
+          applyShape(draft, hexes.map((h) => hexPolygon(hexGrid, h)), 'add', floorTexture);
+          return;
+        }
+        uncutCells(draft, cells);
+        for (const c of cells) carveFloor(draft, `${c.x},${c.y}`, floorTexture);
+      },
+      { coalesce: `stroke-${strokeCountRef.current}` }
+    );
+  };
 
   // Adds the finished polygon or path to the active layer, or cuts it out
   const finishShape = useCallback(() => {
@@ -943,6 +961,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       wallStrokeRef.current = {
         corner: nearestCorner(mapData.gridType, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize),
         erase: e.shiftKey,
+        edges: [],
       };
       drawMap();
     } else if (activeTool === 'door') {
@@ -1031,7 +1050,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       wallEraseRef.current = stroke ? stroke.erase : e.shiftKey;
       const corner = nearestCorner(mapData.gridType, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize);
       if (stroke && (corner[0] !== stroke.corner[0] || corner[1] !== stroke.corner[1])) {
-        traceWalls(stroke.corner, corner, stroke.erase);
+        const edges = edgePath(mapData.gridType, stroke.corner, corner);
+        stroke.edges.push(...edges);
+        traceWalls(edges, stroke.erase);
         stroke.corner = corner;
       }
     }
@@ -1085,6 +1106,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const radius = circleRadius(centre, snapPoint(end), freePlacementRef.current);
       editLayer((draft) => applyShape(draft, [circlePolygon(centre[0], centre[1], radius)], shapeMode, floorTexture));
     }
+    const wallStroke = wallStrokeRef.current;
+    if (wallStroke && !wallStroke.erase && wallStroke.edges.length > 0) finishWallStroke(wallStroke.edges);
     const box = selectBoxRef.current;
     if (box) {
       const [x0, y0] = box.start;

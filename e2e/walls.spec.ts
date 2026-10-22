@@ -153,3 +153,87 @@ async function downloadText(page: Page, trigger: () => Promise<unknown>) {
   for await (const chunk of stream) chunks.push(chunk as Buffer);
   return Buffer.concat(chunks).toString('utf8');
 }
+
+/** One stroke through several grid points */
+async function tracePoints(page: Page, points: [number, number][]) {
+  const [first, ...rest] = await Promise.all(points.map((p) => gridPoint(page, ...p)));
+  await page.mouse.move(first.x, first.y);
+  await page.mouse.down();
+  for (const p of rest) await page.mouse.move(p.x, p.y, { steps: 10 });
+  await page.mouse.up();
+}
+
+const roomCells = async (page: Page) => Object.keys((await layer(page)).rooms).filter((k) => {
+  const [x, y] = k.split(',').map(Number);
+  return x >= -15 && x <= -8 && y >= -8 && y <= 0;
+});
+
+test('walls that close off ground make it a room with the chosen floor, undone with the stroke', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page, { mapSettings: true });
+  await page.getByLabel('Ground').selectOption('grass');
+  await page.keyboard.press('a');
+  await page.getByRole('button', { name: 'cobbles' }).click();
+
+  // One stroke all the way round a 4x4 square
+  await tracePoints(page, [[-15, -7], [-11, -7], [-11, -3], [-15, -3], [-15, -7]]);
+  expect(await roomCells(page)).toHaveLength(16);
+  let l = await layer(page);
+  expect(l.floors['-14,-6']).toBe('cobbles');
+  expect(l.walls).toHaveLength(16);
+
+  // It is a room now, so the fill tool re-textures it
+  await page.keyboard.press('k');
+  await page.getByRole('button', { name: 'tiles' }).click();
+  await clickCell(page, -13, -5);
+  expect((await layer(page)).floors['-12,-4']).toBe('tiles');
+
+  // Undo the fill, then the stroke takes its room with it
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+  l = await layer(page);
+  expect(await roomCells(page)).toHaveLength(0);
+  expect(l.walls).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
+test('an outline closed over several strokes becomes a room, one with a gap does not', async ({ page }) => {
+  await openApp(page);
+  await page.keyboard.press('a');
+  // Three sides leave a gap: no room
+  await tracePoints(page, [[-15, -7], [-11, -7], [-11, -3], [-15, -3]]);
+  expect(await roomCells(page)).toHaveLength(0);
+  // The last side closes it
+  await tracePoints(page, [[-15, -3], [-15, -7]]);
+  expect(await roomCells(page)).toHaveLength(16);
+  // A wall splitting the new room changes no floor
+  await tracePoints(page, [[-13, -7], [-13, -3]]);
+  expect(await roomCells(page)).toHaveLength(16);
+});
+
+test('on a hex grid, walls that close off a hex make it floor', async ({ page }) => {
+  await openApp(page, { mapSettings: true });
+  await page.getByLabel('Grid shape').selectOption('hex-pointy');
+  await page.keyboard.press('a');
+  // Round the six corners of the hex centred near (-12.5, -4.5)
+  const corners: [number, number][] = await page.evaluate(() => {
+    const s = Math.sqrt(3) / 6;
+    // Hex (q, r) with centre on the lattice; pick r = -6 row, nearest q
+    const r = -6;
+    const q = Math.round(-13 - r / 2);
+    const cx = q + r / 2 + 0.5;
+    const cy = r * 3 * s + 0.5;
+    const offsets: [number, number][] = [[0.5, s], [0, 2 * s], [-0.5, s], [-0.5, -s], [0, -2 * s], [0.5, -s]];
+    return offsets.map(([dx, dy]) => [cx + dx, cy + dy] as [number, number]);
+  });
+  await tracePoints(page, [...corners, corners[0]]);
+  const l = await layer(page);
+  expect(l.walls).toHaveLength(6);
+  // Exactly one hex of floor: √3/2 square units
+  const area = l.shapes.flat().reduce((sum, ring) => {
+    let a = 0;
+    for (let i = 0; i < ring.length - 1; i++) a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+    return sum + Math.abs(a) / 2;
+  }, 0);
+  expect(area).toBeCloseTo(Math.sqrt(3) / 2, 4);
+});
