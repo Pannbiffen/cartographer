@@ -41,6 +41,13 @@ export type FloorTexture =
 // How the rock outside the walls is shaded
 export type HatchStyle = 'dyson' | 'crosshatch' | 'stipple' | 'shadow' | 'none';
 
+// A layer's own hatching, in place of the map's `hatchStyle`, `hatchLength` and `hatchDensity`
+export interface LayerHatching {
+  style: HatchStyle;
+  length: number; // pixels
+  density: number; // 1 to 5
+}
+
 export type WallStyle = 'bold' | 'fine' | 'rough';
 
 export type GridType = 'square' | 'hex-pointy' | 'hex-flat';
@@ -161,6 +168,7 @@ export interface MapLayer extends LayerContent {
   visible: boolean;
   locked: boolean; // locked layers can't be drawn on or selected from
   opacity: number; // 0 to 1
+  hatching?: LayerHatching; // missing: the map's hatching
 }
 
 /** Settings shared by every level of a map */

@@ -1,5 +1,5 @@
 // Map layers: creating, finding, reordering and loading them
-import type { LayerContent, LevelMap, MapData, MapLayer, MapLevel } from '../types/map';
+import type { HatchStyle, LayerContent, LayerHatching, LevelMap, MapData, MapLayer, MapLevel, MapSettings } from '../types/map';
 
 /** Anything holding layers: a level, or the level view the canvas draws */
 type Layered = Pick<MapLevel, 'layers'>;
@@ -51,6 +51,11 @@ export function findLayer(map: MapData | LevelMap, id: string): MapLayer | undef
     if (layer) return layer;
   }
   return undefined;
+}
+
+/** The hatching a layer is drawn with: its own, or else the map's */
+export function layerHatching(layer: MapLayer, settings: MapSettings): LayerHatching {
+  return layer.hatching ?? { style: settings.hatchStyle, length: settings.hatchLength, density: settings.hatchDensity };
 }
 
 /** Tools only draw on, and select from, layers that are shown and unlocked */
@@ -110,6 +115,18 @@ type StoredLevel = Partial<Omit<MapLevel, 'layers'>> & { layers?: StoredLayer[] 
 type StoredMap = Partial<Omit<MapData, 'levels'>> &
   Partial<LayerContent> & { layers?: StoredLayer[]; levels?: StoredLevel[] };
 
+const HATCH_STYLES: HatchStyle[] = ['dyson', 'crosshatch', 'stipple', 'shadow', 'none'];
+
+/** A stored layer's own hatching, or undefined (the map's) when it is missing or broken */
+function cleanHatching(raw: unknown): LayerHatching | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const { style, length, density } = raw as Record<string, unknown>;
+  if (!HATCH_STYLES.includes(style as HatchStyle)) return undefined;
+  const num = (v: unknown, min: number, max: number, fallback: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
+  return { style: style as HatchStyle, length: num(length, 6, 24, 14), density: num(density, 1, 5, 3) };
+}
+
 function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string>): MapLayer {
   const layer: MapLayer = {
     ...newLayer(stored.id ?? `layer${index + 1}`, stored.name ?? `Layer ${index + 1}`),
@@ -128,6 +145,9 @@ function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string
     labels: stored.labels ?? [],
     lights: stored.lights ?? [],
   };
+  const hatching = cleanHatching(stored.hatching);
+  if (hatching) layer.hatching = hatching;
+  else delete layer.hatching;
   // Edits find layers by id across all levels, so a clash gets a new one
   if (takenIds.has(layer.id)) layer.id = newLayerId();
   takenIds.add(layer.id);

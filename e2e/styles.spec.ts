@@ -90,6 +90,54 @@ test('wall and hatching styles are saved with the map', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('a layer can override the map hatching, and keeps it after a reload', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  // A room on the starter layer, then one on a new layer three cells along
+  await page.keyboard.press('r');
+  await dragCells(page, [-15, 8], [-13, 10]);
+  await page.getByRole('button', { name: 'New layer' }).click();
+  await dragCells(page, [-9, 8], [-7, 10]);
+  await page.getByRole('button', { name: 'Zoom to fit' }).click();
+
+  // Just outside each room's left wall, clear of grid lines and the hatching
+  // of the room above them
+  const outsideFirst = () => inkShare(page, -15.8, 9.15, 0.7);
+  const outsideSecond = () => inkShare(page, -9.8, 9.15, 0.7);
+  expect(await outsideFirst()).toBeGreaterThan(0.02);
+  expect(await outsideSecond()).toBeGreaterThan(0.02);
+
+  const hatching = page.getByLabel('Layer hatching', { exact: true });
+  await expect(hatching).toHaveValue('map');
+  await expect(page.getByLabel('Layer hatching width')).toHaveCount(0);
+  await hatching.selectOption('none');
+  expect(await outsideSecond()).toBe(0);
+  expect(await outsideFirst()).toBeGreaterThan(0.02);
+  await expect(page.getByLabel('Layer hatching width')).toHaveCount(0);
+
+  let layers = (await saveMap(page)).levels[0].layers;
+  expect(layers[0].hatching).toBeUndefined();
+  expect(layers[1].hatching).toEqual({ style: 'none', length: 14, density: 3 });
+
+  // Kept in the browser's copy of the map
+  await page.reload();
+  await expect(page.getByTestId('map-stats')).toBeVisible();
+  await page.getByRole('list', { name: 'Layers' }).getByRole('button', { name: 'Layer 2', exact: true }).click();
+  await expect(hatching).toHaveValue('none');
+  expect(await outsideSecond()).toBe(0);
+  expect(await outsideFirst()).toBeGreaterThan(0.02);
+
+  // Its own style gets its own width; back to the map's, the override goes
+  await hatching.selectOption('shadow');
+  await page.getByLabel('Layer hatching width').fill('20');
+  expect((await saveMap(page)).levels[0].layers[1].hatching).toEqual({ style: 'shadow', length: 20, density: 3 });
+  await hatching.selectOption('map');
+  layers = (await saveMap(page)).levels[0].layers;
+  expect(layers[1].hatching).toBeUndefined();
+  expect(await outsideSecond()).toBeGreaterThan(0.02);
+  expect(errors).toEqual([]);
+});
+
 test('stipple hatching on a large map draws from a tile, zoomed out and back in', async ({ page }) => {
   const errors = trackErrors(page);
   // Count the dots drawn, on any canvas

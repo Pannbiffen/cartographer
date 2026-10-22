@@ -5,8 +5,10 @@ import type {
   PropType,
   FoliageType,
   FloorTexture,
+  HatchStyle,
   LabelStyle,
   LevelMap,
+  MapLayer,
   MapLevel,
   Selection,
   ShapeMode,
@@ -19,6 +21,7 @@ import {
   BUTTON_CLASS,
   FIELD_CLASS,
   FLOOR_TEXTURES,
+  HATCH_STYLES,
   LABEL_STYLES,
   PROP_TYPES,
   TOOLS,
@@ -27,7 +30,7 @@ import {
   optionButtonClass,
 } from './options';
 import type { ModifyMap } from '../App';
-import { findLayer, withLayer } from '../core/layers';
+import { findLayer, layerHatching, withLayer } from '../core/layers';
 import { withLevel } from '../core/levels';
 import type { Preferences } from '../core/preferences';
 import { isHexGrid } from '../core/geometry/hex';
@@ -258,6 +261,58 @@ const LevelsSection: React.FC<
   );
 };
 
+// The active layer's hatching: the map's, or its own style, width and density
+const LayerHatchingControls: React.FC<{
+  mapData: LevelMap;
+  layer: MapLayer;
+  editLayer: (id: string, edit: (layer: MapLayer) => void, coalesce?: string) => void;
+}> = ({ mapData, layer, editLayer }) => {
+  const hatch = layerHatching(layer, mapData);
+  const setStyle = (style: HatchStyle | 'map') =>
+    editLayer(layer.id, (l) => {
+      if (style === 'map') delete l.hatching;
+      else l.hatching = { ...layerHatching(l, mapData), style };
+    });
+  return (
+    <>
+      <label className="flex flex-col gap-0.5">
+        <span>Layer hatching</span>
+        <select
+          aria-label="Layer hatching"
+          value={layer.hatching ? layer.hatching.style : 'map'}
+          onChange={(e) => setStyle(e.target.value as HatchStyle | 'map')}
+          className={FIELD_CLASS}
+        >
+          <option value="map">Map default</option>
+          {HATCH_STYLES.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
+      </label>
+      {layer.hatching && hatch.style !== 'none' && (
+        <>
+          <Slider
+            label="Layer hatching width"
+            value={hatch.length}
+            display={`${hatch.length}px`}
+            min={6}
+            max={24}
+            onChange={(v) => editLayer(layer.id, (l) => { l.hatching = { ...layerHatching(l, mapData), length: v }; }, `layer-hatch-length-${layer.id}`)}
+          />
+          <Slider
+            label="Layer hatching density"
+            value={hatch.density}
+            display={String(hatch.density)}
+            min={1}
+            max={5}
+            onChange={(v) => editLayer(layer.id, (l) => { l.hatching = { ...layerHatching(l, mapData), density: v }; }, `layer-hatch-density-${layer.id}`)}
+          />
+        </>
+      )}
+    </>
+  );
+};
+
 // Layer list (top layer first) with show/lock toggles, plus the active layer's settings
 const LayersSection: React.FC<
   Pick<
@@ -366,6 +421,7 @@ const LayersSection: React.FC<
             step={0.05}
             onChange={(v) => editLayer(active.id, (l) => { l.opacity = v; }, `layer-opacity-${active.id}`)}
           />
+          <LayerHatchingControls mapData={mapData} layer={active} editLayer={editLayer} />
         </>
       )}
     </Section>

@@ -17,7 +17,7 @@ import { renderLighting } from './lightingRenderer';
 import { floorPath, floorSegments, hasShapes, layerFloor } from '../geometry/region';
 import { hexGridPath, isHexGrid } from '../geometry/hex';
 import { thinWallSegments } from '../geometry/walls';
-import { visibleLayers } from '../layers';
+import { layerHatching, visibleLayers } from '../layers';
 
 export interface GridRange {
   minX: number;
@@ -88,18 +88,11 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
 
   // 1. Exterior hatching goes down first so floors cover any strokes that
   //    stray into neighbouring rooms
-  const hatchStyle = mapData.hatchStyle;
-  if (hatchStyle === 'dyson') {
-    renderDysonHatching(
-      ctx,
-      wallSegments,
-      gridSize,
-      mapData.hatchLength,
-      mapData.hatchDensity,
-      theme.hatch
-    );
-  } else if (hatchStyle !== 'none') {
-    renderBandHatching(ctx, wallSegments, hatchStyle, mapData.hatchLength, mapData.hatchDensity, theme.hatch);
+  const hatch = layerHatching(layer, mapData);
+  if (hatch.style === 'dyson') {
+    renderDysonHatching(ctx, wallSegments, gridSize, hatch.length, hatch.density, theme.hatch);
+  } else if (hatch.style !== 'none') {
+    renderBandHatching(ctx, wallSegments, hatch.style, hatch.length, hatch.density, theme.hatch);
   }
 
   // 2. Floors and their textures
