@@ -91,6 +91,32 @@ test('the properties panel can be hidden from the View menu', async ({ page }) =
   expect(await canvasWidth()).toBeGreaterThan(before);
 });
 
+test('the Levels and Layers sections fold from their headers', async ({ page }) => {
+  await openApp(page);
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  const layersHeader = panel.getByRole('button', { name: 'Layers' });
+  await expect(layersHeader).toHaveAttribute('aria-expanded', 'true');
+
+  await layersHeader.click();
+  await expect(layersHeader).toHaveAttribute('aria-expanded', 'false');
+  await expect(panel.getByRole('list', { name: 'Layers' })).toHaveCount(0);
+  await expect(panel.getByRole('list', { name: 'Levels' })).toBeVisible();
+
+  // Kept across reloads
+  await page.reload();
+  await openApp(page);
+  await expect(layersHeader).toHaveAttribute('aria-expanded', 'false');
+  await expect(panel.getByRole('list', { name: 'Layers' })).toHaveCount(0);
+
+  // Each folds on its own
+  const levelsHeader = panel.getByRole('button', { name: 'Levels' });
+  await levelsHeader.click();
+  await expect(panel.getByRole('list', { name: 'Levels' })).toHaveCount(0);
+  await layersHeader.click();
+  await expect(panel.getByRole('list', { name: 'Layers' })).toBeVisible();
+  await expect(levelsHeader).toHaveAttribute('aria-expanded', 'false');
+});
+
 test('the Levels and Layers sections can be hidden from their menus', async ({ page }) => {
   await openApp(page);
   const panel = page.getByRole('complementary', { name: 'Properties' });

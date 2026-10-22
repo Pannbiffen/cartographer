@@ -21,6 +21,9 @@ export interface Preferences {
   // The Levels and Layers sections of the properties panel
   showLevelsSection: boolean;
   showLayersSection: boolean;
+  // Whether they are unfolded below their headers
+  levelsOpen: boolean;
+  layersOpen: boolean;
   // Draw the level before the active one faintly underneath it
   showLevelBelow: boolean;
   // How strongly it shows through, 0 to 1
@@ -46,6 +49,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showMapSettings: false,
   showLevelsSection: true,
   showLayersSection: true,
+  levelsOpen: true,
+  layersOpen: true,
   showLevelBelow: false,
   levelBelowOpacity: 0.3,
   showLevelsFurtherBelow: false,

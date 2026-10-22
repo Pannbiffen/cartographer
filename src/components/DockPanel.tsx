@@ -15,7 +15,7 @@ import type {
 } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
 import { Slider } from './Slider';
-import { ArrowDown, ArrowUp, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
 import {
   DOOR_TYPES,
   BUTTON_CLASS,
@@ -75,10 +75,31 @@ interface DockPanelProps {
   onMoveLayer: (delta: 1 | -1) => void;
 }
 
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+// A titled part of the panel; given `onToggle`, its header folds it away and back
+const Section: React.FC<{ title: string; open?: boolean; onToggle?: () => void; children: React.ReactNode }> = ({
+  title,
+  open = true,
+  onToggle,
+  children,
+}) => (
   <section className="border-b border-ui-border">
-    <h2 className="px-2.5 py-1 bg-ui-sunken font-semibold text-ui-text border-b border-ui-border">{title}</h2>
-    <div className="p-2.5 flex flex-col gap-2.5">{children}</div>
+    <h2 className={`bg-ui-sunken font-semibold text-ui-text ${open ? 'border-b border-ui-border' : ''}`}>
+      {onToggle ? (
+        <button
+          type="button"
+          aria-expanded={open}
+          title={`${open ? 'Fold' : 'Unfold'} ${title.toLowerCase()}`}
+          onClick={onToggle}
+          className="w-full flex items-center gap-1 px-2.5 py-1 text-left hover:bg-ui-hover"
+        >
+          {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          {title}
+        </button>
+      ) : (
+        <div className="px-2.5 py-1">{title}</div>
+      )}
+    </h2>
+    {open && <div className="p-2.5 flex flex-col gap-2.5">{children}</div>}
   </section>
 );
 
@@ -110,6 +131,8 @@ const Choices = <T extends string>({
 type PanelSetting =
   | 'showLevelsSection'
   | 'showLayersSection'
+  | 'levelsOpen'
+  | 'layersOpen'
   | 'showLevelBelow'
   | 'levelBelowOpacity'
   | 'showLevelsFurtherBelow'
@@ -143,12 +166,12 @@ const LevelsSection: React.FC<
   preferences,
   onPreferencesChange,
 }) => {
-  const { showLevelBelow, levelBelowOpacity, showLevelsFurtherBelow, levelBelowFade } = preferences;
+  const { showLevelBelow, levelBelowOpacity, showLevelsFurtherBelow, levelBelowFade, levelsOpen } = preferences;
   const index = levels.findIndex((l) => l.id === activeLevelId);
   const active = levels[index];
 
   return (
-    <Section title="Levels">
+    <Section title="Levels" open={levelsOpen} onToggle={() => onPreferencesChange({ levelsOpen: !levelsOpen })}>
       <ul aria-label="Levels" className="border border-ui-border rounded-sm bg-ui-field">
         {[...levels].reverse().map((level) => {
           const isActive = level.id === activeLevelId;
@@ -328,16 +351,34 @@ const LayerHatchingControls: React.FC<{
 const LayersSection: React.FC<
   Pick<
     DockPanelProps,
-    'mapData' | 'onModifyMap' | 'activeLayerId' | 'onSelectLayer' | 'onAddLayer' | 'onDeleteLayer' | 'onMoveLayer'
+    | 'mapData'
+    | 'onModifyMap'
+    | 'activeLayerId'
+    | 'onSelectLayer'
+    | 'onAddLayer'
+    | 'onDeleteLayer'
+    | 'onMoveLayer'
+    | 'preferences'
+    | 'onPreferencesChange'
   >
-> = ({ mapData, onModifyMap, activeLayerId, onSelectLayer, onAddLayer, onDeleteLayer, onMoveLayer }) => {
+> = ({
+  mapData,
+  onModifyMap,
+  activeLayerId,
+  onSelectLayer,
+  onAddLayer,
+  onDeleteLayer,
+  onMoveLayer,
+  preferences: { layersOpen },
+  onPreferencesChange,
+}) => {
   const active = findLayer(mapData, activeLayerId);
   const index = active ? mapData.layers.indexOf(active) : -1;
   const editLayer = (id: string, edit: Parameters<typeof withLayer>[2], coalesce?: string) =>
     onModifyMap((draft) => withLayer(draft, id, edit), coalesce ? { coalesce } : undefined);
 
   return (
-    <Section title="Layers">
+    <Section title="Layers" open={layersOpen} onToggle={() => onPreferencesChange({ layersOpen: !layersOpen })}>
       <ul aria-label="Layers" className="border border-ui-border rounded-sm bg-ui-field">
         {[...mapData.layers].reverse().map((layer) => {
           const isActive = layer.id === activeLayerId;
@@ -617,6 +658,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
           onAddLayer={onAddLayer}
           onDeleteLayer={onDeleteLayer}
           onMoveLayer={onMoveLayer}
+          preferences={preferences}
+          onPreferencesChange={onPreferencesChange}
         />
       )}
     </aside>
