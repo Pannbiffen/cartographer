@@ -25,7 +25,8 @@
 - **Hex Grid**: Show a pointy- or flat-top hex grid instead of squares. The room brush and eraser then work in whole hexes, and shapes snap to hex centres and corners.
 - **Floor Textures**: Procedurally drawn flagstones, stone slabs, wooden planks, cobbles, tiles, marble, carpet, dirt, sand or grass, chosen per room as you draw it, with any room tool (cells, polygons, circles, paths and hexes). The Fill tool (or right-click > Fill Room With) re-textures a whole room in one click, up to its walls and doors; `Alt`+click (or right-click > Pick Floor Texture) picks up the texture under the pointer.
 - **Outdoor Maps**: Set Ground in Map settings (or for new maps in Preferences) to grass, dirt, sand, cobbles or any other floor texture, and the whole map becomes ground instead of blank paper. Rooms drawn on it get walls as usual, so buildings sit in a field or a town square; draw walls in the open with the Wall tool. Exports include the ground.
-- **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
+- **Water**: Paint lakes, moats and indoor pools with shoreline ripple lines.
+- **Rivers**: Click points along the way and the River tool lays a river through them that winds between the points and swells and narrows as it goes. Set its narrowest and widest width, how far it wanders and a seed (roll a new one for another river along the same points). It merges with painted water into one shoreline, and the eraser takes it away cell by cell.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
 - **Lighting**: Place lights with their own colour, radius and intensity; the rest of the map goes dark and walls cast shadows. Torches give off light too.
 - **Walls**: Drag along the grid with the Wall tool to put thin walls inside or between rooms, such as splitting a hall in two (on hex grids they follow hex edges). Walls that close off an area make it a room, in the floor texture picked in the panel, so a building or yard can be outlined wall by wall. They're drawn in the room wall style, block light, stop the Fill tool and export as VTT walls; a door on one opens it. `Shift`+drag erases them, and they can be selected, moved and deleted like doors.
@@ -33,7 +34,6 @@
 - **Procedural Generators**:
   - BSP Dungeon Generator (rooms + corridors)
   - Cellular Automata Cave Generator (winding organic caverns)
-  - Meandering river
 - **Export Capabilities**:
   - 🖼️ **Images**: PNG or WebP at 1x–4x resolution, with or without grid.
   - 🎲 **Universal VTT (`.dd2vtt`)**: Line-of-sight walls, door portals and lights (placed lights and torches) for Foundry VTT (via the Universal Battlemap Importer module), Fantasy Grounds Unity and other UVTT-compatible tools.
@@ -105,8 +105,9 @@ npm run preview
 | `H` | Free path |
 | `K` | Fill room with the chosen floor texture |
 | `Alt` + click (room and fill tools) | Pick the floor texture under the pointer |
-| `Enter` / `Backspace` / `Esc` (while drawing a polygon or path) | Finish / remove last point / cancel |
+| `Enter` / `Backspace` / `Esc` (while drawing a polygon, path or river) | Finish / remove last point / cancel |
 | `W` | Water |
+| `Y` | River |
 | `F` | Foliage & terrain |
 | `A` | Wall (`Shift` + drag erases walls) |
 | `D` | Door |

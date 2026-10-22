@@ -1,5 +1,6 @@
 // Procedural Dyson-style pen hatching, wall contouring, and water ripples
 import { tilePattern, viewRect, wrap } from '../renderers/patternTiles';
+import type { Pair, Polygon } from '../../types/map';
 
 export interface WallSegment {
   x1: number;
@@ -401,6 +402,69 @@ export function renderWaterRipples(
     ctx.stroke();
   }
 
+  ctx.restore();
+}
+
+/**
+ * Shoreline ripples inside free-form water (polygons in grid units), the same
+ * three lines as along water cells, broken about once a cell. Draw them
+ * clipped to the water, as the inner lines can cross in tight corners.
+ */
+export function renderShoreRipples(
+  ctx: CanvasRenderingContext2D,
+  water: Polygon[],
+  gridSize: number,
+  waterTint: string = '#2d5a68'
+) {
+  const rippleOffsets = [3, 7, 12];
+  const opacities = [0.85, 0.55, 0.3];
+  const widths = [1.5, 1.1, 0.8];
+  const rings: { ring: Pair[]; inward: number }[] = [];
+  for (const polygon of water) {
+    polygon.forEach((closed, ringIndex) => {
+      const ring = closed.slice(0, -1).map(([x, y]) => [x * gridSize, y * gridSize] as Pair);
+      if (ring.length < 3) return;
+      let area = 0;
+      ring.forEach(([x1, y1], i) => {
+        const [x2, y2] = ring[(i + 1) % ring.length];
+        area += x1 * y2 - x2 * y1;
+      });
+      // (-dy, dx) points into a ring of positive area; water lies inside
+      // the outline and outside its holes
+      rings.push({ ring, inward: (area > 0 ? 1 : -1) * (ringIndex === 0 ? 1 : -1) });
+    });
+  }
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = waterTint;
+  ctx.setLineDash([gridSize - 4, 4]);
+  for (let r = 0; r < rippleOffsets.length; r++) {
+    const offset = rippleOffsets[r];
+    ctx.globalAlpha = opacities[r];
+    ctx.lineWidth = widths[r];
+    ctx.beginPath();
+    for (const { ring, inward } of rings) {
+      const edgeNormal = (i: number): Pair => {
+        const [ax, ay] = ring[i];
+        const [bx, by] = ring[(i + 1) % ring.length];
+        const len = Math.hypot(bx - ax, by - ay) || 1;
+        return [(inward * -(by - ay)) / len, (inward * (bx - ax)) / len];
+      };
+      ring.forEach(([x, y], i) => {
+        // Mitred: each corner moves so both edges beside it end up `offset` in
+        const [n1, n2] = [edgeNormal((i + ring.length - 1) % ring.length), edgeNormal(i)];
+        const k = Math.max(0.35, 1 + n1[0] * n2[0] + n1[1] * n2[1]);
+        const px = x + ((n1[0] + n2[0]) * offset) / k;
+        const py = y + ((n1[1] + n2[1]) * offset) / k;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+    }
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

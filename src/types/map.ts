@@ -8,6 +8,7 @@ export type ToolType =
   | 'path'
   | 'fill'
   | 'water' 
+  | 'river'
   | 'foliage' 
   | 'wall'
   | 'door' 
@@ -153,6 +154,8 @@ export interface LayerContent {
   // those). Replaced on edit, never mutated.
   floorAreas: Partial<Record<FloorTexture, Polygon[]>>;
   water: { [key: string]: boolean }; // "x,y" => true for water cells
+  // Free-form water (rivers) merged with the water cells. Replaced on edit, never mutated.
+  waterAreas: Polygon[];
   foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
   doors: PlacedDoor[];
   walls: PlacedWall[];

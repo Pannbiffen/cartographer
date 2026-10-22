@@ -5,7 +5,7 @@ import type { HatchStyle, LayerContent, LayerHatching, LevelMap, MapData, MapLay
 type Layered = Pick<MapLevel, 'layers'>;
 
 export function emptyContent(): LayerContent {
-  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, foliage: {}, doors: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
+  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, waterAreas: [], foliage: {}, doors: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
 }
 
 export function newLayer(id: string, name: string, content: Partial<LayerContent> = {}): MapLayer {
@@ -25,7 +25,7 @@ export function newLayerId(): string {
 }
 
 /** A layer's own copy of every collection, so a draft can be edited freely
- * (shapes, cuts and floor areas are replaced whole, so they keep being shared) */
+ * (shapes, cuts, floor and water areas are replaced whole, so they keep being shared) */
 export function cloneLayer(layer: MapLayer): MapLayer {
   return {
     ...layer,
@@ -137,6 +137,7 @@ function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string
     floors: stored.floors ?? {},
     floorAreas: stored.floorAreas ?? {},
     water: stored.water ?? {},
+    waterAreas: stored.waterAreas ?? [],
     foliage: stored.foliage ?? {},
     doors: stored.doors ?? [],
     walls: stored.walls ?? [],

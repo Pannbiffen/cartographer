@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   BrickWall,
   DoorOpen,
+  Droplets,
   Eraser,
   Footprints,
   Circle,
@@ -50,6 +51,7 @@ export const TOOLS: ToolInfo[] = [
   { id: 'path', label: 'Free Path', icon: Spline, shortcut: 'H' },
   { id: 'fill', label: 'Fill Room', icon: PaintBucket, shortcut: 'K' },
   { id: 'water', label: 'Water', icon: Waves, shortcut: 'W' },
+  { id: 'river', label: 'River', icon: Droplets, shortcut: 'Y' },
   { id: 'foliage', label: 'Foliage & Terrain', icon: Trees, shortcut: 'F' },
   { id: 'wall', label: 'Wall', icon: BrickWall, shortcut: 'A' },
   { id: 'door', label: 'Door / Portal', icon: DoorOpen, shortcut: 'D' },

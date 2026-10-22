@@ -91,6 +91,45 @@ export function layerFloor(layer: MapLayer): Polygon[] {
   return floor;
 }
 
+const waterById = new Map<string, { cells: string; areas: Polygon[]; water: Polygon[] }>();
+
+/** A layer's water cells and free-form water merged into one outline, in grid units */
+export function layerWater(layer: MapLayer): Polygon[] {
+  const cells = Object.keys(layer.water).join(';');
+  const cached = waterById.get(layer.id);
+  if (cached && cached.cells === cells && cached.areas === layer.waterAreas) return cached.water;
+  const parts = [...cellPolygons(layer.water), ...layer.waterAreas];
+  let water: Polygon[] = [];
+  try {
+    if (parts.length > 0) water = union(parts[0], ...parts.slice(1));
+  } catch (err) {
+    console.warn('Could not merge water', err);
+    water = parts;
+  }
+  waterById.set(layer.id, { cells, areas: layer.waterAreas, water });
+  return water;
+}
+
+/** Adds free-form water to a layer */
+export function addWater(layer: LayerContent, area: Polygon[]) {
+  if (area.length === 0) return;
+  try {
+    layer.waterAreas = union(area, ...layer.waterAreas);
+  } catch (err) {
+    console.warn('Could not add water', err);
+  }
+}
+
+/** Takes an area out of a layer's free-form water */
+export function eraseWater(layer: LayerContent, area: Polygon[]) {
+  if (layer.waterAreas.length === 0 || area.length === 0) return;
+  try {
+    layer.waterAreas = difference(layer.waterAreas, area);
+  } catch (err) {
+    console.warn('Could not erase water', err);
+  }
+}
+
 /** True if (x, y) in grid units lies inside the polygons (outside their holes) */
 export function pointInPolygons(polygons: Polygon[], x: number, y: number): boolean {
   return polygons.some((polygon) => pointInPolygon(polygon, x, y));
@@ -204,9 +243,10 @@ function floorWalls(layers: MapLayer[], gridSize: number): WallSegment[] {
   return floorSegments(union(floors[0], ...floors.slice(1)), gridSize);
 }
 
-/** Extent of a layer's shapes in grid units, or null if it has none */
+/** Extent of a layer's shapes and free-form water in grid units, or null if it has none */
 export function shapeBounds(layer: LayerContent): { minX: number; minY: number; maxX: number; maxY: number } | null {
-  return layer.shapes.length === 0 ? null : polygonBounds(layer.shapes);
+  const polygons = [...layer.shapes, ...layer.waterAreas];
+  return polygons.length === 0 ? null : polygonBounds(polygons);
 }
 
 /**
@@ -306,9 +346,11 @@ export function uncutCells(layer: LayerContent, cells: GridCoord[]) {
   });
 }
 
-/** Erased cells take shapes, cuts and textured areas with them */
+/** Erased cells take shapes, cuts, textured areas and free-form water with them */
 export function eraseShapesInCells(layer: LayerContent, cells: GridCoord[]) {
-  if ((!hasShapes(layer) && !hasFloorAreas(layer)) || cells.length === 0) return;
+  if (cells.length === 0) return;
+  if (layer.waterAreas.length > 0) eraseWater(layer, cellPolygons(cellSet(cells)));
+  if (!hasShapes(layer) && !hasFloorAreas(layer)) return;
   const squares = cellPolygons(cellSet(cells));
   guarded(layer, () => {
     if (layer.shapes.length > 0) layer.shapes = difference(layer.shapes, squares);

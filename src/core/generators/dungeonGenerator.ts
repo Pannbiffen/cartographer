@@ -1,4 +1,4 @@
-// Procedural map generators: BSP Dungeons, Cellular Automata Caves, and Organic Rivers
+// Procedural map generators: BSP Dungeons and Cellular Automata Caves
 
 export interface GeneratorResult {
   rooms: { [key: string]: boolean };
@@ -157,28 +157,4 @@ export function generateCaveSystem(
   }
 
   return { rooms: roomsMap, water: waterMap };
-}
-
-/**
- * Generates an organic river cutting through a natural cavern or ruins
- */
-export function generateRiver(
-  startX: number = -15,
-  endX: number = 15,
-  baseY: number = 0,
-  widthRange: number = 3
-): { [key: string]: boolean } {
-  const waterMap: { [key: string]: boolean } = {};
-
-  let currentY = baseY;
-  for (let x = startX; x <= endX; x++) {
-    currentY += Math.floor((Math.random() - 0.5) * 2.2);
-    const riverWidth = Math.floor(Math.random() * widthRange) + 2;
-
-    for (let w = -Math.floor(riverWidth / 2); w <= Math.floor(riverWidth / 2); w++) {
-      waterMap[`${x},${currentY + w}`] = true;
-    }
-  }
-
-  return waterMap;
 }

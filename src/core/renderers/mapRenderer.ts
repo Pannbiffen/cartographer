@@ -8,13 +8,14 @@ import {
   renderWallOutlines,
   extractWaterSegments,
   renderWaterRipples,
+  renderShoreRipples,
   renderFoliageCluster,
 } from '../geometry/hatching';
 import { renderDoor, renderStairs, renderProp } from './propsRenderer';
 import { renderLabel } from './labelRenderer';
 import { renderFloorTextures, renderGround } from './floorRenderer';
 import { renderLightGlow, renderLighting } from './lightingRenderer';
-import { floorPath, floorSegments, hasShapes, layerFloor } from '../geometry/region';
+import { floorPath, floorSegments, hasShapes, layerFloor, layerWater } from '../geometry/region';
 import { hexGridPath, isHexGrid } from '../geometry/hex';
 import { thinWallSegments } from '../geometry/walls';
 import { layerHatching, visibleLayers } from '../layers';
@@ -110,7 +111,16 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
   }
 
   // 3. Water sits on top of floors (pools inside rooms) and terrain
-  if (Object.keys(layer.water).length > 0) {
+  if (layer.waterAreas.length > 0) {
+    // Free-form water merges with the water cells into one shoreline
+    const water = floorPath(layerWater(layer), gridSize);
+    ctx.fillStyle = theme.waterTint;
+    ctx.fill(water, 'evenodd');
+    ctx.save();
+    ctx.clip(water, 'evenodd');
+    renderShoreRipples(ctx, layerWater(layer), gridSize, theme.waterRipples);
+    ctx.restore();
+  } else if (Object.keys(layer.water).length > 0) {
     ctx.fillStyle = theme.waterTint;
     fillCells(ctx, layer.water, gridSize);
     const waterSegments = extractWaterSegments(layer.water, gridSize);

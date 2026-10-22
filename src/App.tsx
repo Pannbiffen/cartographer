@@ -30,7 +30,6 @@ import { MyMapsDialog } from './components/MyMapsDialog';
 import {
   generateBspDungeon,
   generateCaveSystem,
-  generateRiver,
 } from './core/generators/dungeonGenerator';
 import { triggerDownload } from './core/export/imageExporter';
 import { ARROW_DIRECTIONS, focusUsesArrows, isTypingInField } from './core/keyboard';
@@ -91,6 +90,7 @@ import {
 } from './core/levels';
 import { fitViewport, zoomAbout } from './core/viewport';
 import { fillRoom, textureAt } from './core/tools/fill';
+import { DEFAULT_RIVER, type RiverSettings } from './core/geometry/river';
 import { createBlankMap, mapLook } from './core/newMap';
 import { clearShareFragment, isShareFragment, readShareFragment } from './core/share';
 
@@ -309,6 +309,7 @@ export function App() {
   const [floorTexture, setFloorTexture] = useState<FloorTexture>('plain');
   const [labelStyle, setLabelStyle] = useState<LabelStyle>('text');
   const [shapeMode, setShapeMode] = useState<ShapeMode>('add');
+  const [river, setRiver] = useState<RiverSettings>(DEFAULT_RIVER);
 
   const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, zoom: 1 });
   // Canvas size in CSS pixels, known after its first layout
@@ -846,15 +847,6 @@ export function App() {
     );
   };
 
-  const handleGenerateRiver = () => {
-    const water = generateRiver(-18, 18, 0, 3);
-    modifyMap((draft) =>
-      withLayer(draft, activeLayerId, (layer) => {
-        layer.water = { ...layer.water, ...water };
-      })
-    );
-  };
-
   const handleClearMap = () => {
     if (window.confirm('Are you sure you want to clear the entire map?')) {
       modifyMap((draft) => {
@@ -1067,7 +1059,6 @@ export function App() {
         'separator',
         { label: 'Generate Dungeon', disabled: !activeLayerEditable, onSelect: handleGenerateDungeon },
         { label: 'Generate Cave', disabled: !activeLayerEditable, onSelect: handleGenerateCave },
-        { label: 'Add River', disabled: !activeLayerEditable, onSelect: handleGenerateRiver },
       ],
     },
     {
@@ -1216,6 +1207,7 @@ export function App() {
               floorTexture={floorTexture}
               labelStyle={labelStyle}
               shapeMode={shapeMode}
+              river={river}
               activeLayerId={activeLayerId}
               viewport={viewport}
               onViewportChange={setViewport}
@@ -1257,6 +1249,8 @@ export function App() {
             onLabelStyleChange={setLabelStyle}
             shapeMode={shapeMode}
             onShapeModeChange={setShapeMode}
+            river={river}
+            onRiverChange={setRiver}
             selection={activeSelection}
             onClearSelection={() => setSelection([])}
             onDuplicate={handleDuplicate}

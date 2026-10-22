@@ -15,7 +15,7 @@ import type {
 } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
 import { Slider } from './Slider';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Dices, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
 import {
   DOOR_TYPES,
   BUTTON_CLASS,
@@ -34,6 +34,7 @@ import { findLayer, layerHatching, withLayer } from '../core/layers';
 import { withLevel } from '../core/levels';
 import type { Preferences } from '../core/preferences';
 import { isHexGrid } from '../core/geometry/hex';
+import type { RiverSettings } from '../core/geometry/river';
 
 interface DockPanelProps {
   activeTool: ToolType;
@@ -51,6 +52,8 @@ interface DockPanelProps {
   onLabelStyleChange: (style: LabelStyle) => void;
   shapeMode: ShapeMode;
   onShapeModeChange: (mode: ShapeMode) => void;
+  river: RiverSettings;
+  onRiverChange: (river: RiverSettings) => void;
   selection: Selection[];
   onClearSelection: () => void;
   onDuplicate: () => void;
@@ -497,6 +500,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onLabelStyleChange,
   shapeMode,
   onShapeModeChange,
+  river,
+  onRiverChange,
   selection,
   onClearSelection,
   onDuplicate,
@@ -535,14 +540,19 @@ export const DockPanel: React.FC<DockPanelProps> = ({
       'Click to place corners. Click the first corner, double-click or press Enter to finish. Backspace takes back a corner, Esc cancels.',
     circle: 'Drag from the centre out to the edge.',
     path: 'Click points along the way; double-click or press Enter to finish. Backspace takes back a point, Esc cancels.',
+    river:
+      'Click points along the way; the river winds between them. Double-click or press Enter to finish. Backspace takes back a point, Esc cancels.',
   };
+  const cells = (n: number) => `${n} ${n === 1 ? 'cell' : 'cells'}`;
 
   return (
     <aside aria-label="Properties" className="w-64 shrink-0 bg-ui border-l border-ui-border overflow-y-auto text-ui-text">
       <Section title={toolLabel}>
         {shapeHint[activeTool] && (
           <>
-            <Choices label="Mode" options={['add', 'cut'] as ShapeMode[]} value={shapeMode} columns={2} onChange={onShapeModeChange} />
+            {activeTool !== 'river' && (
+              <Choices label="Mode" options={['add', 'cut'] as ShapeMode[]} value={shapeMode} columns={2} onChange={onShapeModeChange} />
+            )}
             <p className="text-ui-muted leading-snug">
               {shapeHint[activeTool]} Points snap to the grid; hold Shift to place them freely.
             </p>
@@ -591,6 +601,59 @@ export const DockPanel: React.FC<DockPanelProps> = ({
             max={5}
             onChange={onBrushSizeChange}
           />
+        )}
+
+        {activeTool === 'river' && (
+          <>
+            <Slider
+              label="Narrowest"
+              value={river.minWidth}
+              display={cells(river.minWidth)}
+              min={0.5}
+              max={6}
+              step={0.5}
+              onChange={(minWidth) => onRiverChange({ ...river, minWidth, maxWidth: Math.max(minWidth, river.maxWidth) })}
+            />
+            <Slider
+              label="Widest"
+              value={river.maxWidth}
+              display={cells(river.maxWidth)}
+              min={0.5}
+              max={6}
+              step={0.5}
+              onChange={(maxWidth) => onRiverChange({ ...river, maxWidth, minWidth: Math.min(maxWidth, river.minWidth) })}
+            />
+            <Slider
+              label="Wander"
+              value={river.wander}
+              display={river.wander === 0 ? 'none' : cells(river.wander)}
+              min={0}
+              max={4}
+              step={0.5}
+              onChange={(wander) => onRiverChange({ ...river, wander })}
+            />
+            <label className="flex items-center gap-2">
+              <span>Seed</span>
+              <input
+                type="number"
+                min={1}
+                value={river.seed}
+                onChange={(e) => {
+                  const seed = Math.round(Number(e.target.value));
+                  if (Number.isFinite(seed)) onRiverChange({ ...river, seed });
+                }}
+                className={`${FIELD_CLASS} min-w-0 flex-1`}
+              />
+              <button
+                aria-label="New seed"
+                title="New seed: another river along the same points"
+                onClick={() => onRiverChange({ ...river, seed: 1 + Math.floor(Math.random() * 9999) })}
+                className={ICON_BUTTON_CLASS}
+              >
+                <Dices className="w-3.5 h-3.5" />
+              </button>
+            </label>
+          </>
         )}
 
         {hexBrush && (

@@ -19,9 +19,9 @@ const CANVAS_SHORTCUTS: [string, string][] = [
   ['Nudge selection', 'Arrows'],
   ['Nudge a label a whole cell', 'Shift + arrows'],
   ['Clear selection, close dialog', 'Esc'],
-  ['Finish polygon or path', 'Enter'],
+  ['Finish polygon, path or river', 'Enter'],
   ['Remove last point', 'Backspace'],
-  ['Cancel polygon or path', 'Esc'],
+  ['Cancel polygon, path or river', 'Esc'],
   ['Erase walls (wall tool)', 'Shift + drag'],
   ['Pick the floor texture there (room and fill tools)', 'Alt + click'],
 ];
