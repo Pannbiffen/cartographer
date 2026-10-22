@@ -1,4 +1,5 @@
 // Procedural Dyson-style pen hatching, wall contouring, and water ripples
+import { tilePattern, viewRect, wrap } from '../renderers/patternTiles';
 
 export interface WallSegment {
   x1: number;
@@ -129,30 +130,99 @@ export function renderDysonHatching(
   ctx.restore();
 }
 
-/** Adds the area within `width` of any wall to the current path, with round corners */
-function bandPath(ctx: CanvasRenderingContext2D, segments: WallSegment[], width: number) {
+// Hatching tiles span about this many world pixels, a whole number of
+// dots or lines across, so they repeat seamlessly
+const HATCH_TILE = 120;
+
+/** Dots on a jittered lattice, so they look placed by hand */
+function stipplePattern(ctx: CanvasRenderingContext2D, density: number, inkColor: string) {
+  const spacing = Math.max(3, 9 - density * 1.2);
+  const n = Math.ceil(HATCH_TILE / spacing);
+  const draw = (tctx: CanvasRenderingContext2D) => {
+    tctx.fillStyle = inkColor;
+    tctx.beginPath();
+    // A ring of dots around the tile too: jittered, they cross its edges
+    for (let j = -1; j <= n; j++) {
+      for (let i = -1; i <= n; i++) {
+        const wi = wrap(i, n);
+        const wj = wrap(j, n);
+        const px = (i + pseudoRandom(wi, wj, 3) - 0.5) * spacing;
+        const py = (j + pseudoRandom(wi, wj, 7) - 0.5) * spacing;
+        const r = 0.5 + pseudoRandom(wi, wj, 13) * 0.7;
+        tctx.moveTo(px + r, py);
+        tctx.arc(px, py, r, 0, Math.PI * 2);
+      }
+    }
+    tctx.fill();
+  };
+  return tilePattern(ctx, `stipple|${spacing}|${inkColor}`, n * spacing, draw, { fit: true });
+}
+
+/** Two sets of diagonals, tighter with more density */
+function crosshatchPattern(ctx: CanvasRenderingContext2D, density: number, inkColor: string) {
+  const spacing = Math.max(4, 14 - density * 1.8);
+  const size = Math.ceil(HATCH_TILE / spacing) * spacing;
+  const draw = (tctx: CanvasRenderingContext2D) => {
+    tctx.strokeStyle = inkColor;
+    tctx.lineWidth = 0.9;
+    tctx.beginPath();
+    // Every line through the tile, running a step past its edges
+    for (let c = -size - spacing; c <= size + spacing; c += spacing) {
+      tctx.moveTo(c - spacing, -spacing);
+      tctx.lineTo(c + size + spacing, size + spacing);
+      tctx.moveTo(c + size + spacing, -spacing);
+      tctx.lineTo(c - spacing, size + spacing);
+    }
+    tctx.stroke();
+  };
+  return tilePattern(ctx, `crosshatch|${spacing}|${inkColor}`, size, draw, { fit: true });
+}
+
+/**
+ * The walls as lines, with level and upright walls that continue each other
+ * joined into one: a cell's worth of wall at a time, a long wall would be
+ * stroked as dozens of round-capped pieces.
+ */
+function straightRuns(segments: WallSegment[]): [number, number, number, number][] {
+  const runs: [number, number, number, number][] = [];
+  // Level walls by their y, upright ones by their x, as [start, end] along them
+  const level = new Map<number, [number, number][]>();
+  const upright = new Map<number, [number, number][]>();
+  const add = (lines: Map<number, [number, number][]>, at: number, a: number, b: number) => {
+    const span: [number, number] = a < b ? [a, b] : [b, a];
+    const list = lines.get(at);
+    if (list) list.push(span);
+    else lines.set(at, [span]);
+  };
   for (const seg of segments) {
-    // A strip either side of the wall, always wound the same way so that
-    // overlapping strips don't cancel out under the non-zero fill rule
-    const nx = seg.normalX * width;
-    const ny = seg.normalY * width;
-    const flip = (seg.x2 - seg.x1) * ny - (seg.y2 - seg.y1) * nx < 0;
-    const [ax, ay, bx, by] = flip ? [seg.x2, seg.y2, seg.x1, seg.y1] : [seg.x1, seg.y1, seg.x2, seg.y2];
-    ctx.moveTo(ax - nx, ay - ny);
-    ctx.lineTo(bx - nx, by - ny);
-    ctx.lineTo(bx + nx, by + ny);
-    ctx.lineTo(ax + nx, ay + ny);
-    ctx.closePath();
-    for (const [x, y] of [[seg.x1, seg.y1], [seg.x2, seg.y2]]) {
-      ctx.moveTo(x + width, y);
-      ctx.arc(x, y, width, 0, Math.PI * 2);
+    if (seg.y1 === seg.y2) add(level, seg.y1, seg.x1, seg.x2);
+    else if (seg.x1 === seg.x2) add(upright, seg.x1, seg.y1, seg.y2);
+    else runs.push([seg.x1, seg.y1, seg.x2, seg.y2]);
+  }
+  for (const [lines, isLevel] of [[level, true], [upright, false]] as const) {
+    for (const [at, spans] of lines) {
+      spans.sort((p, q) => p[0] - q[0]);
+      let [start, end] = spans[0];
+      for (const [a, b] of spans) {
+        if (a <= end) {
+          end = Math.max(end, b);
+          continue;
+        }
+        runs.push(isLevel ? [start, at, end, at] : [at, start, at, end]);
+        [start, end] = [a, b];
+      }
+      runs.push(isLevel ? [start, at, end, at] : [at, start, at, end]);
     }
   }
+  return runs;
 }
 
 /**
  * Shades a band of `width` pixels around the walls with crosshatching,
  * stippling or a soft shadow. Floors drawn afterwards cover its inner half.
+ * The band is one wide round-capped stroke along the walls in view, painted
+ * from a repeating tile: clipped to as a path, and dotted dot by dot, it took
+ * up to a second a frame on large maps (#61).
  */
 export function renderBandHatching(
   ctx: CanvasRenderingContext2D,
@@ -162,65 +232,38 @@ export function renderBandHatching(
   density: number,
   inkColor: string
 ) {
-  if (segments.length === 0) return;
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const seg of segments) {
-    minX = Math.min(minX, seg.x1, seg.x2);
-    minY = Math.min(minY, seg.y1, seg.y2);
-    maxX = Math.max(maxX, seg.x1, seg.x2);
-    maxY = Math.max(maxY, seg.y1, seg.y2);
-  }
-  minX -= width;
-  minY -= width;
-  maxX += width;
-  maxY += width;
-
+  const view = viewRect(ctx);
   ctx.save();
-  ctx.strokeStyle = inkColor;
-  ctx.fillStyle = inkColor;
+  ctx.beginPath();
+  for (const [x1, y1, x2, y2] of straightRuns(segments)) {
+    if (
+      Math.max(x1, x2) + width < view.minX ||
+      Math.min(x1, x2) - width > view.maxX ||
+      Math.max(y1, y2) + width < view.minY ||
+      Math.min(y1, y2) - width > view.maxY
+    ) continue;
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+  }
+  ctx.lineCap = 'round';
   if (style === 'shadow') {
     // A wide faint band under a narrow one, so it darkens towards the wall
+    ctx.strokeStyle = inkColor;
     ctx.globalAlpha = 0.16;
     for (const w of [width, width * 0.5]) {
-      ctx.beginPath();
-      bandPath(ctx, segments, w);
-      ctx.fill();
+      ctx.lineWidth = w * 2;
+      ctx.stroke();
     }
-    ctx.restore();
-    return;
-  }
-
-  ctx.beginPath();
-  bandPath(ctx, segments, width);
-  ctx.clip();
-  if (style === 'crosshatch') {
-    // Two sets of diagonals, tighter with more density
-    const spacing = Math.max(4, 14 - density * 1.8);
-    const size = maxY - minY;
-    ctx.lineWidth = 0.9;
-    ctx.beginPath();
-    const start = Math.floor((minX - size) / spacing) * spacing;
-    for (let x = start; x <= maxX; x += spacing) {
-      ctx.moveTo(x, minY);
-      ctx.lineTo(x + size, maxY);
-      ctx.moveTo(x + size, minY);
-      ctx.lineTo(x, maxY);
-    }
-    ctx.stroke();
   } else {
-    // Dots on a jittered lattice, so they look placed by hand
-    const spacing = Math.max(3, 9 - density * 1.2);
-    ctx.beginPath();
-    for (let y = Math.floor(minY / spacing) * spacing; y <= maxY; y += spacing) {
-      for (let x = Math.floor(minX / spacing) * spacing; x <= maxX; x += spacing) {
-        const px = x + (pseudoRandom(x, y, 3) - 0.5) * spacing;
-        const py = y + (pseudoRandom(x, y, 7) - 0.5) * spacing;
-        const r = 0.5 + pseudoRandom(x, y, 13) * 0.7;
-        ctx.moveTo(px + r, py);
-        ctx.arc(px, py, r, 0, Math.PI * 2);
-      }
+    const pattern = style === 'crosshatch'
+      ? crosshatchPattern(ctx, density, inkColor)
+      : stipplePattern(ctx, density, inkColor);
+    if (pattern) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.strokeStyle = pattern;
+      ctx.lineWidth = width * 2;
+      ctx.stroke();
     }
-    ctx.fill();
   }
   ctx.restore();
 }

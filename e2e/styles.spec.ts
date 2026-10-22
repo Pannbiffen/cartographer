@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openApp, clickCell, dragCells, saveMap, trackErrors } from './helpers';
+import { openApp, clickCell, dragCells, gridPoint, saveMap, trackErrors, view } from './helpers';
 
 // The starter map leaves rows y >= 8 empty
 
@@ -40,5 +40,86 @@ test('wall and hatching styles are saved with the map', async ({ page }) => {
   const map = await saveMap(page);
   expect(map.wallStyle).toBe('rough');
   expect(map.hatchStyle).toBe('none');
+  expect(errors).toEqual([]);
+});
+
+test('stipple hatching on a large map draws from a tile, zoomed out and back in', async ({ page }) => {
+  const errors = trackErrors(page);
+  // Count the dots drawn, on any canvas
+  await page.addInitScript(() => {
+    const w = window as unknown as { arcs: number };
+    w.arcs = 0;
+    const arc = CanvasRenderingContext2D.prototype.arc;
+    CanvasRenderingContext2D.prototype.arc = function (...args) {
+      w.arcs++;
+      return arc.apply(this, args);
+    };
+  });
+  await openApp(page);
+  // 2,500 small rooms with 20,000 walls between them: dot by dot, this took
+  // seconds a frame, and sometimes nothing was drawn at all
+  const map = await saveMap(page);
+  const rooms: Record<string, boolean> = {};
+  for (let y = 0; y < 150; y += 3) {
+    for (let x = 0; x < 150; x += 3) {
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) rooms[`${x + dx},${y + dy}`] = true;
+    }
+  }
+  map.levels[0].layers = [{ ...map.levels[0].layers[0], rooms, floors: {}, doors: [], stairs: [], props: [], labels: [] }];
+  Object.assign(map, { hatchStyle: 'stipple', hatchDensity: 5, hatchLength: 24 });
+  await page.getByLabel('Open map file').setInputFiles({
+    name: 'large.dndmap',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(map)),
+  });
+  await expect(page.getByTestId('map-stats')).toContainText('Rooms: 10000');
+  const frame = () => page.evaluate(() => new Promise(requestAnimationFrame));
+  const arcs = () => page.evaluate(() => (window as unknown as { arcs: number }).arcs);
+
+  // Share of a square's pixels inked darker than the paper (with the pointer off the canvas)
+  const ink = async (gx: number, gy: number, size = 1) => {
+    const a = await gridPoint(page, gx, gy);
+    const b = await gridPoint(page, gx + size, gy + size);
+    await page.mouse.move(1, 1);
+    await frame();
+    return page.locator('canvas').evaluate((canvas: HTMLCanvasElement, [a, b]) => {
+      const box = canvas.getBoundingClientRect();
+      const scale = canvas.width / box.width;
+      const x = Math.round((a.x - box.x) * scale);
+      const y = Math.round((a.y - box.y) * scale);
+      const w = Math.max(1, Math.round((b.x - a.x) * scale));
+      const h = Math.max(1, Math.round((b.y - a.y) * scale));
+      const data = canvas.getContext('2d')!.getImageData(x, y, w, h).data;
+      let dark = 0;
+      for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] < 600) dark++;
+      return dark / (w * h);
+    }, [a, b]);
+  };
+
+  // Zoom out as far as it goes, then back in on the gap between two rooms
+  const zoomAt = async (gx: number, gy: number, deltaY: number, times: number) => {
+    const p = await gridPoint(page, gx, gy);
+    await page.mouse.move(p.x, p.y);
+    for (let i = 0; i < times; i++) await page.mouse.wheel(0, deltaY);
+  };
+  await zoomAt(75, 75, 100, 15);
+  await expect.poll(async () => (await view(page)).zoom).toBe(0.2);
+  expect(await ink(73.5, 73.5)).toBeGreaterThan(0.05);
+  await zoomAt(74.5, 73, -100, 12);
+  await expect.poll(async () => (await view(page)).zoom).toBeGreaterThan(1);
+
+  // The gap is dotted, the floor covering the band's inner half is not
+  const gap = await ink(74, 73);
+  expect(gap).toBeGreaterThan(0.05);
+  expect(gap).toBeLessThan(0.6);
+  expect(await ink(75.2, 72.2, 0.6)).toBe(0);
+
+  // Panning reuses the tile: no dots drawn one by one (thousands are in view)
+  const before = await arcs();
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(100);
+  await page.keyboard.up('ArrowRight');
+  await frame();
+  expect((await arcs()) - before).toBeLessThan(50);
   expect(errors).toEqual([]);
 });

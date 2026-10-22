@@ -5,12 +5,12 @@
 import type { FloorTexture, LayerContent, Polygon } from '../../types/map';
 import { floorPath, polygonBounds } from '../geometry/region';
 import { pseudoRandom } from '../geometry/hatching';
+import { tilePattern, viewRect, wrap } from './patternTiles';
 
 // The random numbers behind the patterns wrap every PERIOD cells. A 16-cell
 // repeat is hard to tell from one that never repeats. 8 would make tiles a
 // quarter of the size, and so quicker to redraw on zoom, if that is ever needed.
 const PERIOD = 16;
-const wrap = (n: number, m: number) => ((n % m) + m) % m;
 // A number per pair of indices, for the `seen` sets
 const pairKey = (a: number, b: number) => a * 1e6 + b;
 
@@ -216,24 +216,15 @@ export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerC
   }
 }
 
-/** The cells the canvas shows (a whole export, or the view on screen), from its transform */
+/** The cells the canvas shows, from its transform */
 function viewCells(ctx: CanvasRenderingContext2D, gridSize: number) {
-  const inverse = ctx.getTransform().inverse();
-  const { width, height } = ctx.canvas;
-  const corners = [
-    inverse.transformPoint({ x: 0, y: 0 }),
-    inverse.transformPoint({ x: width, y: 0 }),
-    inverse.transformPoint({ x: 0, y: height }),
-    inverse.transformPoint({ x: width, y: height }),
-  ];
-  const xs = corners.map((p) => p.x / gridSize);
-  const ys = corners.map((p) => p.y / gridSize);
+  const view = viewRect(ctx);
   // A cell further out, as patterns reach a little past their own cell
   return {
-    minX: Math.floor(Math.min(...xs)) - 1,
-    minY: Math.floor(Math.min(...ys)) - 1,
-    maxX: Math.ceil(Math.max(...xs)) + 1,
-    maxY: Math.ceil(Math.max(...ys)) + 1,
+    minX: Math.floor(view.minX / gridSize) - 1,
+    minY: Math.floor(view.minY / gridSize) - 1,
+    maxX: Math.ceil(view.maxX / gridSize) + 1,
+    maxY: Math.ceil(view.maxY / gridSize) + 1,
   };
 }
 
@@ -249,72 +240,25 @@ function drawTexture(
   gridSize: number,
   inkColor: string
 ) {
-  const tile = patternTile(ctx, texture, gridSize, inkColor);
-  if (!tile) {
+  const n = PATTERN_PERIOD[texture];
+  const pattern = tilePattern(ctx, `${texture}|${gridSize}|${inkColor}`, n * gridSize, (tctx) => {
+    // A ring of cells around the period too: their shapes cross its edges and
+    // wrap round to the far side
+    const ring: [number, number][] = [];
+    for (let gy = -1; gy <= n; gy++) for (let gx = -1; gx <= n; gx++) ring.push([gx, gy]);
+    strokeCells(tctx, texture, ring, gridSize, inkColor);
+  });
+  if (!pattern) {
     const list = cells();
     if (list.length > 0) drawPattern(ctx, texture, clip, list, gridSize, inkColor);
     return;
   }
-  const pattern = ctx.createPattern(tile.canvas, 'repeat');
-  if (!pattern) return;
-  // Tile pixels in world units, shifted so they land on whole canvas pixels.
-  // The tile is drawn at the canvas's scale, so its pixels are copied as they
-  // are: smoothed across a fraction of a pixel, the fine lines would blur.
-  const t = ctx.getTransform();
-  const shiftX = (Math.round(t.e) - t.e) / t.a;
-  const shiftY = (Math.round(t.f) - t.f) / t.d;
-  const worldPerPixel = (tile.period * gridSize) / tile.canvas.width;
-  pattern.setTransform(new DOMMatrix().translate(shiftX, shiftY).scale(worldPerPixel));
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   ctx.globalAlpha *= TEXTURE_ALPHA[texture] ?? 0.4;
   ctx.fillStyle = pattern;
   ctx.fill(clip, 'evenodd');
   ctx.restore();
-}
-
-// Tiles wider than this aren't made: zoomed in that far, few cells are in view
-// and drawing them directly costs no more than a huge tile
-const MAX_TILE = 2048;
-// Pixels kept in cached tiles (4 bytes each), enough for a few of the largest
-const MAX_CACHED_PIXELS = 16e6;
-// Tiles by texture, grid size, ink and size in pixels, most recently used last
-const tileCache = new Map<string, HTMLCanvasElement>();
-let cachedPixels = 0;
-
-/** One period of a texture drawn at the canvas's scale, or null when it would be too large */
-function patternTile(ctx: CanvasRenderingContext2D, texture: Pattern, gridSize: number, inkColor: string) {
-  const t = ctx.getTransform();
-  // Patterns are only ever drawn unrotated
-  if (t.b !== 0 || t.c !== 0) return null;
-  const period = PATTERN_PERIOD[texture];
-  const size = Math.max(1, Math.round(period * gridSize * Math.abs(t.a)));
-  if (size > MAX_TILE) return null;
-  const key = `${texture}|${gridSize}|${inkColor}|${size}`;
-  let canvas = tileCache.get(key);
-  if (canvas) {
-    tileCache.delete(key);
-  } else {
-    canvas = document.createElement('canvas');
-    canvas.width = canvas.height = size;
-    const tctx = canvas.getContext('2d');
-    if (!tctx) return null;
-    const scale = size / (period * gridSize);
-    tctx.setTransform(scale, 0, 0, scale, 0, 0);
-    // A ring of cells around the period too: their shapes cross its edges and
-    // wrap round to the far side
-    const cells: [number, number][] = [];
-    for (let gy = -1; gy <= period; gy++) for (let gx = -1; gx <= period; gx++) cells.push([gx, gy]);
-    strokeCells(tctx, texture, cells, gridSize, inkColor);
-    cachedPixels += size * size;
-    for (const [oldKey, old] of tileCache) {
-      if (cachedPixels <= MAX_CACHED_PIXELS) break;
-      tileCache.delete(oldKey);
-      cachedPixels -= old.width * old.height;
-    }
-  }
-  tileCache.set(key, canvas);
-  return { canvas, period };
 }
 
 // Cells drawn per path: canvas paths get slower to build the longer they get,
