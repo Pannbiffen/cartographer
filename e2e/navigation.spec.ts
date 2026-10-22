@@ -44,7 +44,7 @@ test('arrow keys pan the map while held, faster with Shift', async ({ page }) =>
 });
 
 test('arrow keys in a form field do not pan the map', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await page.getByLabel('Map title').focus();
   const start = await view(page);
   await page.keyboard.down('ArrowLeft');

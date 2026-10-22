@@ -64,7 +64,7 @@ test('Enter finishes a path and Escape abandons one', async ({ page }) => {
 
 test('a circle cut carves into a room, and painting cells over it fills back', async ({ page }) => {
   const errors = trackErrors(page);
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await page.keyboard.press('c');
   await page.getByRole('button', { name: 'cut', exact: true }).click();
   // Centred on the corner of the starter map's middle room
@@ -77,7 +77,7 @@ test('a circle cut carves into a room, and painting cells over it fills back', a
 
   // The room brush takes back the cells it paints from the cut
   await page.keyboard.press('b');
-  await page.locator('input[type=range]').first().fill('5');
+  await page.getByRole('complementary', { name: 'Properties' }).locator('input[type=range]').first().fill('5');
   await clickAt(page, 0.5, 2.5);
   layer = await topLayer(page);
   const area = layer.cuts.reduce((sum, polygon) => sum + ringArea(polygon[0]), 0);
@@ -93,7 +93,7 @@ const HEX_Y = 0.5 - 2 * Math.sqrt(3);
 
 test('on a hex grid the room brush and eraser work in whole hexes', async ({ page }) => {
   const errors = trackErrors(page);
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await page.getByLabel('Grid shape').selectOption('hex-pointy');
   await page.keyboard.press('b');
   await clickAt(page, -11.5, HEX_Y);
@@ -111,7 +111,7 @@ test('on a hex grid the room brush and eraser work in whole hexes', async ({ pag
 });
 
 test('the grid shape is saved with the map', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await page.getByLabel('Grid shape').selectOption('hex-flat');
   expect((await saveMap(page)).gridType).toBe('hex-flat');
 });

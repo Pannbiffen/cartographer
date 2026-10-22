@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { openApp, dragCells, stats, saveMap } from './helpers';
 
 test('autosave restores the map after a reload', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await dragCells(page, [-15, 8], [-5, 8]);
   await page.getByLabel('Map title').fill('My Test Map');
   await expect(page.getByText('Autosaved in this browser')).toBeVisible();
@@ -36,7 +36,7 @@ test('exports WebP images and tiled PDFs', async ({ page }) => {
 });
 
 test('project files round-trip and version 1 files without layers or labels still load', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   const map = await saveMap(page);
   const { layers, ...settings } = map;
   const { rooms, water, foliage, doors, stairs, props } = layers[0];

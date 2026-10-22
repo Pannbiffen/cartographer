@@ -1,14 +1,34 @@
 import { expect, type Page } from '@playwright/test';
 import type { MapData } from '../src/types/map';
 
-/** Opens the app with the starter map (each test gets fresh browser storage) */
-export async function openApp(page: Page) {
+/**
+ * Opens the app with the starter map (each test gets fresh browser storage).
+ * `mapSettings` starts with the map settings drawer open, as if left open last time,
+ * so the map is framed in the canvas above it.
+ */
+export async function openApp(page: Page, { mapSettings = false } = {}) {
+  if (mapSettings) {
+    await page.addInitScript(() => {
+      const key = 'cartographer.preferences.v1';
+      const prefs = JSON.parse(localStorage.getItem(key) ?? '{}');
+      if (prefs.showMapSettings === undefined) {
+        localStorage.setItem(key, JSON.stringify({ ...prefs, showMapSettings: true }));
+      }
+    });
+  }
   await page.goto('/');
   await expect(page.locator('canvas')).toBeVisible();
   // Wait until the app's keyboard listeners are attached
   await expect(page.getByTestId('map-stats')).toBeVisible();
   // ...and the view has been placed for the canvas size
   await expect(page.locator('canvas')).not.toHaveAttribute('data-view', '0,0,1');
+}
+
+/** Opens the map settings drawer (title, style, walls, lighting, grid) if it is closed */
+export async function openMapSettings(page: Page) {
+  const toggle = page.getByRole('region', { name: 'Map settings' }).getByRole('button', { name: 'Map settings' });
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
 /** The canvas view transform: screen offset of the grid origin and zoom */

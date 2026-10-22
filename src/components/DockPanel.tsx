@@ -5,15 +5,12 @@ import type {
   PropType,
   FoliageType,
   FloorTexture,
-  GridType,
   LabelStyle,
   MapData,
   Selection,
   ShapeMode,
-  ThemeType,
 } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
-import { StylePresets } from './StylePresets';
 import { Slider } from './Slider';
 import { ArrowDown, ArrowUp, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
 import {
@@ -21,13 +18,9 @@ import {
   BUTTON_CLASS,
   FIELD_CLASS,
   FLOOR_TEXTURES,
-  GRID_TYPES,
-  HATCH_STYLES,
   LABEL_STYLES,
   PROP_TYPES,
-  THEME_NAMES,
   TOOLS,
-  WALL_STYLES,
   keepsSelection,
   optionButtonClass,
 } from './options';
@@ -92,28 +85,6 @@ const Choices = <T extends string>({
       ))}
     </div>
   </div>
-);
-
-// A labelled drop-down of [value, name] pairs
-const Picker = <T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: [T, string][];
-  value: T;
-  onChange: (value: T) => void;
-}) => (
-  <label className="flex flex-col gap-0.5">
-    <span>{label}</span>
-    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value as T)} className={FIELD_CLASS}>
-      {options.map(([id, name]) => (
-        <option key={id} value={id}>{name}</option>
-      ))}
-    </select>
-  </label>
 );
 
 const ICON_BUTTON_CLASS = `${BUTTON_CLASS} flex items-center justify-center`;
@@ -232,7 +203,7 @@ const LayersSection: React.FC<
   );
 };
 
-// Properties panel docked to the right of the canvas
+// Properties panel docked to the right of the canvas: tool and selection options, and layers
 export const DockPanel: React.FC<DockPanelProps> = ({
   activeTool,
   brushSize,
@@ -369,116 +340,6 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         onDeleteLayer={onDeleteLayer}
         onMoveLayer={onMoveLayer}
       />
-
-      <Section title="Map">
-        <label className="flex flex-col gap-0.5">
-          <span>Title</span>
-          <input
-            type="text"
-            aria-label="Map title"
-            value={mapData.title}
-            onChange={(e) => onModifyMap((draft) => { draft.title = e.target.value; }, { coalesce: 'title' })}
-            placeholder="Untitled map"
-            className={FIELD_CLASS}
-          />
-        </label>
-        <label className="flex flex-col gap-0.5">
-          <span>Style</span>
-          <select
-            aria-label="Map style"
-            value={mapData.theme}
-            onChange={(e) => onModifyMap((draft) => { draft.theme = e.target.value as ThemeType; })}
-            className={FIELD_CLASS}
-          >
-            {THEME_NAMES.map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
-            ))}
-          </select>
-        </label>
-      </Section>
-
-      <Section title="Style presets">
-        <StylePresets mapData={mapData} onModifyMap={onModifyMap} />
-      </Section>
-
-      <Section title="Walls">
-        <Picker
-          label="Wall style"
-          options={WALL_STYLES}
-          value={mapData.wallStyle}
-          onChange={(v) => onModifyMap((draft) => { draft.wallStyle = v; })}
-        />
-        <Picker
-          label="Hatching"
-          options={HATCH_STYLES}
-          value={mapData.hatchStyle}
-          onChange={(v) => onModifyMap((draft) => { draft.hatchStyle = v; })}
-        />
-        <Slider
-          label="Hatching width"
-          value={mapData.hatchLength}
-          display={`${mapData.hatchLength}px`}
-          min={6}
-          max={24}
-          onChange={(v) => onModifyMap((draft) => { draft.hatchLength = v; }, { coalesce: 'hatchLength' })}
-        />
-        <Slider
-          label="Hatching density"
-          value={mapData.hatchDensity}
-          display={String(mapData.hatchDensity)}
-          min={1}
-          max={5}
-          onChange={(v) => onModifyMap((draft) => { draft.hatchDensity = v; }, { coalesce: 'hatchDensity' })}
-        />
-      </Section>
-
-      <Section title="Lighting">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={mapData.lighting}
-            onChange={(e) => onModifyMap((draft) => { draft.lighting = e.target.checked; })}
-            className="accent-ui-accent"
-          />
-          <span>Darken map and show lights</span>
-        </label>
-        <Slider
-          label="Darkness"
-          value={mapData.darkness}
-          display={`${Math.round(mapData.darkness * 100)}%`}
-          min={0.2}
-          max={1}
-          step={0.05}
-          onChange={(v) => onModifyMap((draft) => { draft.darkness = v; }, { coalesce: 'darkness' })}
-        />
-      </Section>
-
-      <Section title="Grid">
-        <Picker
-          label="Grid shape"
-          options={GRID_TYPES}
-          value={mapData.gridType}
-          onChange={(v: GridType) => onModifyMap((draft) => { draft.gridType = v; })}
-        />
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={mapData.showGrid}
-            onChange={(e) => onModifyMap((draft) => { draft.showGrid = e.target.checked; })}
-            className="accent-ui-accent"
-          />
-          <span>Show battle grid</span>
-        </label>
-        <Slider
-          label="Opacity"
-          value={mapData.gridOpacity}
-          display={`${Math.round(mapData.gridOpacity * 100)}%`}
-          min={0.05}
-          max={0.8}
-          step={0.05}
-          onChange={(v) => onModifyMap((draft) => { draft.gridOpacity = v; }, { coalesce: 'gridOpacity' })}
-        />
-      </Section>
     </aside>
   );
 };

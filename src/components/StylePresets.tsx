@@ -56,7 +56,7 @@ export const StylePresets: React.FC<StylePresetsProps> = ({ mapData, onModifyMap
       {presets.length === 0 ? (
         <p className="text-ui-muted">Save the current look, then apply it to any map.</p>
       ) : (
-        <ul aria-label="Saved style presets" className="flex flex-col gap-1">
+        <ul aria-label="Saved style presets" className="flex flex-col gap-1 max-h-24 overflow-y-auto">
           {presets.map((preset) => (
             <li key={preset.id} className="flex gap-1">
               <button

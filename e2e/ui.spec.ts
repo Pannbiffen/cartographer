@@ -91,6 +91,44 @@ test('the properties panel can be hidden from the View menu', async ({ page }) =
   expect(await canvasWidth()).toBeGreaterThan(before);
 });
 
+test('map-wide settings live in a bottom drawer that remembers whether it is open', async ({ page }) => {
+  await openApp(page);
+  const drawer = page.getByRole('region', { name: 'Map settings' });
+  const toggle = drawer.getByRole('button', { name: 'Map settings' });
+  const canvasHeight = async () => (await page.locator('canvas').boundingBox())!.height;
+  const closedHeight = await canvasHeight();
+
+  // Closed at first; the right panel keeps tool options and layers only
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByLabel('Map title')).toHaveCount(0);
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  await expect(panel.getByRole('list', { name: 'Layers' })).toBeVisible();
+
+  // M opens it under the canvas, which gets shorter
+  await page.keyboard.press('m');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(drawer.getByLabel('Map title')).toBeVisible();
+  await expect(drawer.getByLabel('Wall style')).toBeVisible();
+  await expect(drawer.getByLabel('Grid shape')).toBeVisible();
+  await expect(panel.getByLabel('Map title')).toHaveCount(0);
+  await expect.poll(canvasHeight).toBeLessThan(closedHeight);
+
+  // Kept across reloads, and shown as checked in the View menu
+  await page.reload();
+  await openApp(page);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('menuitem', { name: 'View' }).click();
+  const item = page.getByRole('menuitemcheckbox', { name: /Map Settings/ });
+  await expect(item).toHaveAttribute('aria-checked', 'true');
+  await item.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect.poll(canvasHeight).toBe(closedHeight);
+
+  // The title bar opens it again
+  await toggle.click();
+  await expect(drawer.getByLabel('Map title')).toBeVisible();
+});
+
 test('the map is framed on open and by Zoom to fit', async ({ page }) => {
   await openApp(page);
   const box = (await page.locator('canvas').boundingBox())!;

@@ -27,7 +27,7 @@ const mapRow = (page: Page, title: string) => myMaps(page).getByRole('option', {
 
 test('New keeps the previous map, which Open Recent brings back', async ({ page }) => {
   const errors = trackErrors(page);
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await expect(page.getByRole('menuitem', { name: 'Open Recent' })).toHaveCount(0);
   await page.getByRole('menuitem', { name: 'File' }).click();
   await expect(page.getByRole('menuitem', { name: 'Open Recent' })).toBeDisabled();
@@ -51,7 +51,7 @@ test('New keeps the previous map, which Open Recent brings back', async ({ page 
 });
 
 test('edits made just before switching maps are kept', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await drawMap(page, 'Quick');
   await page.getByLabel('Map title').fill('Quick Edit');
   // No waiting for the autosave: opening another map stores this one first
@@ -62,18 +62,18 @@ test('edits made just before switching maps are kept', async ({ page }) => {
 });
 
 test('the last edit is kept when the tab is reloaded at once', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await drawMap(page, 'Before');
   // No waiting for the autosave: leaving the page stores the map first
   await page.getByLabel('Map title').fill('Reloaded');
   await page.reload();
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await expect(page.getByLabel('Map title')).toHaveValue('Reloaded');
 });
 
 test('My Maps opens, renames, duplicates and deletes maps', async ({ page }) => {
   const errors = trackErrors(page);
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await drawMap(page, 'Alpha');
   await page.keyboard.press('Control+Alt+n');
   await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
@@ -117,7 +117,7 @@ test('My Maps opens, renames, duplicates and deletes maps', async ({ page }) => 
 
   // The map last open comes back after a reload, with Delta still kept
   await page.reload();
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await expect(page.getByLabel('Map title')).toHaveValue('Gamma');
   await fileMenu(page, 'My Maps…');
   await expect(mapRow(page, 'Delta')).toBeVisible();
@@ -131,7 +131,7 @@ test('My Maps opens, renames, duplicates and deletes maps', async ({ page }) => 
 });
 
 test('a map saved to a file still counts as saved after a reload', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await drawMap(page, 'Filed');
   await saveMap(page);
   await expect
@@ -139,7 +139,7 @@ test('a map saved to a file still counts as saved after a reload', async ({ page
     .toBe(true);
 
   await page.reload();
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await expect(page).toHaveTitle(/^Filed/);
   await fileMenu(page, 'New');
   await expect(unsavedDialog(page)).toHaveCount(0);
@@ -155,14 +155,14 @@ test('a map saved to a file still counts as saved after a reload', async ({ page
 });
 
 test('a map autosaved before My Maps existed moves into it', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   const legacy = await saveMap(page);
   await page.evaluate((map) => {
     localStorage.clear();
     localStorage.setItem('cartographer.autosave.v1', JSON.stringify({ ...map, title: 'Old Autosave' }));
   }, legacy);
   await page.reload();
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await expect(page.getByLabel('Map title')).toHaveValue('Old Autosave');
   expect(await page.evaluate(() => localStorage.getItem('cartographer.autosave.v1'))).toBeNull();
   await fileMenu(page, 'My Maps…');

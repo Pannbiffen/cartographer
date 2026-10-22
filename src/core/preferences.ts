@@ -17,6 +17,7 @@ export interface Preferences {
   autosave: boolean;
   unsavedChanges: UnsavedChoice;
   showPanel: boolean;
+  showMapSettings: boolean;
   zoomSpeed: ZoomSpeed;
   // The look File > New starts a map with
   newMap: NewMapDefaults;
@@ -32,6 +33,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autosave: true,
   unsavedChanges: 'ask',
   showPanel: true,
+  showMapSettings: false,
   zoomSpeed: 'normal',
   newMap: DEFAULT_NEW_MAP,
 };

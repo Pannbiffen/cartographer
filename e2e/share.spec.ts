@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, dragCells, saveMap, stats } from './helpers';
+import { openApp, openMapSettings, dragCells, saveMap, stats } from './helpers';
 
 async function createLink(page: Page) {
   await page.getByRole('menuitem', { name: 'File' }).click();
@@ -12,7 +12,7 @@ async function createLink(page: Page) {
 
 test('a share link opens a copy of the map in another browser', async ({ page, browser, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await dragCells(page, [7, 6], [10, 6]);
   await page.getByLabel('Map title').fill('Shared Crypt');
   await page.getByLabel('Map title').blur();
@@ -28,6 +28,7 @@ test('a share link opens a copy of the map in another browser', async ({ page, b
   // A friend with no autosave gets the map straight away
   const friend = await (await browser.newContext()).newPage();
   await friend.goto(link);
+  await openMapSettings(friend);
   await expect(friend.getByLabel('Map title')).toHaveValue('Shared Crypt');
   expect(await stats(friend)).toEqual(await stats(page));
   // The link is cleared from the address bar so a reload keeps the friend's own edits
@@ -38,7 +39,7 @@ test('a share link opens a copy of the map in another browser', async ({ page, b
 });
 
 test('opening a share link over unsaved work asks first', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   const { link } = await createLink(page);
   await page.keyboard.press('Escape');
   await page.getByLabel('Map title').fill('My own map');
@@ -55,7 +56,7 @@ test('opening a share link over unsaved work asks first', async ({ page }) => {
 });
 
 test('a damaged share link says so and keeps the current map', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   const message = new Promise<string>((resolve) =>
     page.once('dialog', (d) => {
       resolve(d.message());

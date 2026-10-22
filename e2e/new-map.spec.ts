@@ -15,7 +15,7 @@ async function openPreferences(page: Page) {
 const unsavedDialog = (page: Page) => page.getByRole('dialog', { name: /\?$/ });
 
 test('File > New starts a blank map without asking when nothing is unsaved', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   expect((await stats(page)).rooms).toBeGreaterThan(0);
 
   await fileMenu(page, 'New');
@@ -70,7 +70,7 @@ test('unsaved changes are kept, discarded or saved first before a new map', asyn
 });
 
 test('opening a file over unsaved changes asks first', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   const map = await saveMap(page);
   await dragCells(page, [7, 6], [10, 6]);
 
@@ -85,7 +85,7 @@ test('opening a file over unsaved changes asks first', async ({ page }) => {
 });
 
 test('new maps start with the look chosen in Preferences', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   const dialog = await openPreferences(page);
   const group = dialog.getByRole('group', { name: 'New maps' });
   await group.getByLabel('Map style').selectOption('blueprint');
@@ -122,7 +122,7 @@ test('new maps start with the look chosen in Preferences', async ({ page }) => {
 });
 
 test('a remembered answer replaces unsaved maps without asking', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
 
   // Remembering Don't save sets the preference and skips the dialog next time
   await dragCells(page, [7, 6], [10, 6]);

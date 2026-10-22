@@ -10,12 +10,12 @@ async function setLook(page: Page) {
 
 async function savePreset(page: Page, name: string) {
   await page.getByLabel('Preset name').fill(name);
-  await page.getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('region', { name: 'Map settings' }).getByRole('button', { name: 'Save' }).click();
 }
 
 test('a saved look can be applied to another map, undone, and survives a reload', async ({ page }) => {
   const errors = trackErrors(page);
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await setLook(page);
   await savePreset(page, 'Night plans');
   await expect(page.getByRole('status')).toHaveText('Saved “Night plans”');
@@ -41,7 +41,7 @@ test('a saved look can be applied to another map, undone, and survives a reload'
 });
 
 test('saving under an existing name replaces that preset; presets can be deleted', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await savePreset(page, 'Mine');
   await page.getByLabel('Map style').selectOption('slate');
   await savePreset(page, 'mine');
@@ -55,18 +55,18 @@ test('saving under an existing name replaces that preset; presets can be deleted
 
   await page.getByRole('button', { name: 'Delete preset Mine' }).click();
   await expect(list).toHaveCount(0);
-  await expect(page.getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: 'Download presets file' })).toBeDisabled();
+  await expect(page.getByRole('region', { name: 'Map settings' }).getByRole('button', { name: 'Download presets file' })).toBeDisabled();
 });
 
 test('presets export to a file and import from one', async ({ page }) => {
   const errors = trackErrors(page);
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await setLook(page);
   await savePreset(page, 'Shared look');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: 'Download presets file' }).click(),
+    page.getByRole('region', { name: 'Map settings' }).getByRole('button', { name: 'Download presets file' }).click(),
   ]);
   expect(download.suggestedFilename()).toBe('style-presets.json');
   const stream = await download.createReadStream();

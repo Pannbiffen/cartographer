@@ -195,6 +195,12 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
           checked={preferences.showPanel}
           onChange={(showPanel) => onChange({ showPanel })}
         />
+        <Check
+          label="Open the map settings drawer"
+          hint="Also under View > Map Settings (M)."
+          checked={preferences.showMapSettings}
+          onChange={(showMapSettings) => onChange({ showMapSettings })}
+        />
       </DialogGroup>
 
       <DialogGroup title="New maps">

@@ -32,7 +32,7 @@ test('room tools lay the chosen floor texture, and plain clears it', async ({ pa
 
 test('wall and hatching styles are saved with the map', async ({ page }) => {
   const errors = trackErrors(page);
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
   await page.getByLabel('Wall style').selectOption('rough');
   for (const style of ['crosshatch', 'stipple', 'shadow', 'none']) {
     await page.getByLabel('Hatching', { exact: true }).selectOption(style);

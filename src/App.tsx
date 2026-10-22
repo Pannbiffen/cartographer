@@ -17,6 +17,7 @@ import { MenuBar, type Menu } from './components/MenuBar';
 import { Toolbar } from './components/Toolbar';
 import { Toolbox } from './components/Toolbox';
 import { DockPanel } from './components/DockPanel';
+import { MapSettingsDrawer } from './components/MapSettingsDrawer';
 import { TOOLS, keepsSelection } from './components/options';
 import { MapCanvas } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
@@ -537,6 +538,9 @@ export function App() {
       draft.showGrid = !draft.showGrid;
     });
   }, [modifyMap]);
+  const toggleMapSettings = useCallback(() => {
+    setPreferences((p) => ({ ...p, showMapSettings: !p.showMapSettings }));
+  }, []);
 
   // Copy, paste and duplicate map objects. A paste lands one cell along from
   // the copy and becomes the next one copied, so pasting again keeps stepping.
@@ -660,6 +664,8 @@ export function App() {
         chooseTool(tool.id);
       } else if (key === 'g') {
         toggleGrid();
+      } else if (key === 'm') {
+        toggleMapSettings();
       }
     };
 
@@ -675,6 +681,7 @@ export function App() {
     handleActualSize,
     handleZoomToFit,
     toggleGrid,
+    toggleMapSettings,
     modifyMap,
     chooseTool,
     activeSelection,
@@ -810,6 +817,7 @@ export function App() {
           checked: preferences.showPanel,
           onSelect: () => changePreferences({ showPanel: !preferences.showPanel }),
         },
+        { label: 'Map Settings', shortcut: 'M', checked: preferences.showMapSettings, onSelect: toggleMapSettings },
       ],
     },
     {
@@ -888,28 +896,37 @@ export function App() {
       <div className="flex flex-1 min-h-0">
         <Toolbox activeTool={activeTool} onSelectTool={chooseTool} />
 
-        <main className="relative flex-1 min-w-0 overflow-hidden">
-          <MapCanvas
+        <div className="flex flex-col flex-1 min-w-0">
+          <main className="relative flex-1 min-h-0 overflow-hidden">
+            <MapCanvas
+              mapData={mapData}
+              activeTool={activeTool}
+              brushSize={brushSize}
+              selectedDoorType={selectedDoorType}
+              selectedPropType={selectedPropType}
+              selectedFoliageType={selectedFoliageType}
+              floorTexture={floorTexture}
+              labelStyle={labelStyle}
+              shapeMode={shapeMode}
+              activeLayerId={activeLayerId}
+              viewport={viewport}
+              onViewportChange={setViewport}
+              zoomSpeed={preferences.zoomSpeed}
+              onResize={setCanvasSize}
+              onModifyMap={modifyMap}
+              onHoverCoord={setHoverCoord}
+              selection={activeSelection}
+              onSelect={select}
+            />
+          </main>
+
+          <MapSettingsDrawer
+            open={preferences.showMapSettings}
+            onToggle={toggleMapSettings}
             mapData={mapData}
-            activeTool={activeTool}
-            brushSize={brushSize}
-            selectedDoorType={selectedDoorType}
-            selectedPropType={selectedPropType}
-            selectedFoliageType={selectedFoliageType}
-            floorTexture={floorTexture}
-            labelStyle={labelStyle}
-            shapeMode={shapeMode}
-            activeLayerId={activeLayerId}
-            viewport={viewport}
-            onViewportChange={setViewport}
-            zoomSpeed={preferences.zoomSpeed}
-            onResize={setCanvasSize}
             onModifyMap={modifyMap}
-            onHoverCoord={setHoverCoord}
-            selection={activeSelection}
-            onSelect={select}
           />
-        </main>
+        </div>
 
         {preferences.showPanel && (
           <DockPanel
