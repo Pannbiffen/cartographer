@@ -97,14 +97,14 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
   ctx.fillStyle = theme.floor;
   if (floor) {
     ctx.fill(floor, 'evenodd');
-    // Textured cells stop where a cut crosses them
+    // Textures stop where a cut crosses them
     ctx.save();
     ctx.clip(floor, 'evenodd');
-    renderFloorTextures(ctx, layer.rooms, layer.floors, gridSize, theme.ink);
+    renderFloorTextures(ctx, layer, gridSize, theme.ink);
     ctx.restore();
   } else {
     fillCells(ctx, layer.rooms, gridSize);
-    renderFloorTextures(ctx, layer.rooms, layer.floors, gridSize, theme.ink);
+    renderFloorTextures(ctx, layer, gridSize, theme.ink);
   }
 
   // 3. Water sits on top of floors (pools inside rooms) and terrain

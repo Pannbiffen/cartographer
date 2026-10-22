@@ -19,7 +19,7 @@ import { Toolbar } from './components/Toolbar';
 import { Toolbox } from './components/Toolbox';
 import { DockPanel } from './components/DockPanel';
 import { MapSettingsDrawer } from './components/MapSettingsDrawer';
-import { DOOR_TYPES, FLOOR_TEXTURES, LABEL_STYLES, PROP_TYPES, TOOLS, keepsSelection } from './components/options';
+import { DOOR_TYPES, FLOOR_TEXTURES, LABEL_STYLES, PROP_TYPES, TOOLS, keepsSelection, laysFloor } from './components/options';
 import { MapCanvas, type CanvasMenuRequest } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
@@ -1100,9 +1100,7 @@ export function App() {
       : []),
     ...(activeTool === 'label' ? [choices('Label Style', LABEL_STYLES, labelStyle, setLabelStyle)] : []),
     ...(brushTool ? [choices(activeTool === 'path' ? 'Path Width' : 'Brush Size', [1, 2, 3, 4, 5], brushSize, setBrushSize)] : []),
-    ...(activeTool === 'room-brush' || activeTool === 'room-rect' || activeTool === 'tunnel'
-      ? [choices('Floor', FLOOR_TEXTURES, floorTexture, setFloorTexture)]
-      : []),
+    ...(laysFloor(activeTool, shapeMode) ? [choices('Floor', FLOOR_TEXTURES, floorTexture, setFloorTexture)] : []),
     ...(activeTool === 'polygon' || activeTool === 'circle' || activeTool === 'path'
       ? [choices('Mode', ['add', 'cut'] as ShapeMode[], shapeMode, setShapeMode)]
       : []),

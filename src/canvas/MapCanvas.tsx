@@ -516,7 +516,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const shape = [...hexes.values()].map((h) => hexPolygon(hexGrid, h));
       editLayer(
         (draft) => {
-          applyShape(draft, shape, activeTool === 'eraser' ? 'cut' : 'add');
+          applyShape(draft, shape, activeTool === 'eraser' ? 'cut' : 'add', floorTexture);
           if (activeTool !== 'eraser') return;
           // Water, plants and objects go with the cells centred in the hexes
           for (const h of hexes.values()) {
@@ -531,7 +531,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         { coalesce: `stroke-${strokeCountRef.current}` }
       );
     },
-    [hexGrid, activeTool, brushSize, editLayer]
+    [hexGrid, activeTool, brushSize, floorTexture, editLayer]
   );
 
   // Adds the finished polygon or path to the active layer, or cuts it out
@@ -541,9 +541,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (!points) return;
     const shape =
       activeTool === 'path' ? pathPolygon(points, brushSize) : polygonFromPoints(points);
-    if (shape.length > 0) editLayer((draft) => applyShape(draft, shape, shapeMode));
+    if (shape.length > 0) editLayer((draft) => applyShape(draft, shape, shapeMode, floorTexture));
     drawRef.current();
-  }, [activeTool, brushSize, shapeMode, editLayer]);
+  }, [activeTool, brushSize, shapeMode, floorTexture, editLayer]);
   const finishShapeRef = useRef(finishShape);
   useEffect(() => {
     finishShapeRef.current = finishShape;
@@ -945,7 +945,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const dragged = centre && end && Math.hypot(end.worldX / mapData.gridSize - centre[0], end.worldY / mapData.gridSize - centre[1]) >= 0.25;
     if (centre && end && dragged) {
       const radius = circleRadius(centre, snapPoint(end), freePlacementRef.current);
-      editLayer((draft) => applyShape(draft, [circlePolygon(centre[0], centre[1], radius)], shapeMode));
+      editLayer((draft) => applyShape(draft, [circlePolygon(centre[0], centre[1], radius)], shapeMode, floorTexture));
     }
     const box = selectBoxRef.current;
     if (box) {

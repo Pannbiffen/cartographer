@@ -26,6 +26,7 @@ import type {
   PlacedStairs,
   PropType,
   ThemeType,
+  ShapeMode,
   ToolType,
   WallStyle,
 } from '../types/map';
@@ -58,6 +59,12 @@ export const TOOLS: ToolInfo[] = [
 /** Tools that keep, and edit, the current selection */
 export function keepsSelection(tool: ToolType): boolean {
   return tool === 'select' || tool === 'label' || tool === 'light';
+}
+
+/** Tools that lay floor, in the floor texture picked in the panel */
+export function laysFloor(tool: ToolType, shapeMode: ShapeMode): boolean {
+  if (tool === 'polygon' || tool === 'circle' || tool === 'path') return shapeMode === 'add';
+  return tool === 'room-brush' || tool === 'room-rect' || tool === 'tunnel';
 }
 
 export const THEME_NAMES: [ThemeType, string][] = [

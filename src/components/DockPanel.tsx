@@ -23,6 +23,7 @@ import {
   PROP_TYPES,
   TOOLS,
   keepsSelection,
+  laysFloor,
   optionButtonClass,
 } from './options';
 import type { ModifyMap } from '../App';
@@ -414,10 +415,10 @@ export const DockPanel: React.FC<DockPanelProps> = ({
 
         {hexBrush && (
           <p className="text-ui-muted leading-snug">
-            {activeTool === 'eraser' ? 'Erases' : 'Paints plain floor in'} whole hexes on the hex grid.
+            {activeTool === 'eraser' ? 'Erases' : 'Paints floor in'} whole hexes on the hex grid.
           </p>
         )}
-        {((activeTool === 'room-brush' && !hexBrush) || activeTool === 'room-rect' || activeTool === 'tunnel') && (
+        {laysFloor(activeTool, shapeMode) && (
           <Choices label="Floor" options={FLOOR_TEXTURES} value={floorTexture} columns={2} onChange={onFloorTextureChange} />
         )}
 

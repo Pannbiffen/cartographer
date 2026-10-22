@@ -1,6 +1,7 @@
 // Procedural floor patterns drawn over floor cells. Every pattern is laid out
 // in world coordinates, so neighbouring cells continue each other seamlessly.
-import type { FloorTexture } from '../../types/map';
+import type { FloorTexture, LayerContent, Polygon } from '../../types/map';
+import { floorPath, polygonBounds } from '../geometry/region';
 import { pseudoRandom } from '../geometry/hatching';
 
 // `seen` lets patterns that reach past a cell skip shapes a neighbour already drew
@@ -128,14 +129,10 @@ const PATTERNS: Record<Exclude<FloorTexture, 'plain'>, PatternFn> = {
 // Fainter for busy patterns, stronger for sparse ones
 const TEXTURE_ALPHA: Partial<Record<FloorTexture, number>> = { dirt: 0.35, cobbles: 0.55, flagstones: 0.5 };
 
-/** Draws each floor cell's texture, clipped to the cells that carry it */
-export function renderFloorTextures(
-  ctx: CanvasRenderingContext2D,
-  rooms: { [key: string]: boolean },
-  floors: { [key: string]: FloorTexture },
-  gridSize: number,
-  inkColor: string
-) {
+/** Draws each floor cell's texture, clipped to the cells that carry it, then
+ * the textured areas of free-form floor over them */
+export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerContent, gridSize: number, inkColor: string) {
+  const { rooms, floors, floorAreas } = layer;
   const groups = new Map<FloorTexture, [number, number][]>();
   for (const key of Object.keys(floors)) {
     const texture = floors[key];
@@ -146,23 +143,53 @@ export function renderFloorTextures(
     else groups.set(texture, [cell]);
   }
 
-  for (const [texture, cells] of groups) {
-    ctx.save();
-    ctx.beginPath();
-    for (const [gx, gy] of cells) ctx.rect(gx * gridSize, gy * gridSize, gridSize, gridSize);
-    ctx.clip();
-
-    ctx.strokeStyle = inkColor;
-    ctx.fillStyle = inkColor;
-    ctx.lineWidth = 0.9;
-    ctx.lineJoin = 'round';
-    ctx.globalAlpha = TEXTURE_ALPHA[texture] ?? 0.4;
-    ctx.beginPath();
-    const draw = PATTERNS[texture as Exclude<FloorTexture, 'plain'>];
-    const seen = new Set<string>();
-    for (const [gx, gy] of cells) draw(ctx, gx, gy, gridSize, seen);
-    if (texture === 'dirt') ctx.fill();
-    else ctx.stroke();
-    ctx.restore();
+  const areas = Object.entries(floorAreas) as [FloorTexture, Polygon[]][];
+  ctx.save();
+  if (areas.length > 0 && groups.size > 0) {
+    // Areas win over the cells beneath them: clip those out
+    const outside = floorPath(areas.flatMap(([, polygons]) => polygons), gridSize);
+    outside.rect(-1e7, -1e7, 2e7, 2e7);
+    ctx.clip(outside, 'evenodd');
   }
+  for (const [texture, cells] of groups) {
+    const clip = new Path2D();
+    for (const [gx, gy] of cells) clip.rect(gx * gridSize, gy * gridSize, gridSize, gridSize);
+    drawPattern(ctx, texture, clip, cells, gridSize, inkColor);
+  }
+  ctx.restore();
+
+  for (const [texture, polygons] of areas) {
+    if (!PATTERNS[texture as Exclude<FloorTexture, 'plain'>] || polygons.length === 0) continue;
+    const b = polygonBounds(polygons);
+    const cells: [number, number][] = [];
+    for (let gy = Math.floor(b.minY); gy < Math.ceil(b.maxY); gy++) {
+      for (let gx = Math.floor(b.minX); gx < Math.ceil(b.maxX); gx++) cells.push([gx, gy]);
+    }
+    drawPattern(ctx, texture, floorPath(polygons, gridSize), cells, gridSize, inkColor);
+  }
+}
+
+/** Draws a texture over the given cells, clipped to `clip` */
+function drawPattern(
+  ctx: CanvasRenderingContext2D,
+  texture: FloorTexture,
+  clip: Path2D,
+  cells: [number, number][],
+  gridSize: number,
+  inkColor: string
+) {
+  ctx.save();
+  ctx.clip(clip, 'evenodd');
+  ctx.strokeStyle = inkColor;
+  ctx.fillStyle = inkColor;
+  ctx.lineWidth = 0.9;
+  ctx.lineJoin = 'round';
+  ctx.globalAlpha = TEXTURE_ALPHA[texture] ?? 0.4;
+  ctx.beginPath();
+  const draw = PATTERNS[texture as Exclude<FloorTexture, 'plain'>];
+  const seen = new Set<string>();
+  for (const [gx, gy] of cells) draw(ctx, gx, gy, gridSize, seen);
+  if (texture === 'dirt') ctx.fill();
+  else ctx.stroke();
+  ctx.restore();
 }

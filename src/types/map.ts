@@ -116,6 +116,10 @@ export interface LayerContent {
   shapes: Polygon[];
   cuts: Polygon[];
   floors: { [key: string]: FloorTexture }; // "x,y" => pattern on a floor cell; missing = plain
+  // Free-form floor laid with a texture, by texture. These never overlap one
+  // another and win over the cell textures beneath them ('plain' areas hide
+  // those). Replaced on edit, never mutated.
+  floorAreas: Partial<Record<FloorTexture, Polygon[]>>;
   water: { [key: string]: boolean }; // "x,y" => true for water cells
   foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
   doors: PlacedDoor[];

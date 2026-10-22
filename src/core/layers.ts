@@ -5,7 +5,7 @@ import type { LayerContent, LevelMap, MapData, MapLayer, MapLevel } from '../typ
 type Layered = Pick<MapLevel, 'layers'>;
 
 export function emptyContent(): LayerContent {
-  return { rooms: {}, shapes: [], cuts: [], floors: {}, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [], lights: [] };
+  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [], lights: [] };
 }
 
 export function newLayer(id: string, name: string, content: Partial<LayerContent> = {}): MapLayer {
@@ -25,12 +25,13 @@ export function newLayerId(): string {
 }
 
 /** A layer's own copy of every collection, so a draft can be edited freely
- * (shapes and cuts are replaced whole, so they keep being shared) */
+ * (shapes, cuts and floor areas are replaced whole, so they keep being shared) */
 export function cloneLayer(layer: MapLayer): MapLayer {
   return {
     ...layer,
     rooms: { ...layer.rooms },
     floors: { ...layer.floors },
+    floorAreas: { ...layer.floorAreas },
     water: { ...layer.water },
     foliage: { ...layer.foliage },
     doors: [...layer.doors],
@@ -116,6 +117,7 @@ function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string
     shapes: stored.shapes ?? [],
     cuts: stored.cuts ?? [],
     floors: stored.floors ?? {},
+    floorAreas: stored.floorAreas ?? {},
     water: stored.water ?? {},
     foliage: stored.foliage ?? {},
     doors: stored.doors ?? [],

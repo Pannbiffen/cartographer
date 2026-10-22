@@ -1,7 +1,7 @@
 // Free-form floor: a layer's cells and shapes merged into one outline, with
 // its cuts taken out. Walls, hatching, lighting and VTT walls follow it.
 import * as clipping from 'polygon-clipping';
-import type { GridCoord, LayerContent, MapLayer, Pair, Polygon, Ring, ShapeMode } from '../../types/map';
+import type { FloorTexture, GridCoord, LayerContent, MapLayer, Pair, Polygon, Ring, ShapeMode } from '../../types/map';
 import { extractWallSegments, type WallSegment } from './hatching';
 
 // The package's types list named exports, but its ES build only has a default one
@@ -171,9 +171,73 @@ export function combinedWalls(layers: MapLayer[], gridSize: number): WallSegment
 
 /** Extent of a layer's shapes in grid units, or null if it has none */
 export function shapeBounds(layer: LayerContent): { minX: number; minY: number; maxX: number; maxY: number } | null {
-  if (layer.shapes.length === 0) return null;
+  return layer.shapes.length === 0 ? null : polygonBounds(layer.shapes);
+}
+
+/**
+ * Adds a shape to a layer's floor, laid with `texture`, or cuts it away.
+ * Cuts and shapes never overlap, so the most recent one wins wherever they meet.
+ */
+export function applyShape(layer: LayerContent, shape: Polygon[], mode: ShapeMode, texture: FloorTexture = 'plain') {
+  if (shape.length === 0) return;
+  guarded(layer, () => {
+    if (mode === 'add') {
+      layer.shapes = union(shape, ...layer.shapes);
+      if (layer.cuts.length > 0) layer.cuts = difference(layer.cuts, shape);
+      layArea(layer, shape, texture);
+    } else {
+      layer.cuts = union(shape, ...layer.cuts);
+      if (layer.shapes.length > 0) layer.shapes = difference(layer.shapes, shape);
+      clearAreas(layer, shape);
+    }
+  });
+}
+
+/**
+ * Lays `texture` over an area of a layer's floor, replacing whatever texture
+ * was there. A plain area is only kept where it hides textured cells.
+ */
+export function paintArea(layer: LayerContent, area: Polygon[], texture: FloorTexture) {
+  if (area.length > 0) guarded(layer, () => layArea(layer, area, texture));
+}
+
+function layArea(layer: LayerContent, area: Polygon[], texture: FloorTexture) {
+  clearAreas(layer, area);
+  if (texture === 'plain' && !coversTexturedCells(layer, area)) return;
+  layer.floorAreas = { ...layer.floorAreas, [texture]: union(area, ...(layer.floorAreas[texture] ?? [])) };
+}
+
+/** Takes an area out of every textured area, so cell textures show there again */
+function clearAreas(layer: LayerContent, area: Polygon[]) {
+  if (!hasFloorAreas(layer)) return;
+  const areas = { ...layer.floorAreas };
+  for (const texture of Object.keys(areas) as FloorTexture[]) {
+    const left = difference(areas[texture]!, area);
+    if (left.length > 0) areas[texture] = left;
+    else delete areas[texture];
+  }
+  layer.floorAreas = areas;
+}
+
+/** True if any textured cell lies within the area's bounds */
+function coversTexturedCells(layer: LayerContent, area: Polygon[]): boolean {
+  const b = polygonBounds(area);
+  for (const key of Object.keys(layer.floors)) {
+    const [x, y] = key.split(',').map(Number);
+    if (layer.rooms[key] && x + 1 > b.minX && x < b.maxX && y + 1 > b.minY && y < b.maxY) return true;
+  }
+  return false;
+}
+
+/** True when a layer has textured free-form floor */
+export function hasFloorAreas(layer: LayerContent): boolean {
+  return Object.keys(layer.floorAreas).length > 0;
+}
+
+/** Extent of polygons' outer rings in grid units */
+export function polygonBounds(polygons: Polygon[]): { minX: number; minY: number; maxX: number; maxY: number } {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const polygon of layer.shapes) {
+  for (const polygon of polygons) {
     for (const [x, y] of polygon[0]) {
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
@@ -184,50 +248,37 @@ export function shapeBounds(layer: LayerContent): { minX: number; minY: number; 
   return { minX, minY, maxX, maxY };
 }
 
-/**
- * Adds a shape to a layer's floor, or cuts it away. Cuts and shapes never
- * overlap, so the most recent one wins wherever they meet.
- */
-export function applyShape(layer: LayerContent, shape: Polygon[], mode: ShapeMode) {
-  if (shape.length === 0) return;
-  guarded(layer, () => {
-    if (mode === 'add') {
-      layer.shapes = union(shape, ...layer.shapes);
-      if (layer.cuts.length > 0) layer.cuts = difference(layer.cuts, shape);
-    } else {
-      layer.cuts = union(shape, ...layer.cuts);
-      if (layer.shapes.length > 0) layer.shapes = difference(layer.shapes, shape);
-    }
-  });
-}
-
 /** Runs a shape edit, leaving the layer's shapes as they were if the geometry fails */
 function guarded(layer: LayerContent, edit: () => void) {
-  const { shapes, cuts } = layer;
+  const { shapes, cuts, floorAreas } = layer;
   try {
     edit();
   } catch (err) {
     console.warn('Shape edit failed', err);
     layer.shapes = shapes;
     layer.cuts = cuts;
+    layer.floorAreas = floorAreas;
   }
 }
 
-/** Cells just drawn take back any cuts they cover, so the newest edit wins */
+/** Cells just drawn take back any cuts and textured areas they cover, so the newest edit wins */
 export function uncutCells(layer: LayerContent, cells: GridCoord[]) {
-  if (layer.cuts.length === 0 || cells.length === 0) return;
+  if ((layer.cuts.length === 0 && !hasFloorAreas(layer)) || cells.length === 0) return;
+  const squares = cellPolygons(cellSet(cells));
   guarded(layer, () => {
-    layer.cuts = difference(layer.cuts, cellPolygons(cellSet(cells)));
+    if (layer.cuts.length > 0) layer.cuts = difference(layer.cuts, squares);
+    clearAreas(layer, squares);
   });
 }
 
-/** Erased cells take shapes and cuts with them */
+/** Erased cells take shapes, cuts and textured areas with them */
 export function eraseShapesInCells(layer: LayerContent, cells: GridCoord[]) {
-  if (!hasShapes(layer) || cells.length === 0) return;
+  if ((!hasShapes(layer) && !hasFloorAreas(layer)) || cells.length === 0) return;
   const squares = cellPolygons(cellSet(cells));
   guarded(layer, () => {
     if (layer.shapes.length > 0) layer.shapes = difference(layer.shapes, squares);
     if (layer.cuts.length > 0) layer.cuts = difference(layer.cuts, squares);
+    clearAreas(layer, squares);
   });
 }
 

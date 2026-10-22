@@ -88,6 +88,58 @@ test('a circle cut carves into a room, and painting cells over it fills back', a
   expect(errors).toEqual([]);
 });
 
+test('shape tools lay the chosen floor texture, and the newest floor wins', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await page.keyboard.press('c');
+  await page.getByRole('button', { name: 'planks' }).click();
+  await dragFrom(page, [-12, -4], [-12, -1]);
+  let layer = await topLayer(page);
+  expect(ringArea(layer.floorAreas.planks![0][0])).toBeCloseTo(ringArea(layer.shapes[0][0]), 5);
+
+  // A plain circle over part of it takes that part back, and stores no plain area
+  await page.getByRole('button', { name: 'plain' }).click();
+  await dragFrom(page, [-9, -4], [-9, -3]);
+  layer = await topLayer(page);
+  const planks = ringArea(layer.floorAreas.planks![0][0]);
+  expect(planks).toBeLessThan(Math.PI * 9 - 0.5);
+  expect(layer.floorAreas.plain).toBeUndefined();
+
+  // Cells painted over it do too
+  await page.keyboard.press('b');
+  await page.getByRole('button', { name: 'cobbles' }).click();
+  await clickAt(page, -12.5, -3.5);
+  layer = await topLayer(page);
+  // The cell becomes a hole in it
+  expect(ringArea(layer.floorAreas.planks![0][0]) - ringArea(layer.floorAreas.planks![0][1])).toBeCloseTo(planks - 1, 5);
+  expect(layer.floors['-13,-4']).toBe('cobbles');
+
+  // A plain shape over textured cells keeps a plain area to hide them
+  await page.keyboard.press('n');
+  await page.getByRole('button', { name: 'plain' }).click();
+  for (const [x, y] of [[-14, -5], [-11, -5], [-11, -2], [-14, -2], [-14, -5]]) await clickAt(page, x, y);
+  layer = await topLayer(page);
+  expect(layer.floorAreas.plain).toHaveLength(1);
+
+  // A cut takes the textures with it
+  await page.keyboard.press('c');
+  await page.getByRole('button', { name: 'cut', exact: true }).click();
+  await dragFrom(page, [-12, -4], [-12, 0]);
+  layer = await topLayer(page);
+  expect(layer.floorAreas).toEqual({});
+  expect(errors).toEqual([]);
+});
+
+test('the hex room brush lays the chosen floor texture', async ({ page }) => {
+  await openApp(page, { mapSettings: true });
+  await page.getByLabel('Grid shape').selectOption('hex-pointy');
+  await page.keyboard.press('b');
+  await page.getByRole('button', { name: 'tiles' }).click();
+  await clickAt(page, -11.5, HEX_Y);
+  const layer = await topLayer(page);
+  expect(ringArea(layer.floorAreas.tiles![0][0])).toBeCloseTo(Math.sqrt(3) / 2, 5);
+});
+
 // The centre of pointy hex (-10, -4), in the empty block
 const HEX_Y = 0.5 - 2 * Math.sqrt(3);
 
