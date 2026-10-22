@@ -6,12 +6,16 @@ import { DEFAULT_NEW_MAP, type NewMapDefaults } from './newMap';
 export type UiTheme = 'dark' | 'light' | 'system';
 export type AccentColor = 'blue' | 'green' | 'orange' | 'purple';
 export type UiSize = 'small' | 'normal' | 'large';
+// What replacing a map with changes not saved to a file does: ask, rely on
+// the copy in My Maps, or download the file first
+export type UnsavedChoice = 'ask' | 'browser' | 'download';
 
 export interface Preferences {
   uiTheme: UiTheme;
   accent: AccentColor;
   uiSize: UiSize;
   autosave: boolean;
+  unsavedChanges: UnsavedChoice;
   showPanel: boolean;
   zoomSpeed: ZoomSpeed;
   // The look File > New starts a map with
@@ -26,6 +30,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   accent: 'blue',
   uiSize: 'normal',
   autosave: true,
+  unsavedChanges: 'ask',
   showPanel: true,
   zoomSpeed: 'normal',
   newMap: DEFAULT_NEW_MAP,

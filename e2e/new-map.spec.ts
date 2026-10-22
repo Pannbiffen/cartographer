@@ -120,3 +120,72 @@ test('new maps start with the look chosen in Preferences', async ({ page }) => {
   map = await saveMap(page);
   expect(map).toMatchObject({ theme: 'parchment', gridType: 'square', showGrid: true, gridOpacity: 0.22 });
 });
+
+test('a remembered answer replaces unsaved maps without asking', async ({ page }) => {
+  await openApp(page);
+
+  // Remembering Don't save sets the preference and skips the dialog next time
+  await dragCells(page, [7, 6], [10, 6]);
+  await fileMenu(page, 'New');
+  await unsavedDialog(page).getByLabel('Remember my choice').check();
+  await expect(unsavedDialog(page)).toContainText('Edit > Preferences');
+  await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
+  await expect(page.getByTestId('map-stats')).toContainText('Rooms: 0');
+  let dialog = await openPreferences(page);
+  await expect(dialog.getByLabel('Unsaved map')).toHaveValue('browser');
+  await page.keyboard.press('Escape');
+
+  await dragCells(page, [0, 0], [2, 0]);
+  await fileMenu(page, 'New');
+  await expect(unsavedDialog(page)).toHaveCount(0);
+  await expect(page.getByLabel('Map title')).toHaveValue('Untitled map');
+
+  // A map that can't be stored (storage full) isn't replaced without asking
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function () {
+      throw new DOMException('Full', 'QuotaExceededError');
+    };
+    (window as unknown as { restoreStorage: () => void }).restoreStorage = () => {
+      Storage.prototype.setItem = setItem;
+    };
+  });
+  await dragCells(page, [0, 0], [2, 0]);
+  await fileMenu(page, 'New');
+  await expect(unsavedDialog(page)).toBeVisible();
+  await unsavedDialog(page).getByRole('button', { name: 'Cancel' }).click();
+  await page.evaluate(() => (window as unknown as { restoreStorage: () => void }).restoreStorage());
+
+  // Without autosave there is no in-browser copy to rely on, so it asks
+  dialog = await openPreferences(page);
+  await dialog.getByLabel('Autosave the map in this browser').uncheck();
+  await page.keyboard.press('Escape');
+  await dragCells(page, [0, 0], [2, 0]);
+  await fileMenu(page, 'New');
+  await expect(unsavedDialog(page)).toBeVisible();
+  await unsavedDialog(page).getByRole('button', { name: 'Cancel' }).click();
+
+  // Download first, chosen in Preferences, saves the file and goes on
+  dialog = await openPreferences(page);
+  await dialog.getByLabel('Unsaved map').selectOption('download');
+  await page.keyboard.press('Escape');
+  await page.getByLabel('Map title').fill('Downloaded');
+  const [download] = await Promise.all([page.waitForEvent('download'), fileMenu(page, 'New')]);
+  expect(download.suggestedFilename()).toBe('downloaded.dndmap');
+  await expect(unsavedDialog(page)).toHaveCount(0);
+  await expect(page.getByLabel('Map title')).toHaveValue('Untitled map');
+
+  // Remembering Save first sets the same mode; Ask every time brings the dialog back
+  dialog = await openPreferences(page);
+  await dialog.getByLabel('Unsaved map').selectOption('ask');
+  await page.keyboard.press('Escape');
+  await dragCells(page, [0, 0], [2, 0]);
+  await fileMenu(page, 'New');
+  await unsavedDialog(page).getByLabel('Remember my choice').check();
+  await Promise.all([
+    page.waitForEvent('download'),
+    unsavedDialog(page).getByRole('button', { name: 'Save first' }).click(),
+  ]);
+  dialog = await openPreferences(page);
+  await expect(dialog.getByLabel('Unsaved map')).toHaveValue('download');
+});

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AccentColor, Preferences, UiSize, UiTheme } from '../core/preferences';
+import type { AccentColor, Preferences, UiSize, UiTheme, UnsavedChoice } from '../core/preferences';
 import type { ZoomSpeed } from '../core/viewport';
 import { DEFAULT_NEW_MAP, type NewMapDefaults } from '../core/newMap';
 import { Dialog, DialogGroup } from './Dialog';
@@ -37,6 +37,11 @@ const ZOOM_SPEEDS: [ZoomSpeed, string][] = [
   ['slow', 'Slow'],
   ['normal', 'Normal'],
   ['fast', 'Fast'],
+];
+const UNSAVED_CHOICES: [UnsavedChoice, string][] = [
+  ['ask', 'Ask every time'],
+  ['browser', 'Don’t warn, rely on the in-browser save'],
+  ['download', 'Download a file first, then continue'],
 ];
 // Swatch colours; the theme colours themselves live in index.css
 const ACCENTS: [AccentColor, string][] = [
@@ -173,6 +178,17 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
           checked={preferences.autosave}
           onChange={(autosave) => onChange({ autosave })}
         />
+        <div className="flex flex-col gap-1">
+          <Select
+            label="Unsaved map"
+            options={UNSAVED_CHOICES}
+            value={preferences.unsavedChanges}
+            onChange={(unsavedChanges) => onChange({ unsavedChanges })}
+          />
+          <p className="text-ui-muted">
+            When New, Open or a share link would replace a map not saved to a file. Relying on the in-browser save needs autosave.
+          </p>
+        </div>
         <Check
           label="Show the properties panel"
           hint="Also under View > Properties Panel."

@@ -223,15 +223,6 @@ export function App() {
   // stored once it has been changed.
   const [mapId, setMapId] = useState(initial.id);
   const [pristineMap, setPristineMap] = useState<MapData | null>(() => (initial.resumed ? null : initial.map));
-  // Replacing the map (New, Open) waits for an answer while it has unsaved changes
-  const [pendingReplace, setPendingReplace] = useState<{ action: string; run: () => void } | null>(null);
-  const confirmReplace = useCallback(
-    (action: string, run: () => void) => {
-      if (unsaved) setPendingReplace({ action, run });
-      else run();
-    },
-    [unsaved]
-  );
   const lastCoalesceRef = useRef<string | null>(null);
   // Counts arrow-key nudges; a held key's repeats share one undo step
   const nudgeCountRef = useRef(0);
@@ -320,7 +311,7 @@ export function App() {
   // Autosave into My Maps shortly after the map stops changing. A pending
   // save can be flushed, so replacing the map doesn't lose the last edits.
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saved' | 'failed'>('idle');
-  const flushAutosaveRef = useRef<(() => void) | null>(null);
+  const flushAutosaveRef = useRef<(() => boolean) | null>(null);
   useEffect(() => {
     if (!preferences.autosave) {
       forgetCurrentMap();
@@ -330,7 +321,9 @@ export function App() {
     const save = () => {
       window.clearTimeout(timer);
       flushAutosaveRef.current = null;
-      setAutosaveStatus(storeMap(mapId, mapData, mapData === savedMapRef.current) ? 'saved' : 'failed');
+      const stored = storeMap(mapId, mapData, mapData === savedMapRef.current);
+      setAutosaveStatus(stored ? 'saved' : 'failed');
+      return stored;
     };
     const timer = window.setTimeout(save, AUTOSAVE_DELAY_MS);
     flushAutosaveRef.current = save;
@@ -419,6 +412,27 @@ export function App() {
     triggerDownload(blob, `${cleanTitle}.dndmap`);
     markSaved(mapData);
   }, [mapData, markSaved]);
+
+  // Replacing the map (New, Open) waits for an answer while it has unsaved
+  // changes, unless an answer is remembered in Preferences. Relying on the
+  // in-browser copy needs it stored, so with autosave off or failing (storage
+  // full) the dialog still asks.
+  const [pendingReplace, setPendingReplace] = useState<{ action: string; run: () => void } | null>(null);
+  const confirmReplace = useCallback(
+    (action: string, run: () => void) => {
+      const choice = preferences.unsavedChanges;
+      const kept = () => preferences.autosave && (flushAutosaveRef.current?.() ?? autosaveStatus !== 'failed');
+      if (!unsaved || (choice === 'browser' && kept())) {
+        run();
+      } else if (choice === 'download') {
+        handleSaveJson();
+        run();
+      } else {
+        setPendingReplace({ action, run });
+      }
+    },
+    [unsaved, preferences.unsavedChanges, preferences.autosave, autosaveStatus, handleSaveJson]
+  );
 
   // A replacing map starts its own history, framed in the window. The map it
   // replaces stays in My Maps; one reopened from there keeps its entry (id).
@@ -981,12 +995,14 @@ export function App() {
           action={pendingReplace.action}
           mapTitle={mapData.title}
           keptInBrowser={preferences.autosave}
-          onSaveFirst={() => {
+          onSaveFirst={(remember) => {
+            if (remember) changePreferences({ unsavedChanges: 'download' });
             handleSaveJson();
             pendingReplace.run();
             setPendingReplace(null);
           }}
-          onDiscard={() => {
+          onDiscard={(remember) => {
+            if (remember) changePreferences({ unsavedChanges: 'browser' });
             pendingReplace.run();
             setPendingReplace(null);
           }}
