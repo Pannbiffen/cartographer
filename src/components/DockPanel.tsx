@@ -29,6 +29,7 @@ import {
 import type { ModifyMap } from '../App';
 import { findLayer, withLayer } from '../core/layers';
 import { withLevel } from '../core/levels';
+import type { Preferences } from '../core/preferences';
 import { isHexGrid } from '../core/geometry/hex';
 
 interface DockPanelProps {
@@ -59,10 +60,9 @@ interface DockPanelProps {
   onAddLevel: () => void;
   onDeleteLevel: () => void;
   onMoveLevel: (delta: 1 | -1) => void;
-  // The level below drawn faintly under the active one, and how strongly
-  showLevelBelow: boolean;
-  levelBelowOpacity: number;
-  onLevelBelowChange: (change: { showLevelBelow?: boolean; levelBelowOpacity?: number }) => void;
+  // The levels below drawn faintly under the active one, and how strongly
+  preferences: Pick<Preferences, LevelBelowSetting>;
+  onLevelBelowChange: (change: Partial<Pick<Preferences, LevelBelowSetting>>) => void;
   onTakeStairs: (stairs: Selection) => void;
   onModifyMap: ModifyMap;
   activeLayerId: string;
@@ -104,6 +104,8 @@ const Choices = <T extends string>({
   </div>
 );
 
+type LevelBelowSetting = 'showLevelBelow' | 'levelBelowOpacity' | 'showLevelsFurtherBelow' | 'levelBelowFade';
+
 const ICON_BUTTON_CLASS = `${BUTTON_CLASS} flex items-center justify-center`;
 
 // Level list (top level first, like floors seen from above), the active
@@ -118,8 +120,7 @@ const LevelsSection: React.FC<
     | 'onDeleteLevel'
     | 'onMoveLevel'
     | 'onModifyMap'
-    | 'showLevelBelow'
-    | 'levelBelowOpacity'
+    | 'preferences'
     | 'onLevelBelowChange'
   >
 > = ({
@@ -130,10 +131,10 @@ const LevelsSection: React.FC<
   onDeleteLevel,
   onMoveLevel,
   onModifyMap,
-  showLevelBelow,
-  levelBelowOpacity,
+  preferences,
   onLevelBelowChange,
 }) => {
+  const { showLevelBelow, levelBelowOpacity, showLevelsFurtherBelow, levelBelowFade } = preferences;
   const index = levels.findIndex((l) => l.id === activeLevelId);
   const active = levels[index];
 
@@ -229,6 +230,28 @@ const LevelsSection: React.FC<
           max={0.8}
           step={0.05}
           onChange={(v) => onLevelBelowChange({ levelBelowOpacity: v })}
+        />
+      )}
+      {showLevelBelow && levels.length > 2 && (
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={showLevelsFurtherBelow}
+            onChange={(e) => onLevelBelowChange({ showLevelsFurtherBelow: e.target.checked })}
+            className="accent-ui-accent"
+          />
+          <span>Show multiple levels below</span>
+        </label>
+      )}
+      {showLevelBelow && showLevelsFurtherBelow && levels.length > 2 && (
+        <Slider
+          label="Fade per level"
+          value={levelBelowFade}
+          display={`-${Math.round(levelBelowFade * 100)}%`}
+          min={0.05}
+          max={0.5}
+          step={0.05}
+          onChange={(v) => onLevelBelowChange({ levelBelowFade: v })}
         />
       )}
     </Section>
@@ -377,8 +400,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onAddLevel,
   onDeleteLevel,
   onMoveLevel,
-  showLevelBelow,
-  levelBelowOpacity,
+  preferences,
   onLevelBelowChange,
   onTakeStairs,
   onModifyMap,
@@ -507,8 +529,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         onDeleteLevel={onDeleteLevel}
         onMoveLevel={onMoveLevel}
         onModifyMap={onModifyMap}
-        showLevelBelow={showLevelBelow}
-        levelBelowOpacity={levelBelowOpacity}
+        preferences={preferences}
         onLevelBelowChange={onLevelBelowChange}
       />
 

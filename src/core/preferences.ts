@@ -22,6 +22,9 @@ export interface Preferences {
   showLevelBelow: boolean;
   // How strongly it shows through, 0 to 1
   levelBelowOpacity: number;
+  // Show further levels down too, each this much fainter than the one above
+  showLevelsFurtherBelow: boolean;
+  levelBelowFade: number;
   zoomSpeed: ZoomSpeed;
   // The look File > New starts a map with
   newMap: NewMapDefaults;
@@ -40,6 +43,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showMapSettings: false,
   showLevelBelow: false,
   levelBelowOpacity: 0.3,
+  showLevelsFurtherBelow: false,
+  levelBelowFade: 0.1,
   zoomSpeed: 'normal',
   newMap: DEFAULT_NEW_MAP,
 };

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { openApp, cellCenter, clickCell, dragCells, saveMap, stats } from './helpers';
 
 test('levels keep their own layers, and can be switched, renamed, reordered and deleted with undo', async ({ page }) => {
@@ -120,21 +120,7 @@ test('the level below shows faintly, at a chosen opacity, from the View menu or 
   const openViewMenu = async () => {
     await page.getByRole('menuitem', { name: 'View' }).click();
   };
-  // Colour of the canvas at the centre of a cell
-  const pixel = async (gx: number, gy: number) => {
-    const p = await cellCenter(page, gx, gy);
-    // Off the canvas, so no cursor preview tints the cell
-    await page.mouse.move(1, 1);
-    return page.locator('canvas').evaluate(
-      (canvas: HTMLCanvasElement, at) => {
-        const box = canvas.getBoundingClientRect();
-        const scale = canvas.width / box.width;
-        const data = canvas.getContext('2d')!.getImageData((at.x - box.x) * scale, (at.y - box.y) * scale, 1, 1).data;
-        return Array.from(data).join(',');
-      },
-      p
-    );
-  };
+  const pixel = (gx: number, gy: number) => cellColour(page, gx, gy);
 
   // Nothing to show with one level
   await openViewMenu();
@@ -188,3 +174,45 @@ test('the level below shows faintly, at a chosen opacity, from the View menu or 
   await page.keyboard.press('Escape');
   await expect(opacity).toHaveValue('0.8');
 });
+
+test('further levels below show fainter by a step each, down to none', async ({ page }) => {
+  await openApp(page);
+  const pixel = (gx: number, gy: number) => cellColour(page, gx, gy);
+  const furtherBelow = page.getByRole('checkbox', { name: 'Show multiple levels below' });
+  const map = await saveMap(page);
+  const [gx, gy] = Object.keys(map.levels[0].layers[0].rooms)[0].split(',').map(Number);
+
+  // Level 1 has floor at the cell; levels 2 and 3 above it are empty
+  await page.getByRole('button', { name: 'New level' }).click();
+  await page.getByRole('checkbox', { name: 'Show level below' }).check();
+  await expect(furtherBelow).toBeHidden();
+  await page.getByRole('button', { name: 'New level' }).click();
+  await expect(page.getByTestId('current-level')).toHaveText('Level 3');
+  await page.getByRole('slider', { name: 'Level below opacity' }).fill('0.3');
+  const empty = await pixel(gx, gy);
+
+  // Two down at 30% - 10%
+  await furtherBelow.check();
+  await expect(page.getByRole('slider', { name: 'Fade per level' })).toHaveValue('0.1');
+  await expect.poll(() => pixel(gx, gy)).not.toBe(empty);
+
+  // 30% - 30% leaves nothing of it
+  await page.getByRole('slider', { name: 'Fade per level' }).fill('0.3');
+  await expect.poll(() => pixel(gx, gy)).toBe(empty);
+});
+
+/** Colour of the canvas at the centre of a cell, with the pointer moved off it */
+async function cellColour(page: Page, gx: number, gy: number) {
+  const p = await cellCenter(page, gx, gy);
+  // Off the canvas, so no cursor preview tints the cell
+  await page.mouse.move(1, 1);
+  return page.locator('canvas').evaluate(
+    (canvas: HTMLCanvasElement, at) => {
+      const box = canvas.getBoundingClientRect();
+      const scale = canvas.width / box.width;
+      const data = canvas.getContext('2d')!.getImageData((at.x - box.x) * scale, (at.y - box.y) * scale, 1, 1).data;
+      return Array.from(data).join(',');
+    },
+    p
+  );
+}

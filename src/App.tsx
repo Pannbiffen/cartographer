@@ -314,11 +314,20 @@ export function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [preferences, setPreferences] = useState<Preferences>(loadPreferences);
-  // The level before this one, shown faintly under it while drawing
-  const levelBelow = useMemo(
-    () => (preferences.showLevelBelow && activeLevelIndex > 0 ? levelView(mapData, mapData.levels[activeLevelIndex - 1]) : null),
-    [preferences.showLevelBelow, mapData, activeLevelIndex]
-  );
+  // The levels under this one, shown faintly beneath it while drawing (deepest first)
+  const { showLevelBelow, levelBelowOpacity, showLevelsFurtherBelow, levelBelowFade } = preferences;
+  const levelsBelow = useMemo(() => {
+    const shown: { map: LevelMap; opacity: number }[] = [];
+    if (!showLevelBelow) return shown;
+    for (let depth = 0; activeLevelIndex - depth > 0; depth++) {
+      if (depth > 0 && !showLevelsFurtherBelow) break;
+      // In whole percent, so 30% less three 10% steps is 0, not a hair above
+      const opacity = Math.round((levelBelowOpacity - depth * levelBelowFade) * 100) / 100;
+      if (opacity <= 0) break;
+      shown.unshift({ map: levelView(mapData, mapData.levels[activeLevelIndex - depth - 1]), opacity });
+    }
+    return shown;
+  }, [showLevelBelow, levelBelowOpacity, showLevelsFurtherBelow, levelBelowFade, mapData, activeLevelIndex]);
   const changePreferences = useCallback((changes: Partial<Preferences>) => {
     setPreferences((p) => ({ ...p, ...changes }));
   }, []);
@@ -1182,8 +1191,7 @@ export function App() {
           <main ref={mainRef} className="relative flex-1 min-h-0 overflow-hidden">
             <MapCanvas
               mapData={levelMap}
-              levelBelow={levelBelow}
-              levelBelowOpacity={preferences.levelBelowOpacity}
+              levelsBelow={levelsBelow}
               activeTool={activeTool}
               brushSize={brushSize}
               selectedDoorType={selectedDoorType}
@@ -1244,8 +1252,7 @@ export function App() {
             onAddLevel={handleAddLevel}
             onDeleteLevel={handleDeleteLevel}
             onMoveLevel={handleMoveLevel}
-            showLevelBelow={preferences.showLevelBelow}
-            levelBelowOpacity={preferences.levelBelowOpacity}
+            preferences={preferences}
             onLevelBelowChange={changePreferences}
             onTakeStairs={takeStairs}
             onModifyMap={modifyMap}
