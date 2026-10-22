@@ -73,6 +73,7 @@ import {
   nextLayerName,
   isMapLike,
   normalizeLoadedMap,
+  visibleLayers,
   withLayer,
 } from './core/layers';
 import {
@@ -89,6 +90,7 @@ import {
   withLevel,
 } from './core/levels';
 import { fitViewport, zoomAbout } from './core/viewport';
+import { fillRoom, textureAt } from './core/tools/fill';
 import { createBlankMap, mapLook } from './core/newMap';
 import { clearShareFragment, isShareFragment, readShareFragment } from './core/share';
 
@@ -1105,6 +1107,13 @@ export function App() {
       ? [choices('Mode', ['add', 'cut'] as ShapeMode[], shapeMode, setShapeMode)]
       : []),
   ];
+  // The floor texture under the right-click, if there is floor on the active layer
+  const menuAt = contextMenu?.at;
+  const spotTexture = menuAt && activeLayerEditable ? textureAt(activeLayer, menuAt.x, menuAt.y) : null;
+  const fillAt = (at: { x: number; y: number }, texture: FloorTexture) => {
+    const doors = visibleLayers(levelMap).flatMap((l) => l.doors);
+    modifyMap((draft) => withLayer(draft, activeLayerId, (layer) => fillRoom(layer, doors, at.x, at.y, texture)));
+  };
   const mapMenu: MenuItem[] = [
     {
       label: 'Paste Here',
@@ -1112,6 +1121,16 @@ export function App() {
       disabled: !clipboard || !activeLayerEditable,
       onSelect: () => contextMenu && handlePaste(contextMenu.at),
     },
+    ...(menuAt && spotTexture
+      ? [{
+          label: 'Fill Room With',
+          submenu: FLOOR_TEXTURES.map((texture) => ({
+            label: capitalize(texture),
+            checked: texture === spotTexture,
+            onSelect: () => fillAt(menuAt, texture),
+          })),
+        }]
+      : []),
     ...(toolSettings.length ? ['separator' as const, ...toolSettings] : []),
     'separator',
     { label: 'Zoom to Fit', shortcut: 'Ctrl+0', onSelect: handleZoomToFit },

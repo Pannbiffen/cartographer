@@ -421,6 +421,11 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         {laysFloor(activeTool, shapeMode) && (
           <Choices label="Floor" options={FLOOR_TEXTURES} value={floorTexture} columns={2} onChange={onFloorTextureChange} />
         )}
+        {activeTool === 'fill' && (
+          <p className="text-ui-muted leading-snug">
+            Click a room to lay this floor across it, up to its walls and doors (archways let it through).
+          </p>
+        )}
 
         {activeTool === 'door' && (
           <Choices label="Door type" options={DOOR_TYPES} value={selectedDoorType} columns={2} onChange={onDoorTypeChange} />

@@ -6,6 +6,7 @@ export type ToolType =
   | 'polygon'
   | 'circle'
   | 'path'
+  | 'fill'
   | 'water' 
   | 'foliage' 
   | 'door' 

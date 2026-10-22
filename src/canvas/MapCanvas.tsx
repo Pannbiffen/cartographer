@@ -32,6 +32,7 @@ import {
   stairsContainCell,
   lineCells,
 } from '../core/tools/toolGeometry';
+import { fillRoom, isFloorAt } from '../core/tools/fill';
 import { isTypingInField } from '../core/keyboard';
 import {
   findDoor,
@@ -50,7 +51,7 @@ import {
   sameSelection,
   type ObjectOrigin,
 } from '../core/objects';
-import { findLayer, isLayerEditable, withLayer } from '../core/layers';
+import { findLayer, isLayerEditable, visibleLayers, withLayer } from '../core/layers';
 import {
   applyShape,
   circlePolygon,
@@ -810,6 +811,15 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         shapePointsRef.current = [...points, point];
       }
       drawMap();
+    } else if (activeTool === 'fill') {
+      const at: Pair = [hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize];
+      const layer = findLayer(mapData, activeLayerId);
+      if (!layer || !isFloorAt(layer, ...at)) return;
+      // Doors on any shown layer bound the room
+      const doors = visibleLayers(mapData).flatMap((l) => l.doors);
+      editLayer((draft) => {
+        fillRoom(draft, doors, ...at, floorTexture);
+      });
     } else if (activeTool === 'circle') {
       freePlacementRef.current = e.shiftKey;
       circleCentreRef.current = snapPoint(hover);

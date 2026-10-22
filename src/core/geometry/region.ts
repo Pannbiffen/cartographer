@@ -5,7 +5,7 @@ import type { FloorTexture, GridCoord, LayerContent, MapLayer, Pair, Polygon, Ri
 import { extractWallSegments, type WallSegment } from './hatching';
 
 // The package's types list named exports, but its ES build only has a default one
-const { union, difference } = (clipping as unknown as { default: typeof clipping }).default;
+const { union, difference, intersection } = (clipping as unknown as { default: typeof clipping }).default;
 
 type Cells = { [key: string]: boolean };
 
@@ -88,6 +88,33 @@ export function layerFloor(layer: MapLayer): Polygon[] {
   }
   byLayer.set(layer, floor);
   return floor;
+}
+
+/** True if (x, y) in grid units lies inside the polygons (outside their holes) */
+export function pointInPolygons(polygons: Polygon[], x: number, y: number): boolean {
+  return polygons.some((polygon) => pointInPolygon(polygon, x, y));
+}
+
+function pointInPolygon(polygon: Polygon, x: number, y: number): boolean {
+  let inside = false;
+  for (const ring of polygon) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i];
+      const [xj, yj] = ring[j];
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** The connected piece of `area` within `floor` that holds (x, y), if any */
+export function floorPieceAt(area: Polygon[], floor: Polygon[], x: number, y: number): Polygon | null {
+  try {
+    return intersection(area, floor).find((polygon) => pointInPolygon(polygon, x, y)) ?? null;
+  } catch (err) {
+    console.warn('Could not clip to the floor', err);
+    return null;
+  }
 }
 
 /** Drops a closing point that repeats the first */

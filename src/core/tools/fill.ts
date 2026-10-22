@@ -1,0 +1,82 @@
+// The fill tool: re-textures the room under a point, up to its walls and doors
+import type { FloorTexture, MapLayer, PlacedDoor } from '../../types/map';
+import { cellPolygons, floorPieceAt, hasShapes, layerFloor, paintArea, pointInPolygons } from '../geometry/region';
+
+// A fill never spreads further than this (an open outdoor map could be huge)
+const MAX_CELLS = 40000;
+// Points tested to tell whether free-form floor reaches into a cell
+const SAMPLES: [number, number][] = [[0.5, 0.5], [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]];
+
+/** True where a layer has floor at (x, y), in grid units */
+export function isFloorAt(layer: MapLayer, x: number, y: number): boolean {
+  return hasShapes(layer)
+    ? pointInPolygons(layerFloor(layer), x, y)
+    : !!layer.rooms[`${Math.floor(x)},${Math.floor(y)}`];
+}
+
+/** The floor texture at (x, y) on a layer, or null where it has no floor */
+export function textureAt(layer: MapLayer, x: number, y: number): FloorTexture | null {
+  if (!isFloorAt(layer, x, y)) return null;
+  for (const [texture, polygons] of Object.entries(layer.floorAreas) as [FloorTexture, typeof layer.shapes][]) {
+    if (pointInPolygons(polygons, x, y)) return texture;
+  }
+  const key = `${Math.floor(x)},${Math.floor(y)}`;
+  return (layer.rooms[key] && layer.floors[key]) || 'plain';
+}
+
+/**
+ * Lays `texture` over the floor connected to (x, y), spreading cell by cell
+ * but never through a door (archways are open, so it passes those). Returns
+ * false if there is no floor there.
+ */
+export function fillRoom(layer: MapLayer, doors: PlacedDoor[], x: number, y: number, texture: FloorTexture): boolean {
+  if (!isFloorAt(layer, x, y)) return false;
+  const shaped = hasShapes(layer);
+  const floor = shaped ? layerFloor(layer) : [];
+  const isFloorCell = shaped
+    ? (gx: number, gy: number) => SAMPLES.some(([sx, sy]) => pointInPolygons(floor, gx + sx, gy + sy))
+    : (gx: number, gy: number) => !!layer.rooms[`${gx},${gy}`];
+  // Door edges as "h,x,y" (the top edge of cell x,y) or "v,x,y" (its left edge)
+  const closed = new Set(
+    doors.filter((d) => d.type !== 'archway').map((d) => `${d.orientation === 'horizontal' ? 'h' : 'v'},${d.x},${d.y}`)
+  );
+
+  const start = [Math.floor(x), Math.floor(y)];
+  const cells = new Map<string, [number, number]>([[`${start[0]},${start[1]}`, [start[0], start[1]]]]);
+  const queue: [number, number][] = [[start[0], start[1]]];
+  while (queue.length > 0 && cells.size < MAX_CELLS) {
+    const [cx, cy] = queue.pop()!;
+    const steps: [number, number, string][] = [
+      [cx, cy - 1, `h,${cx},${cy}`],
+      [cx, cy + 1, `h,${cx},${cy + 1}`],
+      [cx - 1, cy, `v,${cx},${cy}`],
+      [cx + 1, cy, `v,${cx + 1},${cy}`],
+    ];
+    for (const [nx, ny, edge] of steps) {
+      const key = `${nx},${ny}`;
+      if (cells.has(key) || closed.has(edge) || !isFloorCell(nx, ny)) continue;
+      cells.set(key, [nx, ny]);
+      queue.push([nx, ny]);
+    }
+  }
+
+  if (!shaped) {
+    for (const key of cells.keys()) setCellTexture(layer, key, texture);
+    return true;
+  }
+  // Free-form floor can reach past a door's cells, or bridge two rooms in a
+  // cell they share, so keep only the floor joined to the point clicked
+  const squares = cellPolygons(Object.fromEntries([...cells.keys()].map((key) => [key, true])));
+  const piece = floorPieceAt(squares, floor, x, y);
+  if (!piece) return false;
+  for (const [key, [gx, gy]] of cells) {
+    if (layer.rooms[key] && pointInPolygons([piece], gx + 0.5, gy + 0.5)) setCellTexture(layer, key, texture);
+  }
+  paintArea(layer, [piece], texture);
+  return true;
+}
+
+function setCellTexture(layer: MapLayer, key: string, texture: FloorTexture) {
+  if (texture === 'plain') delete layer.floors[key];
+  else layer.floors[key] = texture;
+}

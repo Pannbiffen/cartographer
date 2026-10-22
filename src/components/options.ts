@@ -10,6 +10,7 @@ import {
   MousePointer2,
   Paintbrush,
   Pentagon,
+  PaintBucket,
   Spline,
   Sparkles,
   Square,
@@ -46,6 +47,7 @@ export const TOOLS: ToolInfo[] = [
   { id: 'polygon', label: 'Polygon Room', icon: Pentagon, shortcut: 'N' },
   { id: 'circle', label: 'Circle Room', icon: Circle, shortcut: 'C' },
   { id: 'path', label: 'Free Path', icon: Spline, shortcut: 'H' },
+  { id: 'fill', label: 'Fill Room', icon: PaintBucket, shortcut: 'K' },
   { id: 'water', label: 'Water', icon: Waves, shortcut: 'W' },
   { id: 'foliage', label: 'Foliage & Terrain', icon: Trees, shortcut: 'F' },
   { id: 'door', label: 'Door / Portal', icon: DoorOpen, shortcut: 'D' },
@@ -61,10 +63,10 @@ export function keepsSelection(tool: ToolType): boolean {
   return tool === 'select' || tool === 'label' || tool === 'light';
 }
 
-/** Tools that lay floor, in the floor texture picked in the panel */
+/** Tools that lay floor (or re-texture it), in the floor texture picked in the panel */
 export function laysFloor(tool: ToolType, shapeMode: ShapeMode): boolean {
   if (tool === 'polygon' || tool === 'circle' || tool === 'path') return shapeMode === 'add';
-  return tool === 'room-brush' || tool === 'room-rect' || tool === 'tunnel';
+  return tool === 'room-brush' || tool === 'room-rect' || tool === 'tunnel' || tool === 'fill';
 }
 
 export const THEME_NAMES: [ThemeType, string][] = [
