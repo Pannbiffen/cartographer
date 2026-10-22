@@ -189,10 +189,9 @@ test('textured areas out of view cost nothing to draw', async ({ page }) => {
   await openApp(page);
   const curvesPerFrame = async () => {
     await page.evaluate(() => ((window as unknown as { curves: number }).curves = 0));
-    // Hovering redraws the map
-    const p = await gridPoint(page, -12, -3);
-    await page.mouse.move(p.x, p.y);
-    await page.mouse.move(p.x + 3, p.y);
+    // Hiding and showing the grid redraws the map twice (hovering only redraws the cursor)
+    await page.keyboard.press('g');
+    await page.keyboard.press('g');
     await page.evaluate(() => new Promise(requestAnimationFrame));
     return page.evaluate(() => (window as unknown as { curves: number }).curves);
   };
@@ -212,7 +211,8 @@ test('textured areas out of view cost nothing to draw', async ({ page }) => {
   expect(both).toBeGreaterThan(0);
 
   // Drawing it costs nothing: textures far apart used to fill the whole box between them
-  await page.keyboard.press('Control+z');
+  // (undoing the two grid toggles first)
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Control+z');
   expect((await topLayer(page)).floorAreas.cobbles).toHaveLength(1);
   expect(await curvesPerFrame()).toBe(both);
   expect(errors).toEqual([]);
@@ -220,8 +220,8 @@ test('textured areas out of view cost nothing to draw', async ({ page }) => {
 
 test('zoomed out, textures fill from a tile drawn once, however far the view pans', async ({ page }) => {
   const errors = trackErrors(page);
-  // Count the curves cobbles are drawn with (always off screen, on a tile or
-  // scratch canvas), and the patterns filled from tiles
+  // Count the curves cobbles are drawn with (on a tile or scratch canvas, not on
+  // the map itself), and the patterns filled from tiles
   await page.addInitScript(() => {
     const w = window as unknown as { curves: number; patterns: number };
     w.curves = 0;
@@ -229,7 +229,7 @@ test('zoomed out, textures fill from a tile drawn once, however far the view pan
     const proto = CanvasRenderingContext2D.prototype;
     const curve = proto.quadraticCurveTo;
     proto.quadraticCurveTo = function (...args) {
-      if (!this.canvas.isConnected) w.curves++;
+      if (!this.canvas.isConnected && !this.canvas.dataset.mapCache) w.curves++;
       return curve.apply(this, args);
     };
     const createPattern = proto.createPattern;
@@ -246,10 +246,10 @@ test('zoomed out, textures fill from a tile drawn once, however far the view pan
     });
   const reset = () => page.evaluate(() => Object.assign(window, { curves: 0, patterns: 0 }));
   const hover = async () => {
-    // Hovering redraws the map
-    const p = await gridPoint(page, -12, -3);
-    await page.mouse.move(p.x, p.y);
-    await page.mouse.move(p.x + 3, p.y);
+    // A short pan redraws the map (hovering only redraws the cursor)
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(100);
+    await page.keyboard.up('ArrowRight');
     await page.evaluate(() => new Promise(requestAnimationFrame));
   };
 

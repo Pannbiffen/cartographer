@@ -192,6 +192,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   // Box being dragged out with the select tool (grid units), and the
   // selection it adds to (Shift held)
   const selectBoxRef = useRef<{ start: Pair; end: Pair; base: Selection[] } | null>(null);
+  // The map as last drawn, and what it was drawn from (see `drawMap`)
+  const mapCacheRef = useRef<{ canvas: HTMLCanvasElement; key: unknown[] | null } | null>(null);
   // Drawing is blocked while the active layer is hidden or locked
   const layerEditable = isLayerEditable(findLayer(mapData, activeLayerId));
   const editLayer = useCallback(
@@ -236,31 +238,56 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Nothing to draw before the first resize (and drawImage rejects empty canvases)
+    if (canvas.width === 0 || canvas.height === 0) return;
     const dpr = window.devicePixelRatio || 1;
     const width = canvas.width / dpr;
     const height = canvas.height / dpr;
     const theme = THEMES[mapData.theme] || THEMES.parchment;
     const gridSize = mapData.gridSize;
 
-    // Work in CSS pixels regardless of display density
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = theme.bg;
-    ctx.fillRect(0, 0, width, height);
+    // The map itself only changes with an edit, pan, zoom or resize, so it is
+    // kept on a spare canvas; hovering then only blits it and draws the overlays
+    if (!mapCacheRef.current) {
+      const spare = document.createElement('canvas');
+      spare.dataset.mapCache = 'true';
+      mapCacheRef.current = { canvas: spare, key: null };
+    }
+    const cache = mapCacheRef.current;
+    const key = [mapData, viewport.x, viewport.y, viewport.zoom, canvas.width, canvas.height, dpr];
+    if (!cache.key || cache.key.some((part, i) => part !== key[i])) {
+      if (cache.canvas.width !== canvas.width) cache.canvas.width = canvas.width;
+      if (cache.canvas.height !== canvas.height) cache.canvas.height = canvas.height;
+      const mapCtx = cache.canvas.getContext('2d');
+      if (!mapCtx) return;
+      // Work in CSS pixels regardless of display density
+      mapCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      mapCtx.fillStyle = theme.bg;
+      mapCtx.fillRect(0, 0, width, height);
 
+      mapCtx.save();
+      // Apply viewport transform (pan & zoom)
+      mapCtx.translate(viewport.x, viewport.y);
+      mapCtx.scale(viewport.zoom, viewport.zoom);
+
+      // Map layers, with grid lines limited to the visible area
+      renderMap(mapCtx, mapData, {
+        minX: Math.floor(-viewport.x / viewport.zoom / gridSize) - 1,
+        minY: Math.floor(-viewport.y / viewport.zoom / gridSize) - 1,
+        maxX: Math.ceil((width - viewport.x) / viewport.zoom / gridSize) + 1,
+        maxY: Math.ceil((height - viewport.y) / viewport.zoom / gridSize) + 1,
+      });
+      renderLightMarkers(mapCtx, mapData, viewport.zoom, theme.ink);
+      mapCtx.restore();
+      cache.key = key;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(cache.canvas, 0, 0);
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.save();
-    // Apply viewport transform (pan & zoom)
     ctx.translate(viewport.x, viewport.y);
     ctx.scale(viewport.zoom, viewport.zoom);
-
-    // Map layers, with grid lines limited to the visible area
-    renderMap(ctx, mapData, {
-      minX: Math.floor(-viewport.x / viewport.zoom / gridSize) - 1,
-      minY: Math.floor(-viewport.y / viewport.zoom / gridSize) - 1,
-      maxX: Math.ceil((width - viewport.x) / viewport.zoom / gridSize) + 1,
-      maxY: Math.ceil((height - viewport.y) / viewport.zoom / gridSize) + 1,
-    });
-
-    renderLightMarkers(ctx, mapData, viewport.zoom, theme.ink);
 
     // Live cursor & drag previews
     const hover = currentHoverRef.current;
