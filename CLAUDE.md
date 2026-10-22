@@ -28,5 +28,6 @@ Inspired by Dungeon Scrawl: match its features, never copy its code, art or asse
 ## Workflow
 - Work on a branch per batch (`fix/...`, `feat/...`). Make one commit per logical change with a `fix:`/`feat:`/`docs:`/`chore:` prefix. Ask before merging to `main` or pushing.
 - Backlog is GitHub Issues (`gh issue list`). Put `Fixes #N` in commits. Every new issue gets a `model: opus` (complex or design-heavy) or `model: sonnet` (routine, well-scoped) label, a `priority: high`/`medium`/`low` label (the user may re-rank them; pick high-priority work first), plus `enhancement`/`bug`/`ui`/`pro-parity`/`chore` as fits.
+- "Triage #N": rewrite the issue in the style of the others (a short summary, bullets with the files and functions involved, cross-links to related issues, a final `e2e:` bullet), give it a clear title and add the labels above. Read the relevant code first so the pointers are right; don't implement anything.
 - Keep the README feature list and shortcut table in sync with the app.
 - When a task is done, check whether it taught something a future session would need (a new module, convention or gotcha) and add it here in a line or two. Keep this file short: no history or per-feature notes, those belong in commits and issues.
