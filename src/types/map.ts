@@ -24,7 +24,18 @@ export type FoliageType = 'tree' | 'bush' | 'rock';
 
 export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome';
 
-export type FloorTexture = 'plain' | 'flagstones' | 'planks' | 'cobbles' | 'tiles' | 'dirt';
+export type FloorTexture =
+  | 'plain'
+  | 'flagstones'
+  | 'planks'
+  | 'cobbles'
+  | 'tiles'
+  | 'dirt'
+  | 'grass'
+  | 'sand'
+  | 'carpet'
+  | 'slabs'
+  | 'marble';
 
 // How the rock outside the walls is shaded
 export type HatchStyle = 'dyson' | 'crosshatch' | 'stipple' | 'shadow' | 'none';

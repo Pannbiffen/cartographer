@@ -1,7 +1,27 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { openApp, clickCell, dragCells, gridPoint, saveMap, trackErrors, view } from './helpers';
 
 // The starter map leaves rows y >= 8 empty
+
+/** Share of a square's pixels inked darker than the paper (with the pointer off the canvas) */
+async function inkShare(page: Page, gx: number, gy: number, size: number) {
+  const a = await gridPoint(page, gx, gy);
+  const b = await gridPoint(page, gx + size, gy + size);
+  await page.mouse.move(1, 1);
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  return page.locator('canvas').evaluate((canvas: HTMLCanvasElement, [a, b]) => {
+    const box = canvas.getBoundingClientRect();
+    const scale = canvas.width / box.width;
+    const x = Math.round((a.x - box.x) * scale);
+    const y = Math.round((a.y - box.y) * scale);
+    const w = Math.max(1, Math.round((b.x - a.x) * scale));
+    const h = Math.max(1, Math.round((b.y - a.y) * scale));
+    const data = canvas.getContext('2d')!.getImageData(x, y, w, h).data;
+    let dark = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] < 600) dark++;
+    return dark / (w * h);
+  }, [a, b]);
+}
 
 test('room tools lay the chosen floor texture, and plain clears it', async ({ page }) => {
   const errors = trackErrors(page);
@@ -27,6 +47,33 @@ test('room tools lay the chosen floor texture, and plain clears it', async ({ pa
   expect(floors['-15,8']).toBeUndefined();
   expect(floors['-10,8']).toBeUndefined();
   expect(floors['-14,8']).toBe('planks');
+  expect(errors).toEqual([]);
+});
+
+test('grass, sand, carpet, slabs and marble can be laid and are drawn', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  // A blank map, framed around the origin
+  await page.keyboard.press('Control+Alt+n');
+  await expect(page.getByTestId('map-stats')).toContainText('Rooms: 0');
+  await page.keyboard.press('r');
+  // A plain room for comparison, then one room per texture, a cell apart
+  const textures = ['plain', 'grass', 'sand', 'carpet', 'slabs', 'marble'];
+  for (const [i, texture] of textures.entries()) {
+    await page.getByRole('button', { name: texture, exact: true }).click();
+    await dragCells(page, [-11 + i * 4, 0], [-9 + i * 4, 1]);
+  }
+  const floors = (await saveMap(page)).levels[0].layers[0].floors;
+  for (const [i, texture] of textures.entries()) {
+    expect(floors[`${-10 + i * 4},1`]).toBe(texture === 'plain' ? undefined : texture);
+  }
+
+  // Each inks its room clearly more than the grid alone does in the plain one
+  const room = (i: number) => inkShare(page, -11 + i * 4, 0, 2);
+  const plain = await room(0);
+  for (let i = 1; i < textures.length; i++) {
+    expect(await room(i), textures[i]).toBeGreaterThan(plain + 0.01);
+  }
   expect(errors).toEqual([]);
 });
 
@@ -76,25 +123,7 @@ test('stipple hatching on a large map draws from a tile, zoomed out and back in'
   const frame = () => page.evaluate(() => new Promise(requestAnimationFrame));
   const arcs = () => page.evaluate(() => (window as unknown as { arcs: number }).arcs);
 
-  // Share of a square's pixels inked darker than the paper (with the pointer off the canvas)
-  const ink = async (gx: number, gy: number, size = 1) => {
-    const a = await gridPoint(page, gx, gy);
-    const b = await gridPoint(page, gx + size, gy + size);
-    await page.mouse.move(1, 1);
-    await frame();
-    return page.locator('canvas').evaluate((canvas: HTMLCanvasElement, [a, b]) => {
-      const box = canvas.getBoundingClientRect();
-      const scale = canvas.width / box.width;
-      const x = Math.round((a.x - box.x) * scale);
-      const y = Math.round((a.y - box.y) * scale);
-      const w = Math.max(1, Math.round((b.x - a.x) * scale));
-      const h = Math.max(1, Math.round((b.y - a.y) * scale));
-      const data = canvas.getContext('2d')!.getImageData(x, y, w, h).data;
-      let dark = 0;
-      for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] < 600) dark++;
-      return dark / (w * h);
-    }, [a, b]);
-  };
+  const ink = (gx: number, gy: number, size = 1) => inkShare(page, gx, gy, size);
 
   // Zoom out as far as it goes, then back in on the gap between two rooms
   const zoomAt = async (gx: number, gy: number, deltaY: number, times: number) => {

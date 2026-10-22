@@ -76,7 +76,19 @@ export const THEME_NAMES: [ThemeType, string][] = [
   ['monochrome', 'Monochrome Ink'],
 ];
 
-export const FLOOR_TEXTURES: FloorTexture[] = ['plain', 'flagstones', 'planks', 'cobbles', 'tiles', 'dirt'];
+export const FLOOR_TEXTURES: FloorTexture[] = [
+  'plain',
+  'flagstones',
+  'slabs',
+  'planks',
+  'cobbles',
+  'tiles',
+  'marble',
+  'carpet',
+  'dirt',
+  'sand',
+  'grass',
+];
 export const HATCH_STYLES: [HatchStyle, string][] = [
   ['dyson', 'Pen strokes'],
   ['crosshatch', 'Crosshatch'],

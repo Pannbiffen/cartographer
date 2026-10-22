@@ -139,6 +139,128 @@ const dirt: PatternFn = (ctx, gx, gy, g) => {
   }
 };
 
+// Grass: tufts of three blades rising from a short base and curling outwards,
+// leaning a little, scattered over the cell
+const GRASS_TUFTS = 5;
+const grass: PatternFn = (ctx, gx, gy, g) => {
+  const wx = wrap(gx, PERIOD);
+  const wy = wrap(gy, PERIOD);
+  for (let n = 0; n < GRASS_TUFTS; n++) {
+    const bx = (gx + 0.1 + pseudoRandom(wx, wy, 140 + n) * 0.8) * g;
+    const by = (gy + 0.15 + pseudoRandom(wx, wy, 160 + n) * 0.8) * g;
+    const height = g * (0.11 + pseudoRandom(wx, wy, 180 + n) * 0.06);
+    const lean = (pseudoRandom(wx, wy, 200 + n) - 0.5) * height * 0.6;
+    for (const side of [-1, 0, 1]) {
+      const x = bx + side * g * 0.03;
+      const top = by - height * (side === 0 ? 1 : 0.75);
+      ctx.moveTo(x, by);
+      ctx.quadraticCurveTo(x + lean * 0.3, (by + top) / 2, x + lean + side * height * 0.45, top);
+    }
+  }
+};
+
+// Sand: fine even specks, and a low ripple across some cells (filled, not stroked)
+const SAND_SPECKS = 26;
+const sand: PatternFn = (ctx, gx, gy, g) => {
+  const wx = wrap(gx, PERIOD);
+  const wy = wrap(gy, PERIOD);
+  for (let n = 0; n < SAND_SPECKS; n++) {
+    const px = (gx + pseudoRandom(wx, wy, 240 + n)) * g;
+    const py = (gy + pseudoRandom(wx, wy, 270 + n)) * g;
+    const r = 0.5 + pseudoRandom(wx, wy, 300 + n) * 0.5;
+    ctx.moveTo(px + r, py);
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+  }
+  if (pseudoRandom(wx, wy, 330) < 0.5) {
+    // A thin crescent, its ends inside the cell
+    const cx = (gx + 0.35 + pseudoRandom(wx, wy, 331) * 0.3) * g;
+    const cy = (gy + 0.3 + pseudoRandom(wx, wy, 332) * 0.5) * g;
+    const half = g * (0.2 + pseudoRandom(wx, wy, 333) * 0.1);
+    const rise = g * 0.12;
+    ctx.moveTo(cx - half, cy);
+    ctx.quadraticCurveTo(cx, cy - rise, cx + half, cy);
+    ctx.quadraticCurveTo(cx, cy - rise + 2.4, cx - half, cy);
+    ctx.closePath();
+  }
+};
+
+// Carpet: a woven diamond lattice, half a cell across, with a knot in each diamond
+const carpet: PatternFn = (ctx, gx, gy, g) => {
+  const x = gx * g;
+  const y = gy * g;
+  const h = g / 2;
+  for (const [x1, y1, x2, y2] of [
+    [x, y, x + g, y + g],
+    [x + h, y, x + g, y + h],
+    [x, y + h, x + h, y + g],
+    [x + g, y, x, y + g],
+    [x + h, y, x, y + h],
+    [x + g, y + h, x + h, y + g],
+  ]) {
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+  }
+  // Diamond centres a quarter cell off the lines' crossings; those on the
+  // top and left edges are this cell's, the others its neighbours'
+  const r = g * 0.035;
+  for (const [fx, fy] of [[0.25, 0.5], [0.75, 0.5], [0.5, 0.25], [0.5, 0.75], [0.25, 0], [0.75, 0], [0, 0.25], [0, 0.75]]) {
+    ctx.moveTo(x + fx * g + r, y + fy * g);
+    ctx.arc(x + fx * g, y + fy * g, r, 0, Math.PI * 2);
+  }
+};
+
+// Stone slabs: two cells long and one high, in a running bond set half a cell
+// off the grid so the joints don't hide under grid lines, the odd one cracked
+const slabs: PatternFn = (ctx, gx, gy, g) => {
+  const x = gx * g;
+  const y = gy * g;
+  const h = g / 2;
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x + g, y + h);
+  // Rows alternate which cells a joint crosses: the top half's or the bottom's
+  const jointTop = wrap(gx + gy, 2) === 1;
+  ctx.moveTo(x + h, jointTop ? y : y + h);
+  ctx.lineTo(x + h, jointTop ? y + h : y + g);
+  const wx = wrap(gx, PERIOD);
+  const wy = wrap(gy, PERIOD);
+  if (pseudoRandom(wx, wy, 350) < 0.2) {
+    // A crack running from the middle line into the slab beside the joint
+    const side = jointTop ? 1 : -1;
+    let cx = x + (0.6 + pseudoRandom(wx, wy, 351) * 0.3) * g;
+    let cy = y + h;
+    ctx.moveTo(cx, cy);
+    for (let n = 0; n < 3; n++) {
+      cx += (pseudoRandom(wx, wy, 352 + n) - 0.5) * g * 0.15;
+      cy += side * g * 0.12;
+      ctx.lineTo(cx, cy);
+    }
+  }
+};
+
+// Marble: polished squares, a cell each, crossed by a wandering vein that sometimes forks
+const marble: PatternFn = (ctx, gx, gy, g) => {
+  const x = gx * g;
+  const y = gy * g;
+  // Each cell draws its top and left edges
+  ctx.moveTo(x + g, y);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x, y + g);
+  const wx = wrap(gx, PERIOD);
+  const wy = wrap(gy, PERIOD);
+  const rand = (n: number) => pseudoRandom(wx, wy, 370 + n);
+  // From the left edge to the right, or the top to the bottom, in an S
+  const across = rand(0) < 0.5;
+  const at = (a: number, b: number): [number, number] => (across ? [x + a * g, y + b * g] : [x + b * g, y + a * g]);
+  const ends = [0.15 + rand(1) * 0.7, rand(3), rand(4), 0.15 + rand(2) * 0.7];
+  ctx.moveTo(...at(0.04, ends[0]));
+  ctx.bezierCurveTo(...at(0.35, ends[1]), ...at(0.65, ends[2]), ...at(0.96, ends[3]));
+  if (rand(5) < 0.5) {
+    // A branch off the vein's middle
+    ctx.moveTo(...at(0.5, (ends[0] + 3 * ends[1] + 3 * ends[2] + ends[3]) / 8));
+    ctx.quadraticCurveTo(...at(0.6 + rand(6) * 0.2, 0.5), ...at(0.7 + rand(7) * 0.2, rand(8) < 0.5 ? 0.12 : 0.88));
+  }
+};
+
 type Pattern = Exclude<FloorTexture, 'plain'>;
 const PATTERNS: Record<Pattern, PatternFn> = {
   tiles,
@@ -146,6 +268,11 @@ const PATTERNS: Record<Pattern, PatternFn> = {
   flagstones,
   cobbles,
   dirt,
+  grass,
+  sand,
+  carpet,
+  slabs,
+  marble,
 };
 const PATTERN_PERIOD: Record<Pattern, number> = {
   tiles: PERIOD,
@@ -153,10 +280,26 @@ const PATTERN_PERIOD: Record<Pattern, number> = {
   flagstones: PERIOD,
   cobbles: PERIOD,
   dirt: PERIOD,
+  grass: PERIOD,
+  sand: PERIOD,
+  carpet: PERIOD,
+  slabs: PERIOD,
+  marble: PERIOD,
 };
 
 // Fainter for busy patterns, stronger for sparse ones
-const TEXTURE_ALPHA: Partial<Record<FloorTexture, number>> = { dirt: 0.35, cobbles: 0.55, flagstones: 0.5 };
+const TEXTURE_ALPHA: Partial<Record<FloorTexture, number>> = {
+  dirt: 0.35,
+  cobbles: 0.55,
+  flagstones: 0.5,
+  grass: 0.55,
+  sand: 0.45,
+  carpet: 0.3,
+  slabs: 0.5,
+  marble: 0.45,
+};
+// Patterns of specks, filled rather than stroked
+const FILLED = new Set<Pattern>(['dirt', 'sand']);
 
 const isPattern = (texture: FloorTexture): texture is Pattern => texture in PATTERNS;
 
@@ -265,7 +408,7 @@ function drawTexture(
 // so a large area is drawn in many short paths. Cobbles have ~60 curves a cell.
 const cellsPerPath = (texture: Pattern) => (texture === 'cobbles' ? 4 : 16);
 
-/** Strokes (or for dirt, fills) a texture's shapes over `cells` */
+/** Strokes (or for specks, fills) a texture's shapes over `cells` */
 function strokeCells(ctx: CanvasRenderingContext2D, texture: Pattern, cells: [number, number][], gridSize: number, inkColor: string) {
   ctx.strokeStyle = inkColor;
   ctx.fillStyle = inkColor;
@@ -277,7 +420,7 @@ function strokeCells(ctx: CanvasRenderingContext2D, texture: Pattern, cells: [nu
   for (let start = 0; start < cells.length; start += perPath) {
     ctx.beginPath();
     for (const [gx, gy] of cells.slice(start, start + perPath)) draw(ctx, gx, gy, gridSize, seen);
-    if (texture === 'dirt') ctx.fill();
+    if (FILLED.has(texture)) ctx.fill();
     else ctx.stroke();
   }
 }
