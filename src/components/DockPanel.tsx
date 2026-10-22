@@ -48,6 +48,8 @@ interface DockPanelProps {
   onShapeModeChange: (mode: ShapeMode) => void;
   selection: Selection | null;
   onClearSelection: () => void;
+  onDuplicate: () => void;
+  onCopy: () => void;
   // The active level, as drawn
   mapData: LevelMap;
   levels: MapLevel[];
@@ -318,6 +320,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onShapeModeChange,
   selection,
   onClearSelection,
+  onDuplicate,
+  onCopy,
   mapData,
   levels,
   activeLevelId,
@@ -386,6 +390,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
             }
             onModifyMap={onModifyMap}
             onClearSelection={onClearSelection}
+            onDuplicate={onDuplicate}
+            onCopy={onCopy}
           />
         )}
 

@@ -1077,6 +1077,8 @@ export function App() {
             onShapeModeChange={setShapeMode}
             selection={activeSelection}
             onClearSelection={() => setSelection(null)}
+            onDuplicate={handleDuplicate}
+            onCopy={handleCopy}
             mapData={levelMap}
             levels={mapData.levels}
             activeLevelId={activeLevelId}

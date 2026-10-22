@@ -26,7 +26,7 @@ import {
   replaceStairs,
   rotateObject,
 } from '../core/objects';
-import { RotateCw, Trash2 } from 'lucide-react';
+import { Copy, CopyPlus, RotateCw, Trash2 } from 'lucide-react';
 import { Slider } from './Slider';
 import { LIGHT_RADIUS_RANGE, TORCH_LIGHT } from '../core/lighting';
 
@@ -113,6 +113,8 @@ interface SelectionInspectorProps {
   focusLabelText?: boolean;
   onModifyMap: ModifyMap;
   onClearSelection: () => void;
+  onDuplicate: () => void;
+  onCopy: () => void;
 }
 
 export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
@@ -125,6 +127,8 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   focusLabelText = false,
   onModifyMap,
   onClearSelection,
+  onDuplicate,
+  onCopy,
 }) => {
   const labelInputRef = useRef<HTMLInputElement | null>(null);
   const labelId = selection?.kind === 'label' ? selection.id : null;
@@ -332,6 +336,14 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
             Rotate (R)
           </button>
         )}
+        <button onClick={onDuplicate} className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}>
+          <CopyPlus className="w-3.5 h-3.5" />
+          Duplicate
+        </button>
+        <button onClick={onCopy} className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}>
+          <Copy className="w-3.5 h-3.5" />
+          Copy
+        </button>
         <button
           onClick={() => {
             onModifyMap((draft) => deleteObject(draft, selection));

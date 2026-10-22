@@ -145,6 +145,20 @@ test('duplicate, copy and paste objects', async ({ page }) => {
   expect((await saveMap(page)).levels[0].layers[0].doors).toHaveLength(map.levels[0].layers[0].doors.length - 1);
 });
 
+test('the selection panel duplicates and copies the selected object', async ({ page }) => {
+  await openApp(page);
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  await page.keyboard.press('v');
+  await clickCell(page, 9, 1);
+  await panel.getByRole('button', { name: 'Duplicate' }).click();
+  await panel.getByRole('button', { name: 'Copy' }).click();
+  await page.keyboard.press('Control+v');
+  const map = await saveMap(page);
+  const altar = map.levels[0].layers[0].props.find((p) => p.id === 'p3')!;
+  const copies = map.levels[0].layers[0].props.filter((p) => p.type === altar.type && p.id !== 'p3');
+  expect(copies.map((p) => [p.x, p.y])).toEqual([[10, 1], [11, 1]]);
+});
+
 test('labels can be placed, typed, resized and dragged', async ({ page }) => {
   await openApp(page);
   await page.keyboard.press('l');
