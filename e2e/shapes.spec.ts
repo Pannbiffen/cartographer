@@ -19,7 +19,7 @@ async function dragFrom(page: Page, from: [number, number], to: [number, number]
 
 async function topLayer(page: Page) {
   const map = await saveMap(page);
-  return map.layers[map.layers.length - 1];
+  return map.levels[0].layers[map.levels[0].layers.length - 1];
 }
 
 test('the polygon tool adds a free-form room, undone in one step', async ({ page }) => {

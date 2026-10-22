@@ -1,5 +1,5 @@
 // Shared map renderer used by both the live canvas and the exporters
-import type { MapData, MapLayer } from '../../types/map';
+import type { LevelMap, MapLayer } from '../../types/map';
 import { THEMES } from '../theme';
 import {
   extractWallSegments,
@@ -68,7 +68,7 @@ function drawWithOpacity(
 }
 
 /** One layer's terrain and objects, bottom to top (labels are drawn separately) */
-function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: MapData) {
+function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: LevelMap) {
   const theme = THEMES[mapData.theme] || THEMES.parchment;
   const gridSize = mapData.gridSize;
   // Cells alone are quick to outline; free-form shapes need merging with them
@@ -155,7 +155,7 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Ma
  */
 export function renderMap(
   ctx: CanvasRenderingContext2D,
-  mapData: MapData,
+  mapData: LevelMap,
   gridRange: GridRange | null,
   { lighting = true }: { lighting?: boolean } = {}
 ) {

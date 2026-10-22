@@ -22,7 +22,7 @@ test('the light tool places a light, turns lighting on and edits it', async ({ p
 
   let map = await saveMap(page);
   expect(map.lighting).toBe(true);
-  expect(map.layers[0].lights).toEqual([
+  expect(map.levels[0].layers[0].lights).toEqual([
     expect.objectContaining({ x: -2, y: 4, radius: 8 }),
   ]);
 
@@ -32,7 +32,7 @@ test('the light tool places a light, turns lighting on and edits it', async ({ p
   await expect(page.getByText('Selected: light')).toBeVisible();
   await page.keyboard.press('Delete');
   map = await saveMap(page);
-  expect(map.layers[0].lights).toEqual([]);
+  expect(map.levels[0].layers[0].lights).toEqual([]);
   expect(errors).toEqual([]);
 });
 
@@ -42,7 +42,7 @@ test('torches carry editable light settings', async ({ page }) => {
   await clickCell(page, -4, 2);
   await expect(page.getByText('Selected: torch')).toBeVisible();
   await page.getByLabel('Light colour').fill('#3366ff');
-  const torch = (await saveMap(page)).layers[0].props.find((p) => p.type === 'torch');
+  const torch = (await saveMap(page)).levels[0].layers[0].props.find((p) => p.type === 'torch');
   expect(torch?.light?.color).toBe('#3366ff');
 });
 

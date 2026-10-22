@@ -74,6 +74,7 @@ export interface PlacedStairs {
   height: number;
   direction: 'up' | 'down' | 'left' | 'right';
   steps: number;
+  toLevel?: string; // id of the level these stairs lead to; missing (or a deleted level) means none
 }
 
 export interface PlacedProp {
@@ -132,8 +133,9 @@ export interface MapLayer extends LayerContent {
   opacity: number; // 0 to 1
 }
 
-export interface MapData {
-  version: number; // 2 since layers; version 1 kept one layer's content at the top level
+/** Settings shared by every level of a map */
+export interface MapSettings {
+  version: number; // 3 since levels; 2 kept one level's layers at the top level, 1 one layer's content
   title: string;
   gridSize: number; // pixels per grid cell (e.g. 40)
   theme: ThemeType;
@@ -146,7 +148,23 @@ export interface MapData {
   wallStyle: WallStyle;
   lighting: boolean; // darken the map so lights and torches show
   darkness: number; // 0 to 1, away from any light
+}
+
+/** One floor or area of a map: a dungeon level, a storey, a building's interior */
+export interface MapLevel {
+  id: string;
+  name: string;
   layers: MapLayer[]; // bottom to top; never empty
+}
+
+/** A map as saved: its settings and its levels */
+export interface MapData extends MapSettings {
+  levels: MapLevel[]; // in the order listed; never empty
+}
+
+/** One level with the map's settings: what the canvas, tools and exports draw */
+export interface LevelMap extends MapSettings {
+  layers: MapLayer[];
 }
 
 export interface ViewportTransform {

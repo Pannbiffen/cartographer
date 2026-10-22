@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { MapData } from '../types/map';
+import type { LevelMap } from '../types/map';
 import { exportToImage, exportToVtt } from '../core/export/imageExporter';
 import type { ImageFormat } from '../core/export/imageExporter';
 import type { PdfLayout, PaperSize } from '../core/export/pdfExporter';
@@ -7,13 +7,15 @@ import { Dialog, DialogGroup } from './Dialog';
 import { BUTTON_CLASS, FIELD_CLASS } from './options';
 
 interface ExportModalProps {
-  mapData: MapData;
+  mapData: LevelMap;
+  // Set when the map has several levels: only the current one is exported
+  levelName?: string;
   isOpen: boolean;
   onSaveProject: () => void;
   onClose: () => void;
 }
 
-export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onSaveProject, onClose }) => {
+export const ExportModal: React.FC<ExportModalProps> = ({ mapData, levelName, isOpen, onSaveProject, onClose }) => {
   const [scale, setScale] = useState<number>(2);
   const [includeGrid, setIncludeGrid] = useState<boolean>(true);
   const [copiedVtt, setCopiedVtt] = useState<boolean>(false);
@@ -48,6 +50,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({ mapData, isOpen, onSav
 
   return (
     <Dialog title="Export" onClose={onClose}>
+      {levelName !== undefined && (
+        <p className="text-ui-muted leading-snug">
+          Exports the current level, “{levelName}”. Switch level to export another; the project file keeps them all.
+        </p>
+      )}
       <DialogGroup title="Image">
         <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
           <span>Format</span>

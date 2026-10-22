@@ -34,7 +34,7 @@ test('a share link opens a copy of the map in another browser', async ({ page, b
   // The link is cleared from the address bar so a reload keeps the friend's own edits
   expect(new URL(friend.url()).hash).toBe('');
   const opened = await saveMap(friend);
-  expect(opened.layers).toEqual(original.layers);
+  expect(opened.levels[0].layers).toEqual(original.levels[0].layers);
   await friend.context().close();
 });
 

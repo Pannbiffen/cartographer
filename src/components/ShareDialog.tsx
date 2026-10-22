@@ -40,8 +40,8 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ mapData, onClose }) =>
   return (
     <Dialog title="Share Link" onClose={onClose}>
       <p className="leading-snug">
-        Anyone with this link can open a copy of “{mapData.title || 'Untitled map'}”, including hidden
-        layers. Their changes don’t affect yours, and the map is stored in the link itself, not on a
+        Anyone with this link can open a copy of “{mapData.title || 'Untitled map'}”, including all its levels and
+        hidden layers. Their changes don’t affect yours, and the map is stored in the link itself, not on a
         server.
       </p>
       {failed ? (

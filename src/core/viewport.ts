@@ -1,4 +1,4 @@
-import type { MapData, Selection, ViewportTransform } from '../types/map';
+import type { LevelMap, Selection, ViewportTransform } from '../types/map';
 import { objectBounds } from './objects';
 import { visibleLayers } from './layers';
 import { shapeBounds } from './geometry/region';
@@ -49,7 +49,7 @@ export function wheelZoomFactor(
 }
 
 /** Extent of everything drawn on the map's shown layers, in grid units, or null if empty */
-export function mapBounds(map: MapData): { x: number; y: number; w: number; h: number } | null {
+export function mapBounds(map: LevelMap): { x: number; y: number; w: number; h: number } | null {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -87,7 +87,7 @@ export function mapBounds(map: MapData): { x: number; y: number; w: number; h: n
 }
 
 /** A view that frames the whole map in a canvas of the given size */
-export function fitViewport(map: MapData, width: number, height: number): ViewportTransform {
+export function fitViewport(map: LevelMap, width: number, height: number): ViewportTransform {
   const bounds = mapBounds(map);
   if (!bounds) return { x: width / 2, y: height / 2, zoom: 1 };
 

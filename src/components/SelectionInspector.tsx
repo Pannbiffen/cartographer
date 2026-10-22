@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import type { LightSettings, MapData, PlacedLabel, PlacedStairs, Selection } from '../types/map';
+import type { LevelMap, LightSettings, MapLevel, PlacedLabel, PlacedStairs, Selection } from '../types/map';
 import {
   DOOR_TYPES,
   LABEL_SIZES,
@@ -65,8 +65,48 @@ const LightControls: React.FC<{
   </>
 );
 
+// The level a staircase leads to, and a button to go there
+const StairsLink: React.FC<{
+  stairs: PlacedStairs;
+  levels: MapLevel[];
+  onChange: (toLevel: string | undefined) => void;
+  onTake: () => void;
+}> = ({ stairs, levels, onChange, onTake }) => {
+  const target = levels.find((l) => l.id === stairs.toLevel);
+  return (
+    <>
+      <label className="flex flex-col gap-0.5">
+        <span>Go to level</span>
+        <select
+          aria-label="Stairs go to level"
+          value={target?.id ?? ''}
+          onChange={(e) => onChange(e.target.value || undefined)}
+          className={FIELD_CLASS}
+        >
+          <option value="">None</option>
+          {levels.map((level) => (
+            <option key={level.id} value={level.id}>
+              {level.name || 'Untitled level'}
+            </option>
+          ))}
+        </select>
+      </label>
+      {target && (
+        <button onClick={onTake} title="Or double-click the stairs" className={BUTTON_CLASS}>
+          Take stairs to {target.name || 'Untitled level'}
+        </button>
+      )}
+    </>
+  );
+};
+
 interface SelectionInspectorProps {
-  mapData: MapData;
+  // The active level, as drawn
+  mapData: LevelMap;
+  // All the map's levels, for the level a staircase leads to
+  levels: MapLevel[];
+  activeLevelId: string;
+  onTakeStairs: (stairs: Selection) => void;
   selection: Selection | null;
   hint?: string;
   // Focus the label text box when a label is selected (label tool only)
@@ -77,6 +117,9 @@ interface SelectionInspectorProps {
 
 export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   mapData,
+  levels,
+  activeLevelId,
+  onTakeStairs,
   selection,
   hint,
   focusLabelText = false,
@@ -192,6 +235,16 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
               </label>
             ))}
           </div>
+          {levels.length > 1 ? (
+            <StairsLink
+              stairs={stairs}
+              levels={levels.filter((l) => l.id !== activeLevelId)}
+              onChange={(toLevel) => setStairs({ toLevel })}
+              onTake={() => onTakeStairs(selection)}
+            />
+          ) : (
+            <p className="text-ui-muted leading-snug">Add a level (Level &gt; New Level) to link these stairs to it.</p>
+          )}
         </>
       )}
 

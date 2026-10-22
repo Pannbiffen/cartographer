@@ -1,5 +1,5 @@
 // Light sources: placed lights plus the torches that double as lights
-import type { LightSettings, MapData } from '../types/map';
+import type { LightSettings, LevelMap } from '../types/map';
 import { visibleLayers } from './layers';
 
 export const DEFAULT_LIGHT: LightSettings = { color: '#ffe2a8', radius: 5, intensity: 1 };
@@ -14,7 +14,7 @@ export interface MapLight extends LightSettings {
 }
 
 /** Every light on the shown layers, torches included */
-export function mapLights(map: MapData): MapLight[] {
+export function mapLights(map: LevelMap): MapLight[] {
   const lights: MapLight[] = [];
   for (const layer of visibleLayers(map)) {
     for (const l of layer.lights) {

@@ -1,6 +1,6 @@
 // Darkness and light: every light lifts the darkness within its radius,
 // except where walls block it, and tints what it reaches with its colour
-import type { MapData, MapLayer } from '../../types/map';
+import type { LevelMap, MapLayer } from '../../types/map';
 import { combinedWalls } from '../geometry/region';
 import { mergeWallSegments, visibilityPolygon, type Point, type Segment } from '../geometry/visibility';
 import { mapLights, type MapLight } from '../lighting';
@@ -15,7 +15,7 @@ let cache: {
   shapes: Map<string, Point[]>;
 } | null = null;
 
-function lightShape(map: MapData, light: MapLight): Point[] {
+function lightShape(map: LevelMap, light: MapLight): Point[] {
   const g = map.gridSize;
   if (!cache || cache.layers !== map.layers || cache.gridSize !== g) {
     const walls = mergeWallSegments(combinedWalls(visibleLayers(map), g));
@@ -46,7 +46,7 @@ function rgba(hex: string, alpha: number): string {
 let darkCanvas: HTMLCanvasElement | null = null;
 
 /** Darkens the whole canvas except where lights reach (world transform on `ctx`) */
-export function renderLighting(ctx: CanvasRenderingContext2D, map: MapData) {
+export function renderLighting(ctx: CanvasRenderingContext2D, map: LevelMap) {
   const g = map.gridSize;
   const lights = mapLights(map);
 
@@ -107,7 +107,7 @@ export function renderLighting(ctx: CanvasRenderingContext2D, map: MapData) {
  * Small sun icons where placed lights are, for the editor only (exports
  * show just the light). Sized in screen pixels whatever the zoom.
  */
-export function renderLightMarkers(ctx: CanvasRenderingContext2D, map: MapData, zoom: number, ink: string) {
+export function renderLightMarkers(ctx: CanvasRenderingContext2D, map: LevelMap, zoom: number, ink: string) {
   const g = map.gridSize;
   const r = 6 / zoom;
   ctx.save();

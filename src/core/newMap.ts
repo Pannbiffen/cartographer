@@ -1,6 +1,6 @@
 // The look a blank map starts with, chosen in Preferences
 import type { MapData } from '../types/map';
-import { newLayer, newLayerId } from './layers';
+import { newLevel, newLevelId } from './levels';
 
 export type NewMapDefaults = Pick<
   MapData,
@@ -34,16 +34,16 @@ export function mapLook(map: MapData): NewMapDefaults {
   return Object.fromEntries(NEW_MAP_KEYS.map((key) => [key, map[key]])) as unknown as NewMapDefaults;
 }
 
-/** An empty map with one layer */
+/** An empty map with one level of one layer */
 export function createBlankMap(defaults: NewMapDefaults): MapData {
   return {
-    version: 2,
+    version: 3,
     title: 'Untitled map',
     gridSize: 40,
     ...DEFAULT_NEW_MAP,
     ...defaults,
     lighting: false,
     darkness: 0.75,
-    layers: [newLayer(newLayerId(), 'Layer 1')],
+    levels: [newLevel(newLevelId(), 'Level 1')],
   };
 }

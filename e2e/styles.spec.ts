@@ -14,7 +14,7 @@ test('room tools lay the chosen floor texture, and plain clears it', async ({ pa
   await page.getByRole('button', { name: 'cobbles' }).click();
   await dragCells(page, [-10, 8], [-9, 9]);
 
-  let floors = (await saveMap(page)).layers[0].floors;
+  let floors = (await saveMap(page)).levels[0].layers[0].floors;
   expect(floors).toMatchObject({ '-15,8': 'planks', '-13,8': 'planks', '-10,8': 'cobbles', '-9,9': 'cobbles' });
 
   // Painting plain over a textured cell clears its texture; erasing drops it
@@ -23,7 +23,7 @@ test('room tools lay the chosen floor texture, and plain clears it', async ({ pa
   await clickCell(page, -15, 8);
   await page.keyboard.press('e');
   await clickCell(page, -10, 8);
-  floors = (await saveMap(page)).layers[0].floors;
+  floors = (await saveMap(page)).levels[0].layers[0].floors;
   expect(floors['-15,8']).toBeUndefined();
   expect(floors['-10,8']).toBeUndefined();
   expect(floors['-14,8']).toBe('planks');

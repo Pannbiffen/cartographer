@@ -174,7 +174,12 @@ test('opening a project frames the new map', async ({ page }) => {
     buffer: Buffer.from(
       JSON.stringify({
         ...map,
-        layers: [{ ...map.layers[0], rooms, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [] }],
+        levels: [
+          {
+            ...map.levels[0],
+            layers: [{ ...map.levels[0].layers[0], rooms, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [] }],
+          },
+        ],
       })
     ),
   });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type {
+  LevelMap,
   MapData,
   ToolType,
   DoorType,
@@ -51,6 +52,7 @@ import {
   copyObject,
   deleteObject,
   findSelected,
+  findStairs,
   nudgeObject,
   offsetCopy,
   rotateObject,
@@ -71,6 +73,19 @@ import {
   normalizeLoadedMap,
   withLayer,
 } from './core/layers';
+import {
+  addLevel,
+  deleteLevel,
+  findLevel,
+  levelView,
+  moveLevel,
+  newLevel,
+  newLevelId,
+  nextLevelName,
+  stairsBackTo,
+  stairsTarget,
+  withLevel,
+} from './core/levels';
 import { fitViewport, zoomAbout } from './core/viewport';
 import { createBlankMap, mapLook } from './core/newMap';
 import { clearShareFragment, isShareFragment, readShareFragment } from './core/share';
@@ -132,7 +147,7 @@ function createDefaultStarterMap(): MapData {
   foliage['5,-8'] = { type: 'rock', seed: 404 };
 
   return {
-    version: 2,
+    version: 3,
     title: 'The Sunken Crypt',
     gridSize: 40,
     theme: 'parchment',
@@ -145,31 +160,37 @@ function createDefaultStarterMap(): MapData {
     wallStyle: 'bold',
     lighting: false,
     darkness: 0.75,
-    layers: [
-      newLayer('layer1', 'Dungeon', {
-        rooms,
-        water,
-        foliage,
-        doors: [
-          { id: 'd1', x: 0, y: -6, orientation: 'horizontal', type: 'standard' },
-          { id: 'd2', x: 6, y: 1, orientation: 'vertical', type: 'standard' },
-          { id: 'd3', x: -5, y: 4, orientation: 'vertical', type: 'secret' },
+    levels: [
+      {
+        id: 'level1',
+        name: 'Level 1',
+        layers: [
+          newLayer('layer1', 'Dungeon', {
+            rooms,
+            water,
+            foliage,
+            doors: [
+              { id: 'd1', x: 0, y: -6, orientation: 'horizontal', type: 'standard' },
+              { id: 'd2', x: 6, y: 1, orientation: 'vertical', type: 'standard' },
+              { id: 'd3', x: -5, y: 4, orientation: 'vertical', type: 'secret' },
+            ],
+            stairs: [
+              { id: 's1', x: 0, y: -10, width: 2, height: 1, direction: 'down', steps: 4 },
+            ],
+            props: [
+              { id: 'p1', x: -3, y: 0, type: 'pillar', rotation: 0 },
+              { id: 'p2', x: -3, y: 4, type: 'pillar', rotation: 0 },
+              { id: 'p3', x: 9, y: 1, type: 'altar', rotation: 0 },
+              { id: 'p4', x: -10, y: 3, type: 'chest', rotation: 0 },
+              { id: 'p5', x: -4, y: 2, type: 'torch', rotation: 0 },
+            ],
+            labels: [
+              { id: 'l1', x: 0.5, y: 5.5, text: 'Grand Hall', size: 20 },
+              { id: 'l2', x: -9, y: 6.5, text: 'Hidden Vault', size: 16 },
+            ],
+          }),
         ],
-        stairs: [
-          { id: 's1', x: 0, y: -10, width: 2, height: 1, direction: 'down', steps: 4 },
-        ],
-        props: [
-          { id: 'p1', x: -3, y: 0, type: 'pillar', rotation: 0 },
-          { id: 'p2', x: -3, y: 4, type: 'pillar', rotation: 0 },
-          { id: 'p3', x: 9, y: 1, type: 'altar', rotation: 0 },
-          { id: 'p4', x: -10, y: 3, type: 'chest', rotation: 0 },
-          { id: 'p5', x: -4, y: 2, type: 'torch', rotation: 0 },
-        ],
-        labels: [
-          { id: 'l1', x: 0.5, y: 5.5, text: 'Grand Hall', size: 20 },
-          { id: 'l2', x: -9, y: 6.5, text: 'Hidden Vault', size: 16 },
-        ],
-      }),
+      },
     ],
   };
 }
@@ -197,8 +218,8 @@ function initialMap(): { map: MapData; id: string; resumed: boolean; saved: bool
 // File > Open Recent lists this many maps
 const RECENT_MAPS = 8;
 
-/** Cells of one terrain kind across all layers */
-function countCells(map: MapData, kind: 'rooms' | 'water' | 'foliage'): number {
+/** Cells of one terrain kind across a level's layers */
+function countCells(map: LevelMap, kind: 'rooms' | 'water' | 'foliage'): number {
   return map.layers.reduce((n, layer) => n + Object.keys(layer[kind]).length, 0);
 }
 
@@ -229,17 +250,24 @@ export function App() {
   const nudgeCountRef = useRef(0);
 
   const [activeTool, setActiveTool] = useState<ToolType>('room-brush');
-  // Tools draw on the active layer; if it is gone (undo, delete) the top one is used
+  // The level shown and edited; if it is gone (undo, delete) the first one is used.
+  // The canvas, tools and exports see only this level (levelMap).
+  const [activeLevelChoice, setActiveLevelId] = useState<string>('');
+  const activeLevel = findLevel(mapData, activeLevelChoice) ?? mapData.levels[0];
+  const activeLevelId = activeLevel.id;
+  const levelMap = useMemo(() => levelView(mapData, activeLevel), [mapData, activeLevel]);
+  // Tools draw on the active layer; if it is gone (undo, delete, another
+  // level) the level's top one is used
   const [activeLayerChoice, setActiveLayerId] = useState<string>('');
-  const activeLayer = findLayer(mapData, activeLayerChoice) ?? mapData.layers[mapData.layers.length - 1];
+  const activeLayer = findLayer(levelMap, activeLayerChoice) ?? levelMap.layers[levelMap.layers.length - 1];
   const activeLayerId = activeLayer.id;
   const activeLayerEditable = isLayerEditable(activeLayer);
 
   const [selection, setSelection] = useState<Selection | null>(null);
-  // A selection whose object was removed (undo, eraser) or whose layer was
-  // hidden or locked counts as none
+  // A selection whose object was removed (undo, eraser), whose layer was
+  // hidden or locked, or which is on another level counts as none
   const activeSelection =
-    selection && isLayerEditable(findLayer(mapData, selection.layerId)) && findSelected(mapData, selection)
+    selection && isLayerEditable(findLayer(levelMap, selection.layerId)) && findSelected(levelMap, selection)
       ? selection
       : null;
   // Selecting an object makes its layer the one being edited
@@ -248,6 +276,20 @@ export function App() {
     if (sel) setActiveLayerId(sel.layerId);
   }, []);
 
+  // Levels. Switching level keeps the view, so floors drawn one above
+  // another line up; it drops the selection, which belongs to the old level.
+  const goToLevel = useCallback((id: string) => {
+    setActiveLevelId(id);
+    setSelection(null);
+  }, []);
+  const activeLevelIndex = mapData.levels.indexOf(activeLevel);
+  const goToNextLevel = useCallback(
+    (delta: 1 | -1) => {
+      const level = mapData.levels[activeLevelIndex + delta];
+      if (level) goToLevel(level.id);
+    },
+    [mapData.levels, activeLevelIndex, goToLevel]
+  );
   const chooseTool = useCallback((tool: ToolType) => {
     setActiveTool(tool);
     if (!keepsSelection(tool)) setSelection(null);
@@ -294,7 +336,10 @@ export function App() {
 
     setHistory((h) => {
       const prev = h.present;
-      const next: MapData = { ...prev, layers: prev.layers.map(cloneLayer) };
+      const next: MapData = {
+        ...prev,
+        levels: prev.levels.map((level) => ({ ...level, layers: level.layers.map(cloneLayer) })),
+      };
       mutator(next);
       return {
         past: merge ? h.past : [...h.past, prev].slice(-MAX_HISTORY),
@@ -397,8 +442,8 @@ export function App() {
   const handleActualSize = useCallback(() => zoomTo(() => 1), [zoomTo]);
 
   const handleZoomToFit = useCallback(() => {
-    if (canvasSize) setViewport(fitViewport(mapData, canvasSize.width, canvasSize.height));
-  }, [mapData, canvasSize]);
+    if (canvasSize) setViewport(fitViewport(levelMap, canvasSize.width, canvasSize.height));
+  }, [levelMap, canvasSize]);
 
   // Frame the map on open and whenever a new map replaces it (file open,
   // generators). Waits for the canvas size and for the new map to render.
@@ -409,8 +454,8 @@ export function App() {
   useEffect(() => {
     if (!canvasSize || !fitPendingRef.current) return;
     fitPendingRef.current = false;
-    setViewport(fitViewport(mapData, canvasSize.width, canvasSize.height));
-  }, [mapData, canvasSize]);
+    setViewport(fitViewport(levelMap, canvasSize.width, canvasSize.height));
+  }, [levelMap, canvasSize]);
 
   // Project JSON Save/Load
   const handleSaveJson = useCallback(() => {
@@ -455,6 +500,7 @@ export function App() {
       setPristineMap(from.pristine ? map : null);
       setAutosaveStatus('idle');
       setSelection(null);
+      setActiveLevelId('');
     },
     [requestFit, resetMap, markSaved, preferences.autosave]
   );
@@ -557,16 +603,16 @@ export function App() {
     [modifyMap, select, activeTool]
   );
   const handleCopy = useCallback(() => {
-    if (selectionEditable) setClipboard(copyObject(mapData, activeSelection) ?? null);
-  }, [selectionEditable, mapData, activeSelection]);
+    if (selectionEditable) setClipboard(copyObject(levelMap, activeSelection) ?? null);
+  }, [selectionEditable, levelMap, activeSelection]);
   const handlePaste = useCallback(() => {
     if (clipboard && activeLayerEditable) setClipboard(placeCopy(clipboard, activeLayer));
   }, [clipboard, activeLayerEditable, activeLayer, placeCopy]);
   const handleDuplicate = useCallback(() => {
-    const copied = selectionEditable && copyObject(mapData, activeSelection);
-    const layer = activeSelection && findLayer(mapData, activeSelection.layerId);
+    const copied = selectionEditable && copyObject(levelMap, activeSelection);
+    const layer = activeSelection && findLayer(levelMap, activeSelection.layerId);
     if (copied && layer) placeCopy(copied, layer);
-  }, [selectionEditable, mapData, activeSelection, placeCopy]);
+  }, [selectionEditable, levelMap, activeSelection, placeCopy]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -636,6 +682,11 @@ export function App() {
         handleZoomOut();
         return;
       }
+      if (key === 'pageup' || key === 'pagedown') {
+        e.preventDefault();
+        goToNextLevel(key === 'pageup' ? -1 : 1);
+        return;
+      }
       if (activeSelection && keepsSelection(activeTool)) {
         if (key === 'delete' || key === 'backspace') {
           e.preventDefault();
@@ -691,6 +742,7 @@ export function App() {
     handleCopy,
     handlePaste,
     handleDuplicate,
+    goToNextLevel,
   ]);
 
   // Procedural generators replace the active layer's content
@@ -729,26 +781,73 @@ export function App() {
   const handleClearMap = () => {
     if (window.confirm('Are you sure you want to clear the entire map?')) {
       modifyMap((draft) => {
-        draft.layers = draft.layers.map((layer) => ({ ...layer, ...emptyContent() }));
+        for (const level of draft.levels) {
+          level.layers = level.layers.map((layer) => ({ ...layer, ...emptyContent() }));
+        }
       });
     }
   };
 
-  // Layers
+  // Layers, on the active level
   const handleAddLayer = () => {
-    const layer = newLayer(newLayerId(), nextLayerName(mapData));
-    modifyMap((draft) => addLayer(draft, layer, activeLayerId));
+    const layer = newLayer(newLayerId(), nextLayerName(activeLevel));
+    modifyMap((draft) => withLevel(draft, activeLevelId, (level) => addLayer(level, layer, activeLayerId)));
     setActiveLayerId(layer.id);
   };
   const handleDeleteLayer = () => {
     // The layer below takes over, or the new bottom one
-    const index = mapData.layers.findIndex((l) => l.id === activeLayerId);
-    const next = mapData.layers[index - 1] ?? mapData.layers[index + 1];
-    modifyMap((draft) => deleteLayer(draft, activeLayerId));
+    const index = activeLevel.layers.findIndex((l) => l.id === activeLayerId);
+    const next = activeLevel.layers[index - 1] ?? activeLevel.layers[index + 1];
+    modifyMap((draft) => withLevel(draft, activeLevelId, (level) => deleteLayer(level, activeLayerId)));
     if (next) setActiveLayerId(next.id);
   };
-  const handleMoveLayer = (delta: 1 | -1) => modifyMap((draft) => moveLayer(draft, activeLayerId, delta));
-  const activeLayerIndex = mapData.layers.indexOf(activeLayer);
+  const handleMoveLayer = (delta: 1 | -1) =>
+    modifyMap((draft) => withLevel(draft, activeLevelId, (level) => moveLayer(level, activeLayerId, delta)));
+  const activeLayerIndex = activeLevel.layers.indexOf(activeLayer);
+
+  // Levels
+  const handleAddLevel = () => {
+    const level = newLevel(newLevelId(), nextLevelName(mapData));
+    modifyMap((draft) => addLevel(draft, level, activeLevelId));
+    goToLevel(level.id);
+  };
+  const handleDeleteLevel = () => {
+    // The level before takes over, or the new first one
+    const next = mapData.levels[activeLevelIndex - 1] ?? mapData.levels[activeLevelIndex + 1];
+    modifyMap((draft) => deleteLevel(draft, activeLevelId));
+    if (next) goToLevel(next.id);
+  };
+  const handleMoveLevel = (delta: 1 | -1) => modifyMap((draft) => moveLevel(draft, activeLevelId, delta));
+  // Taking a staircase opens the level it leads to. Stairs there leading
+  // back are selected and brought into view, so a town and the interiors
+  // drawn elsewhere on their own levels still join up.
+  const takeStairs = (sel: Selection) => {
+    const layer = sel.kind === 'stairs' ? findLayer(levelMap, sel.layerId) : undefined;
+    const stairs = layer && findStairs(layer, sel.id);
+    const target = stairs && stairsTarget(mapData, stairs);
+    if (!target) return;
+    goToLevel(target.id);
+    const back = stairsBackTo(target, activeLevelId);
+    if (!back) return;
+    setSelection({ kind: 'stairs', id: back.stairs.id, layerId: back.layerId });
+    setActiveLayerId(back.layerId);
+    if (canvasSize) {
+      const g = mapData.gridSize;
+      const cx = (back.stairs.x + back.stairs.width / 2) * g;
+      const cy = (back.stairs.y + back.stairs.height / 2) * g;
+      setViewport((v) => ({ ...v, x: canvasSize.width / 2 - cx * v.zoom, y: canvasSize.height / 2 - cy * v.zoom }));
+    }
+  };
+
+  // Exports draw the current level; with several, its name joins the title
+  // (file names, PDF page captions)
+  const exportMap = useMemo(
+    () =>
+      mapData.levels.length > 1
+        ? { ...levelMap, title: `${levelMap.title || 'Untitled map'} - ${activeLevel.name || 'Untitled level'}` }
+        : levelMap,
+    [levelMap, mapData.levels.length, activeLevel.name]
+  );
 
   const menus: Menu[] = [
     {
@@ -824,14 +923,44 @@ export function App() {
       label: 'Layer',
       items: [
         { label: 'New Layer', onSelect: handleAddLayer },
-        { label: 'Delete Layer', disabled: mapData.layers.length <= 1, onSelect: handleDeleteLayer },
+        { label: 'Delete Layer', disabled: activeLevel.layers.length <= 1, onSelect: handleDeleteLayer },
         'separator',
         {
           label: 'Move Layer Up',
-          disabled: activeLayerIndex >= mapData.layers.length - 1,
+          disabled: activeLayerIndex >= activeLevel.layers.length - 1,
           onSelect: () => handleMoveLayer(1),
         },
         { label: 'Move Layer Down', disabled: activeLayerIndex <= 0, onSelect: () => handleMoveLayer(-1) },
+      ],
+    },
+    {
+      label: 'Level',
+      items: [
+        { label: 'New Level', onSelect: handleAddLevel },
+        { label: 'Delete Level', disabled: mapData.levels.length <= 1, onSelect: handleDeleteLevel },
+        'separator',
+        { label: 'Previous Level', shortcut: 'Page Up', disabled: activeLevelIndex <= 0, onSelect: () => goToNextLevel(-1) },
+        {
+          label: 'Next Level',
+          shortcut: 'Page Down',
+          disabled: activeLevelIndex >= mapData.levels.length - 1,
+          onSelect: () => goToNextLevel(1),
+        },
+        {
+          label: 'Go to Level',
+          submenu: mapData.levels.map((level) => ({
+            label: level.name || 'Untitled level',
+            checked: level.id === activeLevelId,
+            onSelect: () => goToLevel(level.id),
+          })),
+        },
+        'separator',
+        { label: 'Move Level Up', disabled: activeLevelIndex <= 0, onSelect: () => handleMoveLevel(-1) },
+        {
+          label: 'Move Level Down',
+          disabled: activeLevelIndex >= mapData.levels.length - 1,
+          onSelect: () => handleMoveLevel(1),
+        },
       ],
     },
     {
@@ -899,7 +1028,7 @@ export function App() {
         <div className="flex flex-col flex-1 min-w-0">
           <main className="relative flex-1 min-h-0 overflow-hidden">
             <MapCanvas
-              mapData={mapData}
+              mapData={levelMap}
               activeTool={activeTool}
               brushSize={brushSize}
               selectedDoorType={selectedDoorType}
@@ -917,6 +1046,7 @@ export function App() {
               onHoverCoord={setHoverCoord}
               selection={activeSelection}
               onSelect={select}
+              onTakeStairs={takeStairs}
             />
           </main>
 
@@ -947,7 +1077,14 @@ export function App() {
             onShapeModeChange={setShapeMode}
             selection={activeSelection}
             onClearSelection={() => setSelection(null)}
-            mapData={mapData}
+            mapData={levelMap}
+            levels={mapData.levels}
+            activeLevelId={activeLevelId}
+            onSelectLevel={goToLevel}
+            onAddLevel={handleAddLevel}
+            onDeleteLevel={handleDeleteLevel}
+            onMoveLevel={handleMoveLevel}
+            onTakeStairs={takeStairs}
             onModifyMap={modifyMap}
             activeLayerId={activeLayerId}
             onSelectLayer={setActiveLayerId}
@@ -963,9 +1100,14 @@ export function App() {
           {hoverCoord ? `Grid: (${hoverCoord.gx}, ${hoverCoord.gy})` : ''}
         </span>
         <span data-testid="map-stats" className="tabular-nums">
-          Rooms: {countCells(mapData, 'rooms')} · Water: {countCells(mapData, 'water')} ·
-          Foliage: {countCells(mapData, 'foliage')}
+          Rooms: {countCells(levelMap, 'rooms')} · Water: {countCells(levelMap, 'water')} ·
+          Foliage: {countCells(levelMap, 'foliage')}
         </span>
+        {mapData.levels.length > 1 && (
+          <span>
+            Level: <span data-testid="current-level">{activeLevel.name || 'Untitled level'}</span>
+          </span>
+        )}
         {!activeLayerEditable && (
           <span className="text-ui-danger">
             Layer “{activeLayer.name}” is {activeLayer.visible ? 'locked' : 'hidden'}
@@ -990,7 +1132,8 @@ export function App() {
       )}
 
       <ExportModal
-        mapData={mapData}
+        mapData={exportMap}
+        levelName={mapData.levels.length > 1 ? activeLevel.name || 'Untitled level' : undefined}
         isOpen={isExportOpen}
         onSaveProject={handleSaveJson}
         onClose={() => setIsExportOpen(false)}

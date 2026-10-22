@@ -6,7 +6,8 @@ import type {
   FoliageType,
   FloorTexture,
   LabelStyle,
-  MapData,
+  LevelMap,
+  MapLevel,
   Selection,
   ShapeMode,
 } from '../types/map';
@@ -26,6 +27,7 @@ import {
 } from './options';
 import type { ModifyMap } from '../App';
 import { findLayer, withLayer } from '../core/layers';
+import { withLevel } from '../core/levels';
 import { isHexGrid } from '../core/geometry/hex';
 
 interface DockPanelProps {
@@ -46,7 +48,15 @@ interface DockPanelProps {
   onShapeModeChange: (mode: ShapeMode) => void;
   selection: Selection | null;
   onClearSelection: () => void;
-  mapData: MapData;
+  // The active level, as drawn
+  mapData: LevelMap;
+  levels: MapLevel[];
+  activeLevelId: string;
+  onSelectLevel: (id: string) => void;
+  onAddLevel: () => void;
+  onDeleteLevel: () => void;
+  onMoveLevel: (delta: 1 | -1) => void;
+  onTakeStairs: (stairs: Selection) => void;
   onModifyMap: ModifyMap;
   activeLayerId: string;
   onSelectLayer: (id: string) => void;
@@ -88,6 +98,92 @@ const Choices = <T extends string>({
 );
 
 const ICON_BUTTON_CLASS = `${BUTTON_CLASS} flex items-center justify-center`;
+
+// Level list (first level first), plus the active level's name
+const LevelsSection: React.FC<
+  Pick<
+    DockPanelProps,
+    'levels' | 'activeLevelId' | 'onSelectLevel' | 'onAddLevel' | 'onDeleteLevel' | 'onMoveLevel' | 'onModifyMap'
+  >
+> = ({ levels, activeLevelId, onSelectLevel, onAddLevel, onDeleteLevel, onMoveLevel, onModifyMap }) => {
+  const index = levels.findIndex((l) => l.id === activeLevelId);
+  const active = levels[index];
+
+  return (
+    <Section title="Levels">
+      <ul aria-label="Levels" className="border border-ui-border rounded-sm bg-ui-field">
+        {levels.map((level) => {
+          const isActive = level.id === activeLevelId;
+          return (
+            <li key={level.id} className={isActive ? 'bg-ui-accent text-white' : ''}>
+              <button
+                aria-pressed={isActive}
+                onClick={() => onSelectLevel(level.id)}
+                className="w-full min-w-0 truncate text-left px-1.5 py-1"
+              >
+                {level.name || 'Untitled level'}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="grid grid-cols-4 gap-1">
+        <button aria-label="New level" title="New level" onClick={onAddLevel} className={ICON_BUTTON_CLASS}>
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+        <button
+          aria-label="Move level up"
+          title="Move level up"
+          disabled={index <= 0}
+          onClick={() => onMoveLevel(-1)}
+          className={ICON_BUTTON_CLASS}
+        >
+          <ArrowUp className="w-3.5 h-3.5" />
+        </button>
+        <button
+          aria-label="Move level down"
+          title="Move level down"
+          disabled={index >= levels.length - 1}
+          onClick={() => onMoveLevel(1)}
+          className={ICON_BUTTON_CLASS}
+        >
+          <ArrowDown className="w-3.5 h-3.5" />
+        </button>
+        <button
+          aria-label="Delete level"
+          title="Delete level"
+          disabled={levels.length <= 1}
+          onClick={onDeleteLevel}
+          className={`${ICON_BUTTON_CLASS} text-ui-danger`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {active && (
+        <label className="flex flex-col gap-0.5">
+          <span>Name</span>
+          <input
+            type="text"
+            aria-label="Level name"
+            value={active.name}
+            onChange={(e) =>
+              onModifyMap(
+                (draft) => withLevel(draft, active.id, (l) => { l.name = e.target.value; }),
+                { coalesce: `level-name-${active.id}` }
+              )
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur();
+            }}
+            className={FIELD_CLASS}
+          />
+        </label>
+      )}
+    </Section>
+  );
+};
 
 // Layer list (top layer first) with show/lock toggles, plus the active layer's settings
 const LayersSection: React.FC<
@@ -203,7 +299,7 @@ const LayersSection: React.FC<
   );
 };
 
-// Properties panel docked to the right of the canvas: tool and selection options, and layers
+// Properties panel docked to the right of the canvas: tool and selection options, levels and layers
 export const DockPanel: React.FC<DockPanelProps> = ({
   activeTool,
   brushSize,
@@ -223,6 +319,13 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   selection,
   onClearSelection,
   mapData,
+  levels,
+  activeLevelId,
+  onSelectLevel,
+  onAddLevel,
+  onDeleteLevel,
+  onMoveLevel,
+  onTakeStairs,
   onModifyMap,
   activeLayerId,
   onSelectLayer,
@@ -266,6 +369,9 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         {keepsSelection(activeTool) && (
           <SelectionInspector
             mapData={mapData}
+            levels={levels}
+            activeLevelId={activeLevelId}
+            onTakeStairs={onTakeStairs}
             selection={selection}
             // Room numbers fill themselves in, so keep clicking instead of typing
             focusLabelText={activeTool === 'label' && labelStyle === 'text'}
@@ -330,6 +436,16 @@ export const DockPanel: React.FC<DockPanelProps> = ({
           </p>
         )}
       </Section>
+
+      <LevelsSection
+        levels={levels}
+        activeLevelId={activeLevelId}
+        onSelectLevel={onSelectLevel}
+        onAddLevel={onAddLevel}
+        onDeleteLevel={onDeleteLevel}
+        onMoveLevel={onMoveLevel}
+        onModifyMap={onModifyMap}
+      />
 
       <LayersSection
         mapData={mapData}

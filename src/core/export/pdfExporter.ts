@@ -1,5 +1,5 @@
 // Printable PDF exporter. Imported on demand so jsPDF stays out of the main bundle.
-import type { MapData } from '../../types/map';
+import type { LevelMap } from '../../types/map';
 import { jsPDF } from 'jspdf';
 import { computeMapBounds, fileBaseName, renderOffscreenMap, type BoundingBox } from './imageExporter';
 
@@ -17,7 +17,7 @@ const PRINT_PX_PER_SQUARE = 150;
  * pages as needed, ready to trim and tape together.
  */
 export function exportToPdf(
-  mapData: MapData,
+  mapData: LevelMap,
   includeGrid: boolean = true,
   layout: PdfLayout = 'fit',
   paper: PaperSize = 'a4'
@@ -31,7 +31,7 @@ export function exportToPdf(
 }
 
 function buildFitPdf(
-  mapData: MapData,
+  mapData: LevelMap,
   bounds: BoundingBox,
   includeGrid: boolean,
   paper: PaperSize
@@ -60,7 +60,7 @@ function buildFitPdf(
 }
 
 function buildTiledPdf(
-  mapData: MapData,
+  mapData: LevelMap,
   bounds: BoundingBox,
   includeGrid: boolean,
   paper: PaperSize

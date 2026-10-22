@@ -1,5 +1,5 @@
 // High-resolution image and Universal VTT exporters, and the bounding box they share
-import type { MapData } from '../../types/map';
+import type { LevelMap } from '../../types/map';
 import { THEMES } from '../theme';
 import { renderMap } from '../renderers/mapRenderer';
 import { exportUniversalVtt } from './vttExporter';
@@ -15,7 +15,7 @@ export interface BoundingBox {
   height: number;
 }
 
-export function computeMapBounds(mapData: MapData, margin: number = 2): BoundingBox {
+export function computeMapBounds(mapData: LevelMap, margin: number = 2): BoundingBox {
   const coords: { x: number; y: number }[] = [];
 
   // Hidden layers are left out of exports
@@ -83,7 +83,7 @@ export function computeMapBounds(mapData: MapData, margin: number = 2): Bounding
  * Renders the entire bounded map to an offscreen canvas at a specified scale multiplier
  */
 export function renderOffscreenMap(
-  mapData: MapData,
+  mapData: LevelMap,
   bounds: BoundingBox,
   scale: number = 1,
   includeGrid: boolean = true,
@@ -131,7 +131,7 @@ export function triggerDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function fileBaseName(mapData: MapData): string {
+export function fileBaseName(mapData: LevelMap): string {
   return mapData.title.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'map';
 }
 
@@ -141,7 +141,7 @@ export type ImageFormat = 'png' | 'webp';
  * Export Map as a PNG or WebP image
  */
 export function exportToImage(
-  mapData: MapData,
+  mapData: LevelMap,
   scale: number = 2,
   includeGrid: boolean = true,
   format: ImageFormat = 'png'
@@ -165,7 +165,7 @@ export function exportToImage(
 /**
  * Export Map as Universal VTT (.dd2vtt)
  */
-export function exportToVtt(mapData: MapData) {
+export function exportToVtt(mapData: LevelMap) {
   const bounds = computeMapBounds(mapData, 1);
   // The VTT draws its own darkness from the exported lights
   const canvas = renderOffscreenMap(mapData, bounds, 1, false, false);

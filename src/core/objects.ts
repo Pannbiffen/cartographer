@@ -1,6 +1,7 @@
 // Selectable map objects (doors, stairs, props, labels, lights): hit testing, bounds and edits
 import type {
   LayerContent,
+  LevelMap,
   MapData,
   MapLayer,
   PlacedDoor,
@@ -47,7 +48,7 @@ function labelBounds(label: PlacedLabel, gridSize: number) {
 
 /** The selected object, or undefined if it no longer exists (e.g. after undo) */
 export function findSelected(
-  map: MapData,
+  map: MapData | LevelMap,
   sel: Selection | null
 ): PlacedDoor | PlacedStairs | PlacedProp | PlacedLabel | PlacedLight | undefined {
   const layer = sel ? findLayer(map, sel.layerId) : undefined;
@@ -64,7 +65,7 @@ export function findSelected(
  * are drawn above every layer, so they are hit first; then doors, lights,
  * props and stairs, from the top layer down.
  */
-export function hitTestObject(map: MapData, worldX: number, worldY: number): Selection | null {
+export function hitTestObject(map: LevelMap, worldX: number, worldY: number): Selection | null {
   const layers = map.layers.filter(isLayerEditable).reverse();
   for (const layer of layers) {
     const hit = hitTestLabel(layer, worldX, worldY, map.gridSize);
@@ -123,7 +124,7 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
 
 /** Selection outline in grid units */
 export function objectBounds(
-  map: MapData,
+  map: MapData | LevelMap,
   sel: Selection
 ): { x: number; y: number; w: number; h: number } | null {
   const layer = findLayer(map, sel.layerId);
@@ -150,7 +151,7 @@ export function objectBounds(
 const STAIR_DIRECTIONS: PlacedStairs['direction'][] = ['up', 'right', 'down', 'left'];
 
 /** Rotates the selected object 90° clockwise (in place on a draft map) */
-export function rotateObject(draft: MapData, sel: Selection) {
+export function rotateObject(draft: MapData | LevelMap, sel: Selection) {
   const layer = findLayer(draft, sel.layerId);
   if (!layer) return;
   if (sel.kind === 'door') {
@@ -172,7 +173,7 @@ export function rotateObject(draft: MapData, sel: Selection) {
   }
 }
 
-export function deleteObject(draft: MapData, sel: Selection) {
+export function deleteObject(draft: MapData | LevelMap, sel: Selection) {
   const layer = findLayer(draft, sel.layerId);
   if (!layer) return;
   if (sel.kind === 'door') layer.doors = layer.doors.filter((d) => d.id !== sel.id);
@@ -187,7 +188,7 @@ export function deleteObject(draft: MapData, sel: Selection) {
  * `labelStep` cells, grid-snapped objects by a whole cell. A door won't move
  * onto an edge another door already uses.
  */
-export function nudgeObject(draft: MapData, sel: Selection, dx: number, dy: number, labelStep: number) {
+export function nudgeObject(draft: MapData | LevelMap, sel: Selection, dx: number, dy: number, labelStep: number) {
   const layer = findLayer(draft, sel.layerId);
   if (!layer) return;
   if (sel.kind === 'label') {
@@ -221,7 +222,7 @@ export type CopiedObject =
   | { kind: 'label'; object: PlacedLabel }
   | { kind: 'light'; object: PlacedLight };
 
-export function copyObject(map: MapData, sel: Selection): CopiedObject | undefined {
+export function copyObject(map: MapData | LevelMap, sel: Selection): CopiedObject | undefined {
   const object = findSelected(map, sel);
   return object && ({ kind: sel.kind, object } as CopiedObject);
 }
@@ -245,7 +246,7 @@ export function offsetCopy(layer: LayerContent, copied: CopiedObject): CopiedObj
 }
 
 /** Adds an object (from offsetCopy) on top of a layer's others of its kind */
-export function addObject(draft: MapData, layerId: string, copied: CopiedObject) {
+export function addObject(draft: MapData | LevelMap, layerId: string, copied: CopiedObject) {
   const layer = findLayer(draft, layerId);
   if (!layer) return;
   if (copied.kind === 'door') layer.doors = [...layer.doors, copied.object];

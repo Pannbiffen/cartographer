@@ -1,5 +1,5 @@
 // Universal VTT (.dd2vtt) Exporter
-import type { MapData } from '../../types/map';
+import type { LevelMap } from '../../types/map';
 import { combinedWalls } from '../geometry/region';
 import { visibleLayers } from '../layers';
 import { mapLights } from '../lighting';
@@ -38,7 +38,7 @@ export interface UniversalVttData {
 }
 
 export function exportUniversalVtt(
-  mapData: MapData,
+  mapData: LevelMap,
   imageDataBase64: string,
   minX: number,
   minY: number,

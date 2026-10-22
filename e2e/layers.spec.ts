@@ -12,22 +12,22 @@ test('new layers take drawing, and can be renamed, reordered and deleted with un
   await page.keyboard.press('w');
   await dragCells(page, [-15, 8], [-12, 8]);
   let map = await saveMap(page);
-  expect(map.layers.map((l) => l.name)).toEqual(['Dungeon', 'Water']);
-  expect(Object.keys(map.layers[1].water)).toHaveLength(4);
-  expect(Object.keys(map.layers[0].water)).toHaveLength(16);
+  expect(map.levels[0].layers.map((l) => l.name)).toEqual(['Dungeon', 'Water']);
+  expect(Object.keys(map.levels[0].layers[1].water)).toHaveLength(4);
+  expect(Object.keys(map.levels[0].layers[0].water)).toHaveLength(16);
 
   await page.getByRole('button', { name: 'Move layer down' }).click();
   map = await saveMap(page);
-  expect(map.layers.map((l) => l.name)).toEqual(['Water', 'Dungeon']);
+  expect(map.levels[0].layers.map((l) => l.name)).toEqual(['Water', 'Dungeon']);
   // The list shows the top layer first
   await expect(layers.getByRole('button', { pressed: true })).toHaveText('Water');
   await expect(layers.getByRole('listitem').first()).toContainText('Dungeon');
 
   await page.getByRole('button', { name: 'Delete layer' }).click();
-  expect((await saveMap(page)).layers.map((l) => l.name)).toEqual(['Dungeon']);
+  expect((await saveMap(page)).levels[0].layers.map((l) => l.name)).toEqual(['Dungeon']);
   await expect(page.getByRole('button', { name: 'Delete layer' })).toBeDisabled();
   await page.keyboard.press('Control+z');
-  expect((await saveMap(page)).layers.map((l) => l.name)).toEqual(['Water', 'Dungeon']);
+  expect((await saveMap(page)).levels[0].layers.map((l) => l.name)).toEqual(['Water', 'Dungeon']);
 });
 
 test('hidden and locked layers block drawing and selection', async ({ page }) => {
@@ -54,7 +54,7 @@ test('hidden and locked layers block drawing and selection', async ({ page }) =>
   await clickCell(page, 9, 1);
   await expect(page.getByText('Selected: altar')).toBeVisible();
   const map = await saveMap(page);
-  expect(map.layers[0]).toMatchObject({ visible: true, locked: false });
+  expect(map.levels[0].layers[0]).toMatchObject({ visible: true, locked: false });
 });
 
 test('selecting an object on another layer makes that layer active', async ({ page }) => {
@@ -70,6 +70,6 @@ test('selecting an object on another layer makes that layer active', async ({ pa
   await page.keyboard.press('Delete');
 
   const map = await saveMap(page);
-  expect(map.layers[0].props.find((p) => p.id === 'p3')).toBeUndefined();
-  expect(map.layers[1].opacity).toBe(0.5);
+  expect(map.levels[0].layers[0].props.find((p) => p.id === 'p3')).toBeUndefined();
+  expect(map.levels[0].layers[1].opacity).toBe(0.5);
 });

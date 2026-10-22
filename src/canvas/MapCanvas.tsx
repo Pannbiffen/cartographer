@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type {
   LayerContent,
-  MapData,
+  LevelMap,
   ToolType,
   DoorType,
   PropType,
@@ -68,7 +68,7 @@ import {
 import type { ModifyMap } from '../App';
 
 interface MapCanvasProps {
-  mapData: MapData;
+  mapData: LevelMap;
   activeTool: ToolType;
   brushSize: number;
   selectedDoorType: DoorType;
@@ -91,6 +91,8 @@ interface MapCanvasProps {
   onHoverCoord?: (coord: { gx: number; gy: number } | null) => void;
   selection: Selection | null;
   onSelect: (selection: Selection | null) => void;
+  // Double-clicking stairs with the select tool goes to the level they lead to
+  onTakeStairs?: (stairs: Selection) => void;
 }
 
 interface HoverState {
@@ -127,6 +129,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   onHoverCoord,
   selection,
   onSelect,
+  onTakeStairs,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isPanningRef = useRef<boolean>(false);
@@ -590,7 +593,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     });
   };
 
-  const pointerToGrid = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const pointerToGrid = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     return screenToGrid(e.clientX - rect.left, e.clientY - rect.top);
   };
@@ -871,6 +874,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerLeave}
+        onDoubleClick={(e) => {
+          if (activeTool !== 'select' || !onTakeStairs) return;
+          const { worldX, worldY } = pointerToGrid(e);
+          const hit = hitTestObject(mapData, worldX, worldY);
+          if (hit?.kind === 'stairs') onTakeStairs(hit);
+        }}
         onContextMenu={(e) => e.preventDefault()}
       />
     </div>
