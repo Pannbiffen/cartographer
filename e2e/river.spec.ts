@@ -105,3 +105,26 @@ test('a river swells and narrows within its widths, and the eraser takes it away
   expect(inside(erased, [-9, -4])).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('clicking the first point again closes a river into a loop', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await page.keyboard.press('y');
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  await panel.getByLabel(/^Wander/).fill('0');
+  await panel.getByLabel(/^Widest/).fill('2');
+  const corners: Pair[] = [[-14, -7], [-9, -7], [-9, -1], [-14, -1]];
+  for (const [x, y] of [...corners, corners[0]]) await clickAt(page, x, y);
+
+  // One ring of water with dry land inside, and no seam where it closed
+  const water = (await topLayer(page)).waterAreas;
+  expect(water).toHaveLength(1);
+  expect(water[0]).toHaveLength(2);
+  for (const corner of corners) expect(inside(water, corner)).toBe(true);
+  expect(inside(water, [-11.5, -4])).toBe(false);
+  expect(inside(water, [-14, -4])).toBe(true);
+
+  await page.keyboard.press('Control+z');
+  expect((await topLayer(page)).waterAreas).toHaveLength(0);
+  expect(errors).toEqual([]);
+});

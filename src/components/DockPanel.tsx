@@ -541,7 +541,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
     circle: 'Drag from the centre out to the edge.',
     path: 'Click points along the way; double-click or press Enter to finish. Backspace takes back a point, Esc cancels.',
     river:
-      'Click points along the way; the river winds between them. Double-click or press Enter to finish. Backspace takes back a point, Esc cancels.',
+      'Click points along the way; the river winds between them. Double-click or press Enter to finish, or click the first point to close a loop (a moat). Backspace takes back a point, Esc cancels.',
   };
   const cells = (n: number) => `${n} ${n === 1 ? 'cell' : 'cells'}`;
 

@@ -343,7 +343,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         } else if (activeTool === 'path' && points) {
           preview = pathPolygon([...points, point], brushSize);
         } else if (activeTool === 'river' && points) {
-          preview = [[riverOutline([...points, point], river)]];
+          // Over the first point, show the loop it would close
+          const closing = points.length >= 3 && Math.hypot(point[0] - points[0][0], point[1] - points[0][1]) < 0.15;
+          preview = [riverOutline([...points, closing ? points[0] : point], river)];
         }
         ctx.beginPath();
         for (const polygon of preview) {
@@ -938,6 +940,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const near = (p: Pair | undefined) => !!p && Math.hypot(p[0] - point[0], p[1] - point[1]) < 0.15;
       if (!points) {
         shapePointsRef.current = [point];
+      } else if (activeTool === 'river' && points.length >= 3 && near(points[0])) {
+        // Back on its first point, a river closes into a loop
+        shapePointsRef.current = [...points, points[0]];
+        finishShape();
       } else if (
         // Clicking the last corner again (a double-click) finishes the shape,
         // as does closing a polygon on its first corner
