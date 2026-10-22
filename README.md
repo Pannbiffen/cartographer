@@ -115,7 +115,7 @@ npm run preview
 | `Ctrl + Z` / `Cmd + Z` | Undo |
 | `Ctrl + Y` / `Cmd + Shift + Z` | Redo |
 | `Ctrl + C` / `Cmd + C` | Copy the selected object |
-| `Ctrl + V` / `Cmd + V` | Paste it one cell along, on the active layer |
+| `Ctrl + V` / `Cmd + V` | Paste it under the pointer (or one cell along), on the active layer |
 | `Ctrl + D` / `Cmd + D` | Duplicate the selected object |
 | `Ctrl + Alt + N` / `Cmd + Option + N` | New map |
 | `Ctrl + O` / `Cmd + O` | Open project |

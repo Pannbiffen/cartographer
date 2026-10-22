@@ -121,16 +121,19 @@ test('duplicate, copy and paste objects', async ({ page }) => {
   expect(altar).toMatchObject({ x: 9, y: 1 });
   expect(copies()).toMatchObject([{ x: 10, y: 2, rotation: altar.rotation }]);
 
-  // Each paste steps on from the last one; Edit > Paste lands on the active layer
+  // Ctrl+V pastes under the pointer; Edit > Paste steps on from the last
+  // paste, onto the active layer
   await page.keyboard.press('Control+c');
+  const target = await gridPoint(page, 14.3, 3.8);
+  await page.mouse.move(target.x, target.y);
   await page.keyboard.press('Control+v');
   await page.getByRole('menuitem', { name: 'Layer' }).click();
   await page.getByRole('menuitem', { name: 'New Layer' }).click();
   await page.getByRole('menuitem', { name: 'Edit' }).click();
   await page.getByRole('menuitem', { name: /^Paste/ }).click();
   map = await saveMap(page);
-  expect(copies().map((p) => [p.x, p.y])).toEqual([[10, 2], [11, 2], [12, 2]]);
-  expect(map.levels[0].layers.at(-1)!.props).toMatchObject([{ x: 12, y: 2 }]);
+  expect(copies().map((p) => [p.x, p.y])).toEqual([[10, 2], [14, 3], [15, 3]]);
+  expect(map.levels[0].layers.at(-1)!.props).toMatchObject([{ x: 15, y: 3 }]);
 
   // Doors are copied along their wall; the copy is one undo step
   await page.keyboard.press('Control+z');
@@ -143,6 +146,15 @@ test('duplicate, copy and paste objects', async ({ page }) => {
   expect(map.levels[0].layers[0].doors.filter((d) => d.x === d2.x && d.orientation === d2.orientation && d.y === 2)).toHaveLength(1);
   await page.keyboard.press('Control+z');
   expect((await saveMap(page)).levels[0].layers[0].doors).toHaveLength(map.levels[0].layers[0].doors.length - 1);
+
+  // A door pasted at the pointer goes to the nearest cell edge
+  await page.mouse.click(door.x, door.y);
+  await page.keyboard.press('Control+c');
+  const edge = await gridPoint(page, 14.9, 3.4);
+  await page.mouse.move(edge.x, edge.y);
+  await page.keyboard.press('Control+v');
+  map = await saveMap(page);
+  expect(map.levels[0].layers[0].doors.at(-1)).toMatchObject({ x: 15, y: 3, orientation: 'vertical', type: d2.type });
 });
 
 test('the selection panel duplicates and copies the selected object', async ({ page }) => {

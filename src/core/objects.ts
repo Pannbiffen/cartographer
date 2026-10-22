@@ -228,21 +228,25 @@ export function copyObject(map: MapData | LevelMap, sel: Selection): CopiedObjec
 }
 
 /**
- * The copy to paste onto a layer: a new id, one cell to the right. Doors move
- * along their wall instead, past any door already there.
+ * The copy to paste onto a layer: a new id, one cell to the right, or under
+ * `at` (a point in grid units) snapped as the placing tools do. Doors move
+ * along their wall instead, or to the edge nearest `at`, past any door already there.
  */
-export function offsetCopy(layer: LayerContent, copied: CopiedObject): CopiedObject {
+export function offsetCopy(layer: LayerContent, copied: CopiedObject, at?: { x: number; y: number }): CopiedObject {
   const id = newObjectId(copied.kind);
   if (copied.kind === 'door') {
-    const d = copied.object;
+    const d = { ...copied.object, ...(at && nearestDoorEdge(at.x, at.y, 1)) };
     const [dx, dy] = d.orientation === 'horizontal' ? [1, 0] : [0, 1];
     const taken = (x: number, y: number) =>
       layer.doors.some((o) => o.x === x && o.y === y && o.orientation === d.orientation);
-    let [x, y] = [d.x + dx, d.y + dy];
+    let [x, y] = at ? [d.x, d.y] : [d.x + dx, d.y + dy];
     while (taken(x, y)) [x, y] = [x + dx, y + dy];
     return { kind: 'door', object: { ...d, id, x, y } };
   }
-  return { ...copied, object: { ...copied.object, id, x: copied.object.x + 1 } } as CopiedObject;
+  if (!at) return { ...copied, object: { ...copied.object, id, x: copied.object.x + 1 } } as CopiedObject;
+  // Labels sit freely; everything else fills whole cells
+  const [x, y] = copied.kind === 'label' ? [at.x, at.y] : [Math.floor(at.x), Math.floor(at.y)];
+  return { ...copied, object: { ...copied.object, id, x, y } } as CopiedObject;
 }
 
 /** Adds an object (from offsetCopy) on top of a layer's others of its kind */

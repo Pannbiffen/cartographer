@@ -590,11 +590,13 @@ export function App() {
 
   // Copy, paste and duplicate map objects. A paste lands one cell along from
   // the copy and becomes the next one copied, so pasting again keeps stepping.
+  // Ctrl+V with the pointer over the map pastes under it instead.
   const [clipboard, setClipboard] = useState<CopiedObject | null>(null);
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
   const selectionEditable = activeSelection !== null && keepsSelection(activeTool);
   const placeCopy = useCallback(
-    (copied: CopiedObject, layer: MapLayer) => {
-      const copy = offsetCopy(layer, copied);
+    (copied: CopiedObject, layer: MapLayer, at?: { x: number; y: number }) => {
+      const copy = offsetCopy(layer, copied, at);
       modifyMap((draft) => addObject(draft, layer.id, copy));
       select({ kind: copy.kind, id: copy.object.id, layerId: layer.id });
       if (!keepsSelection(activeTool)) setActiveTool('select');
@@ -605,8 +607,8 @@ export function App() {
   const handleCopy = useCallback(() => {
     if (selectionEditable) setClipboard(copyObject(levelMap, activeSelection) ?? null);
   }, [selectionEditable, levelMap, activeSelection]);
-  const handlePaste = useCallback(() => {
-    if (clipboard && activeLayerEditable) setClipboard(placeCopy(clipboard, activeLayer));
+  const handlePaste = useCallback((at?: { x: number; y: number }) => {
+    if (clipboard && activeLayerEditable) setClipboard(placeCopy(clipboard, activeLayer, at));
   }, [clipboard, activeLayerEditable, activeLayer, placeCopy]);
   const handleDuplicate = useCallback(() => {
     const copied = selectionEditable && copyObject(levelMap, activeSelection);
@@ -655,7 +657,7 @@ export function App() {
           handleCopy();
         } else if (key === 'v' && clipboard) {
           e.preventDefault();
-          handlePaste();
+          handlePaste(pointerRef.current ?? undefined);
         } else if (key === 'd') {
           // Also keeps the browser from bookmarking the page
           e.preventDefault();
@@ -877,7 +879,7 @@ export function App() {
         { label: 'Redo', shortcut: 'Ctrl+Y', macShortcut: 'Ctrl+Shift+Z', onSelect: handleRedo, disabled: history.future.length === 0 },
         'separator',
         { label: 'Copy', shortcut: 'Ctrl+C', disabled: !selectionEditable, onSelect: handleCopy },
-        { label: 'Paste', shortcut: 'Ctrl+V', disabled: !clipboard || !activeLayerEditable, onSelect: handlePaste },
+        { label: 'Paste', shortcut: 'Ctrl+V', disabled: !clipboard || !activeLayerEditable, onSelect: () => handlePaste() },
         { label: 'Duplicate', shortcut: 'Ctrl+D', disabled: !selectionEditable, onSelect: handleDuplicate },
         'separator',
         {
@@ -1044,6 +1046,7 @@ export function App() {
               onResize={setCanvasSize}
               onModifyMap={modifyMap}
               onHoverCoord={setHoverCoord}
+              pointerRef={pointerRef}
               selection={activeSelection}
               onSelect={select}
               onTakeStairs={takeStairs}

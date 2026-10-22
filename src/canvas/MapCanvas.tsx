@@ -89,6 +89,8 @@ interface MapCanvasProps {
   onResize?: (size: { width: number; height: number }) => void;
   onModifyMap: ModifyMap;
   onHoverCoord?: (coord: { gx: number; gy: number } | null) => void;
+  // Kept at the pointer's position in grid units (null off the canvas), for pasting under it
+  pointerRef?: React.RefObject<{ x: number; y: number } | null>;
   selection: Selection | null;
   onSelect: (selection: Selection | null) => void;
   // Double-clicking stairs with the select tool goes to the level they lead to
@@ -127,6 +129,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   onResize,
   onModifyMap,
   onHoverCoord,
+  pointerRef,
   selection,
   onSelect,
   onTakeStairs,
@@ -789,6 +792,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const prev = currentHoverRef.current;
     const cellChanged = !prev || prev.gx !== hover.gx || prev.gy !== hover.gy;
     currentHoverRef.current = hover;
+    if (pointerRef) pointerRef.current = { x: hover.worldX / mapData.gridSize, y: hover.worldY / mapData.gridSize };
     if (isShapeTool(activeTool)) freePlacementRef.current = e.shiftKey;
 
     if (hexGrid && hexBrush && isDrawingRef.current) {
@@ -852,6 +856,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       return;
     }
     currentHoverRef.current = null;
+    if (pointerRef) pointerRef.current = null;
     onHoverCoord?.(null);
     drawMap();
   };
