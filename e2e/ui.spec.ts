@@ -91,6 +91,46 @@ test('the properties panel can be hidden from the View menu', async ({ page }) =
   expect(await canvasWidth()).toBeGreaterThan(before);
 });
 
+test('the Levels and Layers sections can be hidden from their menus', async ({ page }) => {
+  await openApp(page);
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  const menu = async (name: string) => {
+    await page.getByRole('menubar').getByRole('menuitem', { name, exact: true }).click();
+  };
+
+  await menu('Layer');
+  await page.getByRole('menuitemcheckbox', { name: 'Show Layers in Panel' }).click();
+  await expect(panel.getByRole('heading', { name: 'Layers' })).toHaveCount(0);
+  await expect(panel.getByRole('list', { name: 'Layers' })).toHaveCount(0);
+  await expect(panel.getByRole('list', { name: 'Levels' })).toBeVisible();
+  // The menu still works on the hidden section
+  await menu('Layer');
+  await page.getByRole('menuitem', { name: 'New Layer' }).click();
+  expect((await saveMap(page)).levels[0].layers).toHaveLength(2);
+
+  await menu('Level');
+  await page.getByRole('menuitemcheckbox', { name: 'Show Levels in Panel' }).click();
+  await expect(panel.getByRole('list', { name: 'Levels' })).toHaveCount(0);
+  await menu('Level');
+  await page.getByRole('menuitem', { name: 'New Level Above' }).click();
+  expect((await saveMap(page)).levels).toHaveLength(2);
+  await expect(page.getByTestId('current-level')).toHaveText('Level 2');
+
+  // Kept across reloads; turned back on from the menu
+  await page.reload();
+  await openApp(page);
+  await expect(panel.getByRole('list', { name: 'Layers' })).toHaveCount(0);
+  await expect(panel.getByRole('list', { name: 'Levels' })).toHaveCount(0);
+  await menu('Layer');
+  const showLayers = page.getByRole('menuitemcheckbox', { name: 'Show Layers in Panel' });
+  await expect(showLayers).toHaveAttribute('aria-checked', 'false');
+  await showLayers.click();
+  await expect(panel.getByRole('list', { name: 'Layers' })).toBeVisible();
+  await menu('Level');
+  await page.getByRole('menuitemcheckbox', { name: 'Show Levels in Panel' }).click();
+  await expect(panel.getByRole('list', { name: 'Levels' })).toBeVisible();
+});
+
 test('map-wide settings live in a bottom drawer that remembers whether it is open', async ({ page }) => {
   await openApp(page);
   const drawer = page.getByRole('region', { name: 'Map settings' });

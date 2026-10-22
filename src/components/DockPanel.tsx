@@ -63,9 +63,9 @@ interface DockPanelProps {
   onAddLevel: (where: 'above' | 'below') => void;
   onDeleteLevel: () => void;
   onMoveLevel: (delta: 1 | -1) => void;
-  // The levels below drawn faintly under the active one, and how strongly
-  preferences: Pick<Preferences, LevelBelowSetting>;
-  onLevelBelowChange: (change: Partial<Pick<Preferences, LevelBelowSetting>>) => void;
+  // Which sections show, and the levels below drawn faintly under the active one
+  preferences: Pick<Preferences, PanelSetting>;
+  onPreferencesChange: (change: Partial<Pick<Preferences, PanelSetting>>) => void;
   onTakeStairs: (stairs: Selection) => void;
   onModifyMap: ModifyMap;
   activeLayerId: string;
@@ -107,7 +107,13 @@ const Choices = <T extends string>({
   </div>
 );
 
-type LevelBelowSetting = 'showLevelBelow' | 'levelBelowOpacity' | 'showLevelsFurtherBelow' | 'levelBelowFade';
+type PanelSetting =
+  | 'showLevelsSection'
+  | 'showLayersSection'
+  | 'showLevelBelow'
+  | 'levelBelowOpacity'
+  | 'showLevelsFurtherBelow'
+  | 'levelBelowFade';
 
 const ICON_BUTTON_CLASS = `${BUTTON_CLASS} flex items-center justify-center`;
 
@@ -124,7 +130,7 @@ const LevelsSection: React.FC<
     | 'onMoveLevel'
     | 'onModifyMap'
     | 'preferences'
-    | 'onLevelBelowChange'
+    | 'onPreferencesChange'
   >
 > = ({
   levels,
@@ -135,7 +141,7 @@ const LevelsSection: React.FC<
   onMoveLevel,
   onModifyMap,
   preferences,
-  onLevelBelowChange,
+  onPreferencesChange,
 }) => {
   const { showLevelBelow, levelBelowOpacity, showLevelsFurtherBelow, levelBelowFade } = preferences;
   const index = levels.findIndex((l) => l.id === activeLevelId);
@@ -224,7 +230,7 @@ const LevelsSection: React.FC<
           type="checkbox"
           checked={showLevelBelow}
           disabled={levels.length < 2}
-          onChange={(e) => onLevelBelowChange({ showLevelBelow: e.target.checked })}
+          onChange={(e) => onPreferencesChange({ showLevelBelow: e.target.checked })}
           className="accent-ui-accent"
         />
         <span>Show level below</span>
@@ -237,7 +243,7 @@ const LevelsSection: React.FC<
           min={0.1}
           max={0.8}
           step={0.05}
-          onChange={(v) => onLevelBelowChange({ levelBelowOpacity: v })}
+          onChange={(v) => onPreferencesChange({ levelBelowOpacity: v })}
         />
       )}
       {showLevelBelow && levels.length > 2 && (
@@ -245,7 +251,7 @@ const LevelsSection: React.FC<
           <input
             type="checkbox"
             checked={showLevelsFurtherBelow}
-            onChange={(e) => onLevelBelowChange({ showLevelsFurtherBelow: e.target.checked })}
+            onChange={(e) => onPreferencesChange({ showLevelsFurtherBelow: e.target.checked })}
             className="accent-ui-accent"
           />
           <span>Show multiple levels below</span>
@@ -259,7 +265,7 @@ const LevelsSection: React.FC<
           min={0.05}
           max={0.5}
           step={0.05}
-          onChange={(v) => onLevelBelowChange({ levelBelowFade: v })}
+          onChange={(v) => onPreferencesChange({ levelBelowFade: v })}
         />
       )}
     </Section>
@@ -462,7 +468,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onDeleteLevel,
   onMoveLevel,
   preferences,
-  onLevelBelowChange,
+  onPreferencesChange,
   onTakeStairs,
   onModifyMap,
   activeLayerId,
@@ -588,27 +594,31 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         )}
       </Section>
 
-      <LevelsSection
-        levels={levels}
-        activeLevelId={activeLevelId}
-        onSelectLevel={onSelectLevel}
-        onAddLevel={onAddLevel}
-        onDeleteLevel={onDeleteLevel}
-        onMoveLevel={onMoveLevel}
-        onModifyMap={onModifyMap}
-        preferences={preferences}
-        onLevelBelowChange={onLevelBelowChange}
-      />
+      {preferences.showLevelsSection && (
+        <LevelsSection
+          levels={levels}
+          activeLevelId={activeLevelId}
+          onSelectLevel={onSelectLevel}
+          onAddLevel={onAddLevel}
+          onDeleteLevel={onDeleteLevel}
+          onMoveLevel={onMoveLevel}
+          onModifyMap={onModifyMap}
+          preferences={preferences}
+          onPreferencesChange={onPreferencesChange}
+        />
+      )}
 
-      <LayersSection
-        mapData={mapData}
-        onModifyMap={onModifyMap}
-        activeLayerId={activeLayerId}
-        onSelectLayer={onSelectLayer}
-        onAddLayer={onAddLayer}
-        onDeleteLayer={onDeleteLayer}
-        onMoveLayer={onMoveLayer}
-      />
+      {preferences.showLayersSection && (
+        <LayersSection
+          mapData={mapData}
+          onModifyMap={onModifyMap}
+          activeLayerId={activeLayerId}
+          onSelectLayer={onSelectLayer}
+          onAddLayer={onAddLayer}
+          onDeleteLayer={onDeleteLayer}
+          onMoveLayer={onMoveLayer}
+        />
+      )}
     </aside>
   );
 };

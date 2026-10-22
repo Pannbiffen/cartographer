@@ -1001,6 +1001,12 @@ export function App() {
     {
       label: 'Layer',
       items: [
+        {
+          label: 'Show Layers in Panel',
+          checked: preferences.showLayersSection,
+          onSelect: () => changePreferences({ showLayersSection: !preferences.showLayersSection }),
+        },
+        'separator',
         { label: 'New Layer', onSelect: handleAddLayer },
         { label: 'Delete Layer', disabled: activeLevel.layers.length <= 1, onSelect: handleDeleteLayer },
         'separator',
@@ -1015,6 +1021,12 @@ export function App() {
     {
       label: 'Level',
       items: [
+        {
+          label: 'Show Levels in Panel',
+          checked: preferences.showLevelsSection,
+          onSelect: () => changePreferences({ showLevelsSection: !preferences.showLevelsSection }),
+        },
+        'separator',
         { label: 'New Level Above', onSelect: () => handleAddLevel('above') },
         { label: 'New Level Below', onSelect: () => handleAddLevel('below') },
         { label: 'Delete Level', disabled: mapData.levels.length <= 1, onSelect: handleDeleteLevel },
@@ -1257,7 +1269,7 @@ export function App() {
             onDeleteLevel={handleDeleteLevel}
             onMoveLevel={handleMoveLevel}
             preferences={preferences}
-            onLevelBelowChange={changePreferences}
+            onPreferencesChange={changePreferences}
             onTakeStairs={takeStairs}
             onModifyMap={modifyMap}
             activeLayerId={activeLayerId}

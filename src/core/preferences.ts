@@ -18,6 +18,9 @@ export interface Preferences {
   unsavedChanges: UnsavedChoice;
   showPanel: boolean;
   showMapSettings: boolean;
+  // The Levels and Layers sections of the properties panel
+  showLevelsSection: boolean;
+  showLayersSection: boolean;
   // Draw the level before the active one faintly underneath it
   showLevelBelow: boolean;
   // How strongly it shows through, 0 to 1
@@ -41,6 +44,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   unsavedChanges: 'ask',
   showPanel: true,
   showMapSettings: false,
+  showLevelsSection: true,
+  showLayersSection: true,
   showLevelBelow: false,
   levelBelowOpacity: 0.3,
   showLevelsFurtherBelow: false,
