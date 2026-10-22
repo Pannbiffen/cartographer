@@ -12,6 +12,7 @@ import type {
   MapLevel,
   Selection,
   ShapeMode,
+  WaterStyle,
 } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
 import { Slider } from './Slider';
@@ -25,6 +26,7 @@ import {
   LABEL_STYLES,
   PROP_TYPES,
   TOOLS,
+  WATER_STYLES,
   keepsSelection,
   laysFloor,
   optionButtonClass,
@@ -54,6 +56,8 @@ interface DockPanelProps {
   onShapeModeChange: (mode: ShapeMode) => void;
   river: RiverSettings;
   onRiverChange: (river: RiverSettings) => void;
+  waterStyle: WaterStyle;
+  onWaterStyleChange: (style: WaterStyle) => void;
   selection: Selection[];
   onClearSelection: () => void;
   onDuplicate: () => void;
@@ -502,6 +506,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onShapeModeChange,
   river,
   onRiverChange,
+  waterStyle,
+  onWaterStyleChange,
   selection,
   onClearSelection,
   onDuplicate,
@@ -603,6 +609,15 @@ export const DockPanel: React.FC<DockPanelProps> = ({
           />
         )}
 
+        {(activeTool === 'water' || activeTool === 'river') && (
+          <>
+            <Choices label="Water" options={WATER_STYLES} value={waterStyle} columns={2} onChange={onWaterStyleChange} />
+            <p className="text-ui-muted leading-snug">
+              Solid water hides the ground beneath; see-through water shows the floor through it. Right-click
+              water to change it.
+            </p>
+          </>
+        )}
         {activeTool === 'river' && (
           <>
             <Slider

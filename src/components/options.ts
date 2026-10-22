@@ -32,6 +32,7 @@ import type {
   ShapeMode,
   ToolType,
   WallStyle,
+  WaterStyle,
 } from '../types/map';
 
 export interface ToolInfo {
@@ -73,6 +74,8 @@ export function laysFloor(tool: ToolType, shapeMode: ShapeMode): boolean {
   // Walls that close off an area make it a room
   return tool === 'room-brush' || tool === 'room-rect' || tool === 'tunnel' || tool === 'fill' || tool === 'wall';
 }
+
+export const WATER_STYLES: WaterStyle[] = ['solid', 'see-through'];
 
 export const THEME_NAMES: [ThemeType, string][] = [
   ['parchment', 'Parchment'],

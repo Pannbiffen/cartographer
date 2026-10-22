@@ -5,7 +5,7 @@ import type { HatchStyle, LayerContent, LayerHatching, LevelMap, MapData, MapLay
 type Layered = Pick<MapLevel, 'layers'>;
 
 export function emptyContent(): LayerContent {
-  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, waterAreas: [], foliage: {}, doors: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
+  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, waterAreas: [], clearWater: {}, clearWaterAreas: [], foliage: {}, doors: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
 }
 
 export function newLayer(id: string, name: string, content: Partial<LayerContent> = {}): MapLayer {
@@ -33,6 +33,7 @@ export function cloneLayer(layer: MapLayer): MapLayer {
     floors: { ...layer.floors },
     floorAreas: { ...layer.floorAreas },
     water: { ...layer.water },
+    clearWater: { ...layer.clearWater },
     foliage: { ...layer.foliage },
     doors: [...layer.doors],
     walls: [...layer.walls],
@@ -127,7 +128,7 @@ function cleanHatching(raw: unknown): LayerHatching | undefined {
   return { style: style as HatchStyle, length: num(length, 6, 24, 14), density: num(density, 1, 5, 3) };
 }
 
-function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string>): MapLayer {
+function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string>, version: number): MapLayer {
   const layer: MapLayer = {
     ...newLayer(stored.id ?? `layer${index + 1}`, stored.name ?? `Layer ${index + 1}`),
     ...stored,
@@ -138,6 +139,8 @@ function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string
     floorAreas: stored.floorAreas ?? {},
     water: stored.water ?? {},
     waterAreas: stored.waterAreas ?? [],
+    clearWater: stored.clearWater ?? {},
+    clearWaterAreas: stored.clearWaterAreas ?? [],
     foliage: stored.foliage ?? {},
     doors: stored.doors ?? [],
     walls: stored.walls ?? [],
@@ -146,6 +149,13 @@ function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string
     labels: stored.labels ?? [],
     lights: stored.lights ?? [],
   };
+  // All water was see-through before version 4, so it keeps its look
+  if (version < 4) {
+    layer.clearWater = { ...layer.water, ...layer.clearWater };
+    layer.clearWaterAreas = [...layer.waterAreas, ...layer.clearWaterAreas];
+    layer.water = {};
+    layer.waterAreas = [];
+  }
   const hatching = cleanHatching(stored.hatching);
   if (hatching) layer.hatching = hatching;
   else delete layer.hatching;
@@ -155,12 +165,12 @@ function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string
   return layer;
 }
 
-function normalizeLevel(stored: StoredLevel, index: number, takenIds: Set<string>): MapLevel {
+function normalizeLevel(stored: StoredLevel, index: number, takenIds: Set<string>, version: number): MapLevel {
   const layers = Array.isArray(stored.layers) && stored.layers.length > 0 ? stored.layers : [{ name: 'Layer 1' }];
   return {
     id: stored.id ?? `level${index + 1}`,
     name: stored.name ?? `Level ${index + 1}`,
-    layers: layers.map((layer, i) => normalizeLayer(layer, i, takenIds)),
+    layers: layers.map((layer, i) => normalizeLayer(layer, i, takenIds, version)),
   };
 }
 
@@ -179,10 +189,11 @@ export function normalizeLoadedMap(parsed: StoredMap, defaults: MapData): MapDat
           },
         ];
   const takenIds = new Set<string>();
+  const version = typeof parsed.version === 'number' ? parsed.version : 1;
   return {
     ...defaults,
     ...settings,
     version: defaults.version,
-    levels: storedLevels.map((level, i) => normalizeLevel(level, i, takenIds)),
+    levels: storedLevels.map((level, i) => normalizeLevel(level, i, takenIds, version)),
   };
 }

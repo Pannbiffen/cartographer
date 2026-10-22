@@ -12,6 +12,7 @@ import type {
   ViewportTransform,
   MapHistoryState,
   Selection,
+  WaterStyle,
 } from './types/map';
 import { MenuBar, type Menu, type MenuItem } from './components/MenuBar';
 import { ContextMenu } from './components/ContextMenu';
@@ -19,7 +20,7 @@ import { Toolbar } from './components/Toolbar';
 import { Toolbox } from './components/Toolbox';
 import { DockPanel } from './components/DockPanel';
 import { MapSettingsDrawer } from './components/MapSettingsDrawer';
-import { DOOR_TYPES, FLOOR_TEXTURES, LABEL_STYLES, PROP_TYPES, TOOLS, keepsSelection, laysFloor } from './components/options';
+import { DOOR_TYPES, FLOOR_TEXTURES, LABEL_STYLES, PROP_TYPES, TOOLS, WATER_STYLES, keepsSelection, laysFloor } from './components/options';
 import { MapCanvas, type CanvasMenuRequest } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
@@ -91,6 +92,7 @@ import {
 import { fitViewport, zoomAbout } from './core/viewport';
 import { fillRoom, textureAt } from './core/tools/fill';
 import { DEFAULT_RIVER, type RiverSettings } from './core/geometry/river';
+import { setWaterStyleAt, waterStyleAt } from './core/geometry/region';
 import { createBlankMap, mapLook } from './core/newMap';
 import { clearShareFragment, isShareFragment, readShareFragment } from './core/share';
 
@@ -151,7 +153,7 @@ function createDefaultStarterMap(): MapData {
   foliage['5,-8'] = { type: 'rock', seed: 404 };
 
   return {
-    version: 3,
+    version: 4,
     title: 'The Sunken Crypt',
     gridSize: 40,
     theme: 'parchment',
@@ -225,7 +227,7 @@ function initialMap(): { map: MapData; id: string; resumed: boolean; saved: bool
 const RECENT_MAPS = 8;
 
 /** Cells of one terrain kind across a level's layers */
-function countCells(map: LevelMap, kind: 'rooms' | 'water' | 'foliage'): number {
+function countCells(map: LevelMap, kind: 'rooms' | 'water' | 'clearWater' | 'foliage'): number {
   return map.layers.reduce((n, layer) => n + Object.keys(layer[kind]).length, 0);
 }
 
@@ -310,6 +312,7 @@ export function App() {
   const [labelStyle, setLabelStyle] = useState<LabelStyle>('text');
   const [shapeMode, setShapeMode] = useState<ShapeMode>('add');
   const [river, setRiver] = useState<RiverSettings>(DEFAULT_RIVER);
+  const [waterStyle, setWaterStyle] = useState<WaterStyle>('solid');
 
   const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, zoom: 1 });
   // Canvas size in CSS pixels, known after its first layout
@@ -1129,6 +1132,7 @@ export function App() {
     ...(activeTool === 'label' ? [choices('Label Style', LABEL_STYLES, labelStyle, setLabelStyle)] : []),
     ...(brushTool ? [choices(activeTool === 'path' ? 'Path Width' : 'Brush Size', [1, 2, 3, 4, 5], brushSize, setBrushSize)] : []),
     ...(laysFloor(activeTool, shapeMode) ? [choices('Floor', FLOOR_TEXTURES, floorTexture, setFloorTexture)] : []),
+    ...(activeTool === 'water' || activeTool === 'river' ? [choices('New Water', WATER_STYLES, waterStyle, setWaterStyle)] : []),
     ...(activeTool === 'polygon' || activeTool === 'circle' || activeTool === 'path'
       ? [choices('Mode', ['add', 'cut'] as ShapeMode[], shapeMode, setShapeMode)]
       : []),
@@ -1136,6 +1140,7 @@ export function App() {
   // The floor texture under the right-click, if there is floor on the active layer
   const menuAt = contextMenu?.at;
   const spotTexture = menuAt && activeLayerEditable ? textureAt(activeLayer, menuAt.x, menuAt.y) : null;
+  const spotWater = menuAt && activeLayerEditable ? waterStyleAt(activeLayer, menuAt.x, menuAt.y) : null;
   const fillAt = (at: { x: number; y: number }, texture: FloorTexture) => {
     const shown = visibleLayers(levelMap);
     const [doors, walls] = [shown.flatMap((l) => l.doors), shown.flatMap((l) => l.walls)];
@@ -1157,6 +1162,17 @@ export function App() {
             onSelect: () => fillAt(menuAt, texture),
           })),
         }, { label: 'Pick Floor Texture', onSelect: () => setFloorTexture(spotTexture) }]
+      : []),
+    ...(menuAt && spotWater
+      ? [{
+          label: 'Water Here',
+          submenu: WATER_STYLES.map((style) => ({
+            label: capitalize(style),
+            checked: style === spotWater,
+            onSelect: () =>
+              modifyMap((draft) => withLayer(draft, activeLayerId, (layer) => setWaterStyleAt(layer, menuAt.x, menuAt.y, style))),
+          })),
+        }]
       : []),
     ...(toolSettings.length ? ['separator' as const, ...toolSettings] : []),
     'separator',
@@ -1208,6 +1224,7 @@ export function App() {
               labelStyle={labelStyle}
               shapeMode={shapeMode}
               river={river}
+              waterStyle={waterStyle}
               activeLayerId={activeLayerId}
               viewport={viewport}
               onViewportChange={setViewport}
@@ -1251,6 +1268,8 @@ export function App() {
             onShapeModeChange={setShapeMode}
             river={river}
             onRiverChange={setRiver}
+            waterStyle={waterStyle}
+            onWaterStyleChange={setWaterStyle}
             selection={activeSelection}
             onClearSelection={() => setSelection([])}
             onDuplicate={handleDuplicate}
@@ -1280,7 +1299,7 @@ export function App() {
           {hoverCoord ? `Grid: (${hoverCoord.gx}, ${hoverCoord.gy})` : ''}
         </span>
         <span data-testid="map-stats" className="tabular-nums">
-          Rooms: {countCells(levelMap, 'rooms')} · Water: {countCells(levelMap, 'water')} ·
+          Rooms: {countCells(levelMap, 'rooms')} · Water: {countCells(levelMap, 'water') + countCells(levelMap, 'clearWater')} ·
           Foliage: {countCells(levelMap, 'foliage')}
         </span>
         {mapData.levels.length > 1 && (

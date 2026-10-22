@@ -20,7 +20,7 @@ export function computeMapBounds(mapData: LevelMap, margin: number = 2): Boundin
 
   // Hidden layers are left out of exports
   for (const layer of visibleLayers(mapData)) {
-    for (const cells of [layer.rooms, layer.water, layer.foliage]) {
+    for (const cells of [layer.rooms, layer.water, layer.clearWater, layer.foliage]) {
       for (const key of Object.keys(cells)) {
         if (!cells[key]) continue;
         const [x, y] = key.split(',').map(Number);

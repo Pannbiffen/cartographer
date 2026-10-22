@@ -1,6 +1,6 @@
 // Shared map renderer used by both the live canvas and the exporters
-import type { LevelMap, MapLayer } from '../../types/map';
-import { THEMES, propColor } from '../theme';
+import type { LevelMap, MapLayer, WaterStyle } from '../../types/map';
+import { THEMES, propColor, type ThemeColors } from '../theme';
 import {
   extractWallSegments,
   renderDysonHatching,
@@ -25,6 +25,31 @@ export interface GridRange {
   minY: number;
   maxX: number;
   maxY: number;
+}
+
+/** One style of a layer's water: solid water hides what lies beneath, see-through water tints it */
+function renderWater(ctx: CanvasRenderingContext2D, layer: MapLayer, style: WaterStyle, theme: ThemeColors, gridSize: number) {
+  const solid = style === 'solid';
+  const [cells, areas] = solid ? [layer.water, layer.waterAreas] : [layer.clearWater, layer.clearWaterAreas];
+  if (areas.length > 0) {
+    // Free-form water merges with the water cells into one shoreline
+    const outline = layerWater(layer, style);
+    const water = floorPath(outline, gridSize);
+    for (const fill of solid ? [theme.floor, theme.waterTint] : [theme.waterTint]) {
+      ctx.fillStyle = fill;
+      ctx.fill(water, 'evenodd');
+    }
+    ctx.save();
+    ctx.clip(water, 'evenodd');
+    renderShoreRipples(ctx, outline, gridSize, theme.waterRipples);
+    ctx.restore();
+  } else if (Object.keys(cells).length > 0) {
+    for (const fill of solid ? [theme.floor, theme.waterTint] : [theme.waterTint]) {
+      ctx.fillStyle = fill;
+      fillCells(ctx, cells, gridSize);
+    }
+    renderWaterRipples(ctx, extractWaterSegments(cells, gridSize), theme.waterRipples);
+  }
 }
 
 function fillCells(
@@ -111,21 +136,8 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
   }
 
   // 3. Water sits on top of floors (pools inside rooms) and terrain
-  if (layer.waterAreas.length > 0) {
-    // Free-form water merges with the water cells into one shoreline
-    const water = floorPath(layerWater(layer), gridSize);
-    ctx.fillStyle = theme.waterTint;
-    ctx.fill(water, 'evenodd');
-    ctx.save();
-    ctx.clip(water, 'evenodd');
-    renderShoreRipples(ctx, layerWater(layer), gridSize, theme.waterRipples);
-    ctx.restore();
-  } else if (Object.keys(layer.water).length > 0) {
-    ctx.fillStyle = theme.waterTint;
-    fillCells(ctx, layer.water, gridSize);
-    const waterSegments = extractWaterSegments(layer.water, gridSize);
-    renderWaterRipples(ctx, waterSegments, theme.waterRipples);
-  }
+  renderWater(ctx, layer, 'see-through', theme, gridSize);
+  renderWater(ctx, layer, 'solid', theme, gridSize);
 
   // 4. Thick wall outlines, and thin walls in the same style; a door on
   //    any shown layer opens a thin wall where it sits

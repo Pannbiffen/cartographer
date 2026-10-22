@@ -50,7 +50,7 @@ export function mapLook(map: MapData): NewMapDefaults {
 /** An empty map with one level of one layer */
 export function createBlankMap(defaults: NewMapDefaults): MapData {
   return {
-    version: 3,
+    version: 4,
     title: 'Untitled map',
     gridSize: 40,
     ...DEFAULT_NEW_MAP,

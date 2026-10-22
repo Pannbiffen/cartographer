@@ -47,7 +47,7 @@ test('levels keep their own layers, and can be switched, renamed, reordered and 
   // Layers belong to the level they were added on
   await page.getByRole('button', { name: 'New layer' }).click();
   let map = await saveMap(page);
-  expect(map.version).toBe(3);
+  expect(map.version).toBe(4);
   expect(map.levels.map((l) => l.name)).toEqual(['Level 1', 'Cellar']);
   expect(map.levels.map((l) => l.layers.length)).toEqual([1, 2]);
   expect(Object.keys(map.levels[1].layers[0].rooms)).toHaveLength(6);
@@ -126,7 +126,10 @@ test('a version 2 file, with its layers at the top level, opens as one level', a
   const loaded = await saveMap(page);
   expect(loaded.title).toBe('Two Layers');
   expect(loaded.levels).toHaveLength(1);
-  expect(loaded.levels[0].layers).toEqual(levels[0].layers);
+  // Water was all see-through then, and still is
+  expect(loaded.levels[0].layers).toEqual(
+    levels[0].layers.map((layer) => ({ ...layer, water: {}, clearWater: layer.water }))
+  );
   expect(loaded).not.toHaveProperty('layers');
 });
 

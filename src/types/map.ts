@@ -24,6 +24,9 @@ export type PropType = 'pillar' | 'chest' | 'table' | 'altar' | 'torch' | 'barre
 
 export type FoliageType = 'tree' | 'bush' | 'rock';
 
+// Solid water hides the ground and floor beneath; see-through water tints them
+export type WaterStyle = 'solid' | 'see-through';
+
 export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome' | 'colour';
 
 export type FloorTexture =
@@ -156,6 +159,10 @@ export interface LayerContent {
   water: { [key: string]: boolean }; // "x,y" => true for water cells
   // Free-form water (rivers) merged with the water cells. Replaced on edit, never mutated.
   waterAreas: Polygon[];
+  // See-through water (a fountain showing the floor beneath), kept like the
+  // solid water above and never overlapping it
+  clearWater: { [key: string]: boolean };
+  clearWaterAreas: Polygon[];
   foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
   doors: PlacedDoor[];
   walls: PlacedWall[];
@@ -176,7 +183,7 @@ export interface MapLayer extends LayerContent {
 
 /** Settings shared by every level of a map */
 export interface MapSettings {
-  version: number; // 3 since levels; 2 kept one level's layers at the top level, 1 one layer's content
+  version: number; // 4 since see-through water (older water loads see-through); 3 since levels; 2 kept one level's layers at the top level, 1 one layer's content
   title: string;
   gridSize: number; // pixels per grid cell (e.g. 40)
   theme: ThemeType;

@@ -49,7 +49,10 @@ test('project files round-trip and version 1 files without layers or labels stil
   });
   await expect(page.getByLabel('Map title')).toHaveValue('Legacy Map');
   const loaded = await saveMap(page);
-  expect(loaded.version).toBe(3);
+  expect(loaded.version).toBe(4);
+  // Water was all see-through then, and still is
+  expect(loaded.levels[0].layers[0].clearWater).toEqual(water);
+  expect(loaded.levels[0].layers[0].water).toEqual({});
   expect(loaded.levels).toHaveLength(1);
   expect(loaded.levels[0].layers).toHaveLength(1);
   expect(loaded.levels[0].layers[0]).toMatchObject({ name: 'Dungeon', visible: true, locked: false, opacity: 1, labels: [] });

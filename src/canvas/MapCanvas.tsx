@@ -3,6 +3,7 @@ import type {
   LayerContent,
   LevelMap,
   ToolType,
+  WaterStyle,
   DoorType,
   PropType,
   FoliageType,
@@ -60,6 +61,7 @@ import {
   circlePolygon,
   eraseShapesInCells,
   eraseWater,
+  paintWaterCells,
   pathPolygon,
   polygonFromPoints,
   uncutCells,
@@ -96,6 +98,8 @@ interface MapCanvasProps {
   shapeMode: ShapeMode;
   // Width, wander and seed of the rivers the river tool draws
   river: RiverSettings;
+  // Whether the water and river tools lay solid or see-through water
+  waterStyle: WaterStyle;
   // Layer the drawing tools edit
   activeLayerId: string;
   viewport: ViewportTransform;
@@ -157,6 +161,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   labelStyle,
   shapeMode,
   river,
+  waterStyle,
   activeLayerId,
   viewport,
   onViewportChange,
@@ -545,13 +550,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         (draft) => {
           if (activeTool === 'room-brush') uncutCells(draft, [...cells.values()]);
           if (activeTool === 'eraser') eraseShapesInCells(draft, [...cells.values()]);
+          if (activeTool === 'water') paintWaterCells(draft, [...cells.values()], waterStyle);
           for (const { x: gx, y: gy } of cells.values()) {
             const key = `${gx},${gy}`;
 
             if (activeTool === 'room-brush') {
               carveFloor(draft, key, floorTexture);
-            } else if (activeTool === 'water') {
-              draft.water[key] = true;
             } else if (activeTool === 'foliage') {
               // Keep existing plants so dragging over them doesn't reshuffle their shape
               if (draft.foliage[key]?.type !== selectedFoliageType) {
@@ -570,7 +574,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         { coalesce: `stroke-${strokeCountRef.current}` }
       );
     },
-    [activeTool, brushSize, selectedFoliageType, floorTexture, editLayer]
+    [activeTool, brushSize, selectedFoliageType, floorTexture, waterStyle, editLayer]
   );
 
   // On a hex grid the room brush and eraser lay or cut whole hexes
@@ -655,14 +659,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (!points) return;
     if (activeTool === 'river') {
       const water = riverPolygon(points, river);
-      if (water.length > 0) editLayer((draft) => addWater(draft, water));
+      if (water.length > 0) editLayer((draft) => addWater(draft, water, waterStyle));
     } else {
       const shape =
         activeTool === 'path' ? pathPolygon(points, brushSize) : polygonFromPoints(points);
       if (shape.length > 0) editLayer((draft) => applyShape(draft, shape, shapeMode, floorTexture));
     }
     drawRef.current();
-  }, [activeTool, brushSize, shapeMode, floorTexture, river, editLayer]);
+  }, [activeTool, brushSize, shapeMode, floorTexture, river, waterStyle, editLayer]);
   const finishShapeRef = useRef(finishShape);
   useEffect(() => {
     finishShapeRef.current = finishShape;
@@ -1216,6 +1220,7 @@ function carveFloor(layer: LayerContent, key: string, texture: FloorTexture) {
 function eraseCellContents(layer: LayerContent, gx: number, gy: number) {
   const key = `${gx},${gy}`;
   delete layer.water[key];
+  delete layer.clearWater[key];
   delete layer.foliage[key];
   layer.doors = layer.doors.filter((d) => !doorTouchesCell(d, gx, gy));
   layer.walls = layer.walls.filter((w) => !wallTouchesCell(w, gx, gy));
