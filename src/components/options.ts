@@ -77,6 +77,7 @@ export const THEME_NAMES: [ThemeType, string][] = [
   ['blueprint', 'Blueprint'],
   ['slate', 'Dark Slate'],
   ['monochrome', 'Monochrome Ink'],
+  ['colour', 'Colour'],
 ];
 
 export const FLOOR_TEXTURES: FloorTexture[] = [

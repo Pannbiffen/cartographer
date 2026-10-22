@@ -1,5 +1,14 @@
 // Theme palette definitions for Cartographer
-import type { ThemeType } from '../types/map';
+import type { FloorTexture, PropType, ThemeType } from '../types/map';
+
+// Colour is a property of the style for now: a style may colour floors by
+// texture and props by type (#69). A later choice per map, texture or room
+// would override `textureColors` and `propColor`, so floors are saved as
+// textures either way and the file format stays as it is.
+export interface TextureColors {
+  fill: string; // laid under the pattern
+  ink: string; // the pattern's lines
+}
 
 export interface ThemeColors {
   bg: string;
@@ -11,7 +20,10 @@ export interface ThemeColors {
   waterRipples: string;
   foliageFill: string;
   foliageInk: string;
-  propFill: string;
+  propFill: string; // doors
+  // Missing: floors are `floor` with patterns in `ink`, props paper-white
+  textures?: Partial<Record<FloorTexture, TextureColors>>;
+  props?: Partial<Record<PropType, string>>;
 }
 
 export const THEMES: Record<ThemeType, ThemeColors> = {
@@ -63,4 +75,43 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
     foliageInk: '#000000',
     propFill: '#ffffff',
   },
+  colour: {
+    bg: '#d8cfbb',
+    floor: '#efe7d4',
+    grid: 'rgb(70, 56, 44)',
+    ink: '#2a221b',
+    hatch: '#3d342a',
+    waterTint: 'rgba(52, 120, 168, 0.6)',
+    waterRipples: '#d6eef8',
+    foliageFill: 'rgba(76, 128, 62, 0.85)',
+    foliageInk: '#24301c',
+    propFill: '#9c6b3e',
+    textures: {
+      tiles: { fill: '#c98e6a', ink: '#6e3d24' },
+      planks: { fill: '#b4824f', ink: '#5a3a1c' },
+      flagstones: { fill: '#a8a399', ink: '#4a463f' },
+      cobbles: { fill: '#9a958c', ink: '#45413a' },
+      dirt: { fill: '#9c7a52', ink: '#4e3a22' },
+      grass: { fill: '#86a95a', ink: '#3c5a24' },
+      sand: { fill: '#e2cc92', ink: '#8a7040' },
+      carpet: { fill: '#9e3f3c', ink: '#e2b46a' },
+      slabs: { fill: '#b5aea2', ink: '#4f4a42' },
+      marble: { fill: '#e6e2da', ink: '#7d7870' },
+    },
+    props: {
+      pillar: '#bdb7ab',
+      chest: '#a8743f',
+      table: '#b4824f',
+      altar: '#c9c3b6',
+      barrel: '#9c6b3e',
+      sarcophagus: '#a9a398',
+    },
+  },
 };
+
+/** A floor texture's fill (none: the floor shows through) and line colour in a style */
+export const textureColors = (theme: ThemeColors, texture: FloorTexture): Partial<TextureColors> & { ink: string } =>
+  theme.textures?.[texture] ?? { ink: theme.ink };
+
+/** A prop's fill in a style */
+export const propColor = (theme: ThemeColors, type: PropType) => theme.props?.[type] ?? '#f8f4e6';

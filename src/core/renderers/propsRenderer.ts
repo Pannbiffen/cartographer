@@ -168,7 +168,8 @@ export function renderProp(
   ctx: CanvasRenderingContext2D,
   prop: PlacedProp,
   gridSize: number,
-  inkColor: string = '#1e1713'
+  inkColor: string = '#1e1713',
+  fillColor: string = '#f8f4e6'
 ) {
   ctx.save();
   const cx = (prop.x + 0.5) * gridSize;
@@ -178,7 +179,7 @@ export function renderProp(
   ctx.rotate((prop.rotation * Math.PI) / 180);
 
   ctx.strokeStyle = inkColor;
-  ctx.fillStyle = '#f8f4e6';
+  ctx.fillStyle = fillColor;
   ctx.lineWidth = 1.8;
 
   if (prop.type === 'pillar') {

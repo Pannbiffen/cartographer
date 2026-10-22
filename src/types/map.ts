@@ -23,7 +23,7 @@ export type PropType = 'pillar' | 'chest' | 'table' | 'altar' | 'torch' | 'barre
 
 export type FoliageType = 'tree' | 'bush' | 'rock';
 
-export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome';
+export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome' | 'colour';
 
 export type FloorTexture =
   | 'plain'

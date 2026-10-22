@@ -1,6 +1,6 @@
 // Shared map renderer used by both the live canvas and the exporters
 import type { LevelMap, MapLayer } from '../../types/map';
-import { THEMES } from '../theme';
+import { THEMES, propColor } from '../theme';
 import {
   extractWallSegments,
   renderDysonHatching,
@@ -102,11 +102,11 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
     // Textures stop where a cut crosses them
     ctx.save();
     ctx.clip(floor, 'evenodd');
-    renderFloorTextures(ctx, layer, gridSize, theme.ink);
+    renderFloorTextures(ctx, layer, gridSize, theme);
     ctx.restore();
   } else {
     fillCells(ctx, layer.rooms, gridSize);
-    renderFloorTextures(ctx, layer, gridSize, theme.ink);
+    renderFloorTextures(ctx, layer, gridSize, theme);
   }
 
   // 3. Water sits on top of floors (pools inside rooms) and terrain
@@ -150,7 +150,7 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
     renderDoor(ctx, door, gridSize, theme.ink, theme.propFill);
   }
   for (const prop of layer.props) {
-    renderProp(ctx, prop, gridSize, theme.ink);
+    renderProp(ctx, prop, gridSize, theme.ink, propColor(theme, prop.type));
   }
 }
 
@@ -257,7 +257,7 @@ export function renderMap(
 export function renderMapGround(ctx: CanvasRenderingContext2D, mapData: LevelMap) {
   if (!mapData.outdoor) return;
   const theme = THEMES[mapData.theme] || THEMES.parchment;
-  renderGround(ctx, mapData.ground, mapData.gridSize, theme.ink);
+  renderGround(ctx, mapData.ground, mapData.gridSize, theme);
 }
 
 /**

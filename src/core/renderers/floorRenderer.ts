@@ -6,6 +6,7 @@ import type { FloorTexture, LayerContent, Polygon } from '../../types/map';
 import { floorPath, polygonBounds } from '../geometry/region';
 import { pseudoRandom } from '../geometry/hatching';
 import { tilePattern, viewRect, wrap } from './patternTiles';
+import { textureColors, type ThemeColors } from '../theme';
 
 // The random numbers behind the patterns wrap every PERIOD cells. A 16-cell
 // repeat is hard to tell from one that never repeats. 8 would make tiles a
@@ -305,7 +306,7 @@ const isPattern = (texture: FloorTexture): texture is Pattern => texture in PATT
 
 /** Draws each floor cell's texture, clipped to the cells that carry it, then
  * the textured areas of free-form floor over them. Only cells in view are drawn. */
-export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerContent, gridSize: number, inkColor: string) {
+export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerContent, gridSize: number, theme: ThemeColors) {
   const { rooms, floors, floorAreas } = layer;
   const view = viewCells(ctx, gridSize);
   const inView = (gx: number, gy: number) => gx >= view.minX && gx < view.maxX && gy >= view.minY && gy < view.maxY;
@@ -331,7 +332,7 @@ export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerC
   for (const [texture, cells] of groups) {
     const clip = new Path2D();
     for (const [gx, gy] of cells) clip.rect(gx * gridSize, gy * gridSize, gridSize, gridSize);
-    drawTexture(ctx, texture, clip, () => cells, gridSize, inkColor);
+    drawTexture(ctx, texture, clip, () => cells, gridSize, theme);
   }
   ctx.restore();
 
@@ -355,12 +356,12 @@ export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerC
       }
       return cells;
     };
-    drawTexture(ctx, texture, floorPath(polygons, gridSize), cellsUnder, gridSize, inkColor);
+    drawTexture(ctx, texture, floorPath(polygons, gridSize), cellsUnder, gridSize, theme);
   }
 }
 
 /** Lays a texture over everything the canvas shows: an outdoor map's ground */
-export function renderGround(ctx: CanvasRenderingContext2D, texture: FloorTexture, gridSize: number, inkColor: string) {
+export function renderGround(ctx: CanvasRenderingContext2D, texture: FloorTexture, gridSize: number, theme: ThemeColors) {
   if (!isPattern(texture)) return;
   const view = viewCells(ctx, gridSize);
   const clip = new Path2D();
@@ -370,7 +371,7 @@ export function renderGround(ctx: CanvasRenderingContext2D, texture: FloorTextur
     for (let gy = view.minY; gy < view.maxY; gy++) for (let gx = view.minX; gx < view.maxX; gx++) list.push([gx, gy]);
     return list;
   };
-  drawTexture(ctx, texture, clip, cells, gridSize, inkColor);
+  drawTexture(ctx, texture, clip, cells, gridSize, theme);
 }
 
 /** The cells the canvas shows, from its transform */
@@ -386,8 +387,9 @@ function viewCells(ctx: CanvasRenderingContext2D, gridSize: number) {
 }
 
 /**
- * Fills `clip` with a texture: from a tile of one whole period when one fits,
- * else (zoomed far in, where few cells show) by drawing `cells` directly.
+ * Fills `clip` with a texture, over the style's colour for it if it has one:
+ * from a tile of one whole period when one fits, else (zoomed far in, where
+ * few cells show) by drawing `cells` directly.
  */
 function drawTexture(
   ctx: CanvasRenderingContext2D,
@@ -395,8 +397,13 @@ function drawTexture(
   clip: Path2D,
   cells: () => [number, number][],
   gridSize: number,
-  inkColor: string
+  theme: ThemeColors
 ) {
+  const { fill, ink: inkColor } = textureColors(theme, texture);
+  if (fill) {
+    ctx.fillStyle = fill;
+    ctx.fill(clip, 'evenodd');
+  }
   const n = PATTERN_PERIOD[texture];
   const pattern = tilePattern(ctx, `${texture}|${gridSize}|${inkColor}`, n * gridSize, (tctx) => {
     // A ring of cells around the period too: their shapes cross its edges and

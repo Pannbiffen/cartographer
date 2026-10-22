@@ -13,7 +13,7 @@
 
 - **Plain Desktop Interface**: Menu bar, toolbar, docked toolbox, a properties panel for the current tool, selection and layers, a map settings drawer under the map (title, style, presets, walls, lighting, grid; open it with `M`), and a status bar, with your system font.
 - **Preferences** (Edit > Preferences): dark (default), light or system UI theme, accent colour, interface size, autosave on/off, and a reset that wipes everything stored in this browser.
-- **Pen & Parchment Aesthetic**: Four themes (Parchment, Blueprint, Slate, Monochrome), bold, fine or rough pen walls, and pen-stroke, crosshatch, stipple or soft-shadow hatching outside them.
+- **Pen & Parchment Aesthetic**: Five themes (Parchment, Blueprint, Slate, Monochrome, and Colour, where grass is green, planks brown and stone grey), bold, fine or rough pen walls, and pen-stroke, crosshatch, stipple or soft-shadow hatching outside them.
 - **Style Presets**: Save a map's look (style, walls, hatching, grid) under a name in the map settings drawer, apply it to any map in one click, and export or import presets as a `.json` file to share them with friends.
 - **Select & Edit**: Select doors, stairs, props, labels and lights to move (drag or arrow keys), rotate, retype, duplicate, copy and paste, or delete them. Shift+click or drag a box to select several and edit them together; copies keep their layout. Right-click (or long-press) an object or an empty spot for a menu of what you can do there.
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.

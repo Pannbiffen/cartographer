@@ -23,6 +23,26 @@ async function inkShare(page: Page, gx: number, gy: number, size: number) {
   }, [a, b]);
 }
 
+/** Average colour of a square's pixels, as [r, g, b] (with the pointer off the canvas) */
+async function averageColour(page: Page, gx: number, gy: number, size: number) {
+  const a = await gridPoint(page, gx, gy);
+  const b = await gridPoint(page, gx + size, gy + size);
+  await page.mouse.move(1, 1);
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  return page.locator('canvas').evaluate((canvas: HTMLCanvasElement, [a, b]) => {
+    const box = canvas.getBoundingClientRect();
+    const scale = canvas.width / box.width;
+    const x = Math.round((a.x - box.x) * scale);
+    const y = Math.round((a.y - box.y) * scale);
+    const w = Math.max(1, Math.round((b.x - a.x) * scale));
+    const h = Math.max(1, Math.round((b.y - a.y) * scale));
+    const data = canvas.getContext('2d')!.getImageData(x, y, w, h).data;
+    const sum = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c] += data[i + c];
+    return sum.map((v) => v / (w * h));
+  }, [a, b]);
+}
+
 test('room tools lay the chosen floor texture, and plain clears it', async ({ page }) => {
   const errors = trackErrors(page);
   await openApp(page);
@@ -198,5 +218,53 @@ test('stipple hatching on a large map draws from a tile, zoomed out and back in'
   await page.keyboard.up('ArrowRight');
   await frame();
   expect((await arcs()) - before).toBeLessThan(50);
+  expect(errors).toEqual([]);
+});
+
+test('the colour style colours floors by texture and is saved with the map', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page, { mapSettings: true });
+  await page.keyboard.press('Control+Alt+n');
+  await expect(page.getByTestId('map-stats')).toContainText('Rooms: 0');
+  await page.keyboard.press('r');
+  for (const [i, texture] of ['grass', 'planks', 'plain'].entries()) {
+    await page.getByRole('button', { name: texture, exact: true }).click();
+    await dragCells(page, [-7 + i * 5, -1], [-4 + i * 5, 1]);
+  }
+  // The middle of each room, clear of its walls
+  const grass = () => averageColour(page, -6.5, -0.5, 2);
+  const planks = () => averageColour(page, -1.5, -0.5, 2);
+  const plain = () => averageColour(page, 3.5, -0.5, 2);
+
+  // Ink on one floor colour: no texture tints its room
+  const parchment = [await grass(), await planks()];
+  for (const [r, g, b] of parchment) {
+    expect(Math.abs(g - r)).toBeLessThan(15);
+    expect(Math.abs(g - b)).toBeLessThan(40);
+  }
+
+  await page.getByLabel('Map style').selectOption('colour');
+  const [gr, gg, gb] = await grass();
+  expect(gg).toBeGreaterThan(gr + 20);
+  expect(gg).toBeGreaterThan(gb + 40);
+  const [pr, pg, pb] = await planks();
+  expect(pr).toBeGreaterThan(pg + 30);
+  expect(pg).toBeGreaterThan(pb + 20);
+  // Plain floor keeps a pale, uncoloured look
+  const [fr, fg, fb] = await plain();
+  expect(Math.min(fr, fg, fb)).toBeGreaterThan(190);
+  expect(Math.max(fr, fg, fb) - Math.min(fr, fg, fb)).toBeLessThan(40);
+
+  expect((await saveMap(page)).theme).toBe('colour');
+  await page.reload();
+  await expect(page.getByLabel('Map style')).toHaveValue('colour');
+  // The view is framed afresh, so a pixel or two may differ
+  const near = (a: number[], b: number[]) => a.every((v, c) => Math.abs(v - b[c]) < 3);
+  expect(near(await grass(), [gr, gg, gb])).toBe(true);
+
+  // Back to parchment, floors are as they were
+  await page.getByLabel('Map style').selectOption('parchment');
+  expect(near(await grass(), parchment[0])).toBe(true);
+  expect(near(await planks(), parchment[1])).toBe(true);
   expect(errors).toEqual([]);
 });
