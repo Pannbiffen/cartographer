@@ -38,8 +38,10 @@ function fillCells(
   ctx.fill();
 }
 
-// Scratch canvas for drawing a see-through layer before blending it in
-let blendCanvas: HTMLCanvasElement | null = null;
+// Scratch canvases for drawing a see-through layer before blending it in,
+// one per nesting depth (a ghost level holds see-through layers of its own)
+const blendCanvases: HTMLCanvasElement[] = [];
+let blendDepth = 0;
 
 /** Runs `draw` on a blank canvas matching `ctx`, then blends it in at `opacity` */
 function drawWithOpacity(
@@ -47,7 +49,7 @@ function drawWithOpacity(
   opacity: number,
   draw: (layerCtx: CanvasRenderingContext2D) => void
 ) {
-  blendCanvas ??= document.createElement('canvas');
+  const blendCanvas = (blendCanvases[blendDepth] ??= document.createElement('canvas'));
   const { width, height } = ctx.canvas;
   if (blendCanvas.width !== width || blendCanvas.height !== height) {
     blendCanvas.width = width;
@@ -58,7 +60,12 @@ function drawWithOpacity(
   layerCtx.setTransform(1, 0, 0, 1, 0, 0);
   layerCtx.clearRect(0, 0, width, height);
   layerCtx.setTransform(ctx.getTransform());
-  draw(layerCtx);
+  blendDepth++;
+  try {
+    draw(layerCtx);
+  } finally {
+    blendDepth--;
+  }
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -151,13 +158,14 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
  * Draws all shown map layers in world coordinates (the caller sets up
  * pan/zoom and fills the background). Grid lines are drawn over `gridRange`
  * when given. Pass `lighting: false` to leave out darkness and lights even
- * when the map has them on (VTT exports light the map themselves).
+ * when the map has them on (VTT exports light the map themselves), and
+ * `labels: false` to leave out the text.
  */
 export function renderMap(
   ctx: CanvasRenderingContext2D,
   mapData: LevelMap,
   gridRange: GridRange | null,
-  { lighting = true }: { lighting?: boolean } = {}
+  { lighting = true, labels = true }: { lighting?: boolean; labels?: boolean } = {}
 ) {
   const theme = THEMES[mapData.theme] || THEMES.parchment;
   const gridSize = mapData.gridSize;
@@ -207,7 +215,7 @@ export function renderMap(
   if (lighting && mapData.lighting) renderLighting(ctx, mapData);
 
   // Labels of every layer sit above everything, including the grid
-  for (const layer of layers) {
+  for (const layer of labels ? layers : []) {
     ctx.save();
     ctx.globalAlpha = layer.opacity;
     for (const label of layer.labels) {
@@ -215,4 +223,11 @@ export function renderMap(
     }
     ctx.restore();
   }
+}
+
+/** Draws a level faintly, for showing under the one being edited: no grid, light or text */
+export function renderGhostLevel(ctx: CanvasRenderingContext2D, mapData: LevelMap, opacity: number) {
+  drawWithOpacity(ctx, opacity, (ghostCtx) =>
+    renderMap(ghostCtx, mapData, null, { lighting: false, labels: false })
+  );
 }

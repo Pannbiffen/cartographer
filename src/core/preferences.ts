@@ -18,6 +18,8 @@ export interface Preferences {
   unsavedChanges: UnsavedChoice;
   showPanel: boolean;
   showMapSettings: boolean;
+  // Draw the level before the active one faintly underneath it
+  showLevelBelow: boolean;
   zoomSpeed: ZoomSpeed;
   // The look File > New starts a map with
   newMap: NewMapDefaults;
@@ -34,6 +36,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   unsavedChanges: 'ask',
   showPanel: true,
   showMapSettings: false,
+  showLevelBelow: false,
   zoomSpeed: 'normal',
   newMap: DEFAULT_NEW_MAP,
 };

@@ -108,3 +108,67 @@ test('a version 2 file, with its layers at the top level, opens as one level', a
   expect(loaded.levels[0].layers).toEqual(levels[0].layers);
   expect(loaded).not.toHaveProperty('layers');
 });
+
+test('View > Level Below shows the level before the active one faintly, and is remembered', async ({ page }) => {
+  await openApp(page);
+  const levelBelow = page.getByRole('menuitemcheckbox', { name: 'Level Below' });
+  const openViewMenu = async () => {
+    await page.getByRole('menuitem', { name: 'View' }).click();
+  };
+  // Colour of the canvas at the centre of a cell
+  const pixel = async (gx: number, gy: number) => {
+    const p = await cellCenter(page, gx, gy);
+    // Off the canvas, so no cursor preview tints the cell
+    await page.mouse.move(1, 1);
+    return page.locator('canvas').evaluate(
+      (canvas: HTMLCanvasElement, at) => {
+        const box = canvas.getBoundingClientRect();
+        const scale = canvas.width / box.width;
+        const data = canvas.getContext('2d')!.getImageData((at.x - box.x) * scale, (at.y - box.y) * scale, 1, 1).data;
+        return Array.from(data).join(',');
+      },
+      p
+    );
+  };
+
+  // Nothing to show with one level
+  await openViewMenu();
+  await expect(levelBelow).toBeDisabled();
+  await page.keyboard.press('Escape');
+
+  // A floor cell of level 1; level 2 is empty there
+  const map = await saveMap(page);
+  const [gx, gy] = Object.keys(map.levels[0].layers[0].rooms)[0].split(',').map(Number);
+  await page.getByRole('button', { name: 'New level' }).click();
+  await expect(page.getByTestId('current-level')).toHaveText('Level 2');
+  const empty = await pixel(gx, gy);
+
+  await openViewMenu();
+  await levelBelow.click();
+  await expect.poll(() => pixel(gx, gy)).not.toBe(empty);
+  const faint = await pixel(gx, gy);
+
+  // Drawing floor on this level covers the faint one
+  await page.keyboard.press('r');
+  await clickCell(page, gx, gy);
+  await expect.poll(() => pixel(gx, gy)).not.toBe(faint);
+
+  // Level 1 has nothing under it, so it looks the same with or without
+  await page.keyboard.press('PageUp');
+  await expect(page.getByTestId('current-level')).toHaveText('Level 1');
+  const first = await pixel(gx, gy);
+  await openViewMenu();
+  await levelBelow.click();
+  await openViewMenu();
+  await expect(levelBelow).not.toBeChecked();
+  await page.keyboard.press('Escape');
+  expect(await pixel(gx, gy)).toBe(first);
+
+  // The choice is kept for next time
+  await openViewMenu();
+  await levelBelow.click();
+  await page.reload();
+  await expect(page.getByTestId('map-stats')).toBeVisible();
+  await openViewMenu();
+  await expect(levelBelow).toBeChecked();
+});

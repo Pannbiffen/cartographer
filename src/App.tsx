@@ -314,6 +314,11 @@ export function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [preferences, setPreferences] = useState<Preferences>(loadPreferences);
+  // The level before this one, shown faintly under it while drawing
+  const levelBelow = useMemo(
+    () => (preferences.showLevelBelow && activeLevelIndex > 0 ? levelView(mapData, mapData.levels[activeLevelIndex - 1]) : null),
+    [preferences.showLevelBelow, mapData, activeLevelIndex]
+  );
   const changePreferences = useCallback((changes: Partial<Preferences>) => {
     setPreferences((p) => ({ ...p, ...changes }));
   }, []);
@@ -973,6 +978,12 @@ export function App() {
           checked: preferences.showPanel,
           onSelect: () => changePreferences({ showPanel: !preferences.showPanel }),
         },
+        {
+          label: 'Level Below',
+          checked: preferences.showLevelBelow,
+          disabled: mapData.levels.length < 2,
+          onSelect: () => changePreferences({ showLevelBelow: !preferences.showLevelBelow }),
+        },
         { label: 'Map Settings', shortcut: 'M', checked: preferences.showMapSettings, onSelect: toggleMapSettings },
       ],
     },
@@ -1171,6 +1182,7 @@ export function App() {
           <main ref={mainRef} className="relative flex-1 min-h-0 overflow-hidden">
             <MapCanvas
               mapData={levelMap}
+              levelBelow={levelBelow}
               activeTool={activeTool}
               brushSize={brushSize}
               selectedDoorType={selectedDoorType}
