@@ -12,6 +12,8 @@ const CANVAS_SHORTCUTS: [string, string][] = [
   ['Pan faster', 'Shift + arrows'],
   ['Zoom', 'Wheel'],
   ['Take linked stairs to their level', 'Double-click'],
+  ['Select several objects', 'Shift + click'],
+  ['Select objects in a box', 'Drag from an empty spot'],
   ['Menu for the object or spot', 'Right-click'],
   ['Menu for the selection', 'Shift + F10'],
   ['Nudge selection', 'Arrows'],

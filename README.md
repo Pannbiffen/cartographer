@@ -15,7 +15,7 @@
 - **Preferences** (Edit > Preferences): dark (default), light or system UI theme, accent colour, interface size, autosave on/off, and a reset that wipes everything stored in this browser.
 - **Pen & Parchment Aesthetic**: Four themes (Parchment, Blueprint, Slate, Monochrome), bold, fine or rough pen walls, and pen-stroke, crosshatch, stipple or soft-shadow hatching outside them.
 - **Style Presets**: Save a map's look (style, walls, hatching, grid) under a name in the map settings drawer, apply it to any map in one click, and export or import presets as a `.json` file to share them with friends.
-- **Select & Edit**: Select doors, stairs, props and labels to move (drag or arrow keys), rotate, retype, duplicate, copy and paste, or delete them. Right-click (or long-press) an object or an empty spot for a menu of what you can do there.
+- **Select & Edit**: Select doors, stairs, props, labels and lights to move (drag or arrow keys), rotate, retype, duplicate, copy and paste, or delete them. Shift+click or drag a box to select several and edit them together; copies keep their layout. Right-click (or long-press) an object or an empty spot for a menu of what you can do there.
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.
 - **Room Numbers**: Keyed-dungeon markers in a circle or box that count up (1, 2, 3...) as you place them.
 - **Layers**: Split a map into layers (dungeon, water, terrain, objects...) that can be shown or hidden, locked, reordered, renamed and faded. Tools draw on the active layer; hidden layers are left out of exports.
@@ -89,10 +89,11 @@ npm run preview
 | `Ctrl + 0` | Zoom to fit the whole map |
 | `Ctrl + 1` | Actual size (100%) |
 | `V` | Select / move |
+| `Shift` + click / drag a box (select tool) | Add to or take from the selection / select everything the box touches |
 | `R` (with a selection) | Rotate selection |
 | `Delete` / `Backspace` | Delete selection |
 | Double-click linked stairs (select tool) | Go to the level they lead to |
-| Arrow keys (with a selection) | Nudge selection: labels half a cell (`Shift`: a whole cell), other objects a cell |
+| Arrow keys (with a selection) | Nudge selection: labels half a cell (`Shift`: a whole cell), other objects and groups a cell |
 | `Esc` | Clear selection |
 | `B` | Room brush |
 | `R` | Rectangle room |
@@ -114,9 +115,9 @@ npm run preview
 | `M` | Show / hide the map settings drawer |
 | `Ctrl + Z` / `Cmd + Z` | Undo |
 | `Ctrl + Y` / `Cmd + Shift + Z` | Redo |
-| `Ctrl + C` / `Cmd + C` | Copy the selected object |
+| `Ctrl + C` / `Cmd + C` | Copy the selected objects |
 | `Ctrl + V` / `Cmd + V` | Paste it under the pointer (or one cell along), on the active layer |
-| `Ctrl + D` / `Cmd + D` | Duplicate the selected object |
+| `Ctrl + D` / `Cmd + D` | Duplicate the selected objects |
 | Right-click / long-press / `Shift + F10` | Menu for the object or spot under the pointer (or the selection) |
 | `Ctrl + Alt + N` / `Cmd + Option + N` | New map |
 | `Ctrl + O` / `Cmd + O` | Open project |

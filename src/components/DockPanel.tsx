@@ -46,7 +46,7 @@ interface DockPanelProps {
   onLabelStyleChange: (style: LabelStyle) => void;
   shapeMode: ShapeMode;
   onShapeModeChange: (mode: ShapeMode) => void;
-  selection: Selection | null;
+  selection: Selection[];
   onClearSelection: () => void;
   onDuplicate: () => void;
   onCopy: () => void;

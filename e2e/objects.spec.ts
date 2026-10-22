@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openApp, gridPoint, clickCell, dragCells, saveMap, view } from './helpers';
+import { openApp, gridPoint, cellCenter, clickCell, dragCells, saveMap, view } from './helpers';
 
 test('doors snap to the nearest edge; archways are placeable', async ({ page }) => {
   await openApp(page);
@@ -208,4 +208,74 @@ test('room-number markers count up and can switch style', async ({ page }) => {
     { text: '2', style: 'circle' },
     { text: '3', style: 'box' },
   ]);
+});
+
+test('Shift+click and a dragged box select several objects to edit together', async ({ page }) => {
+  await openApp(page);
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  const props = async () => (await saveMap(page)).levels[0].layers[0].props;
+  const at = async (id: string) => {
+    const p = (await props()).find((o) => o.id === id);
+    return p && [p.x, p.y];
+  };
+  await page.keyboard.press('v');
+
+  // Shift+click adds the second pillar; dragging one moves both
+  await clickCell(page, -3, 0);
+  await page.keyboard.down('Shift');
+  await clickCell(page, -3, 4);
+  await page.keyboard.up('Shift');
+  await expect(panel.getByText('Selected: 2 objects')).toBeVisible();
+  await dragCells(page, [-3, 0], [-2, 0]);
+  expect([await at('p1'), await at('p2')]).toEqual([[-2, 0], [-2, 4]]);
+  // Arrow keys and R act on the group
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('r');
+  expect((await props()).filter((p) => p.type === 'pillar')).toMatchObject([
+    { x: -2, y: 1, rotation: 90 },
+    { x: -2, y: 5, rotation: 90 },
+  ]);
+
+  // Copy keeps the layout: pasted under the pointer by the group's top-left
+  // corner, duplicated one cell to the right
+  await page.keyboard.press('Control+c');
+  const target = await gridPoint(page, 14.3, 3.8);
+  await page.mouse.move(target.x, target.y);
+  await page.keyboard.press('Control+v');
+  await expect(panel.getByText('Selected: 2 objects')).toBeVisible();
+  await page.keyboard.press('Control+d');
+  const pillars = (await props()).filter((p) => p.type === 'pillar').map((p) => [p.x, p.y]);
+  pillars.sort(([ax, ay], [bx, by]) => ax - bx || ay - by);
+  expect(pillars).toEqual([[-2, 1], [-2, 5], [14, 3], [14, 7], [15, 3], [15, 7]]);
+
+  // Delete removes the group in one undo step
+  await page.keyboard.press('Delete');
+  expect((await props()).filter((p) => p.type === 'pillar')).toHaveLength(4);
+  await page.keyboard.press('Control+z');
+  expect((await props()).filter((p) => p.type === 'pillar')).toHaveLength(6);
+
+  // A box dragged from an empty spot selects what it touches; Shift+click takes one out
+  await page.keyboard.press('Escape');
+  const corner = await gridPoint(page, -4.6, -0.6);
+  const opposite = await gridPoint(page, -1.5, 5.5);
+  await page.mouse.move(corner.x, corner.y);
+  await page.mouse.down();
+  await page.mouse.move(opposite.x, opposite.y, { steps: 6 });
+  await page.mouse.up();
+  await expect(panel.getByText('Selected: 3 objects')).toBeVisible(); // two pillars and the torch
+  await page.keyboard.down('Shift');
+  await clickCell(page, -4, 2);
+  await page.keyboard.up('Shift');
+  await expect(panel.getByText('Selected: 2 objects')).toBeVisible();
+  // Right-clicking one keeps the group; its menu has no single-object choices
+  const pillar = await cellCenter(page, -2, 1);
+  await page.mouse.click(pillar.x, pillar.y, { button: 'right' });
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem', { name: /^Rotate/ })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Prop' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(panel.getByText('Selected: 2 objects')).toBeVisible();
+  // Clicking one of them without dragging selects just it
+  await clickCell(page, -2, 1);
+  await expect(panel.getByText('Selected: pillar')).toBeVisible();
 });

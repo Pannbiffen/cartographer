@@ -11,7 +11,6 @@ import type {
   ShapeMode,
   ViewportTransform,
   MapHistoryState,
-  MapLayer,
   Selection,
 } from './types/map';
 import { MenuBar, type Menu, type MenuItem } from './components/MenuBar';
@@ -50,15 +49,16 @@ import { applyPreferences, loadPreferences, savePreferences, type Preferences } 
 import { clearLocalData } from './core/storage';
 import {
   addObject,
-  copyObject,
-  deleteObject,
+  copyObjects,
+  deleteObjects,
   findSelected,
   findStairs,
-  nudgeObject,
-  offsetCopy,
+  nudgeObjects,
+  placeCopies,
   retypeObject,
-  rotateObject,
-  type CopiedObject,
+  rotateObjects,
+  sameSelection,
+  type ClipboardEntry,
 } from './core/objects';
 import {
   addLayer,
@@ -265,24 +265,26 @@ export function App() {
   const activeLayerId = activeLayer.id;
   const activeLayerEditable = isLayerEditable(activeLayer);
 
-  const [selection, setSelection] = useState<Selection | null>(null);
-  // A selection whose object was removed (undo, eraser), whose layer was
-  // hidden or locked, or which is on another level counts as none
-  const activeSelection =
-    selection && isLayerEditable(findLayer(levelMap, selection.layerId)) && findSelected(levelMap, selection)
-      ? selection
-      : null;
-  // Selecting an object makes its layer the one being edited
-  const select = useCallback((sel: Selection | null) => {
-    setSelection(sel);
-    if (sel) setActiveLayerId(sel.layerId);
+  // The selected objects; the last one picked is the one the panel edits
+  const [selection, setSelection] = useState<Selection[]>([]);
+  // Objects that were removed (undo, eraser), whose layer was hidden or
+  // locked, or which are on another level drop out of the selection
+  const activeSelection = useMemo(
+    () => selection.filter((sel) => isLayerEditable(findLayer(levelMap, sel.layerId)) && findSelected(levelMap, sel)),
+    [selection, levelMap]
+  );
+  const primarySelection = activeSelection[activeSelection.length - 1] ?? null;
+  // Selecting objects makes the last one's layer the one being edited
+  const select = useCallback((sels: Selection[]) => {
+    setSelection(sels);
+    if (sels.length) setActiveLayerId(sels[sels.length - 1].layerId);
   }, []);
 
   // Levels. Switching level keeps the view, so floors drawn one above
   // another line up; it drops the selection, which belongs to the old level.
   const goToLevel = useCallback((id: string) => {
     setActiveLevelId(id);
-    setSelection(null);
+    setSelection([]);
   }, []);
   const activeLevelIndex = mapData.levels.indexOf(activeLevel);
   const goToNextLevel = useCallback(
@@ -294,7 +296,7 @@ export function App() {
   );
   const chooseTool = useCallback((tool: ToolType) => {
     setActiveTool(tool);
-    if (!keepsSelection(tool)) setSelection(null);
+    if (!keepsSelection(tool)) setSelection([]);
   }, []);
   const [brushSize, setBrushSize] = useState<number>(1);
   const [selectedDoorType, setSelectedDoorType] = useState<DoorType>('standard');
@@ -501,7 +503,7 @@ export function App() {
       markSaved(from.saved === false ? null : map);
       setPristineMap(from.pristine ? map : null);
       setAutosaveStatus('idle');
-      setSelection(null);
+      setSelection([]);
       setActiveLevelId('');
     },
     [requestFit, resetMap, markSaved, preferences.autosave]
@@ -593,37 +595,38 @@ export function App() {
   // Copy, paste and duplicate map objects. A paste lands one cell along from
   // the copy and becomes the next one copied, so pasting again keeps stepping.
   // Ctrl+V with the pointer over the map pastes under it instead.
-  const [clipboard, setClipboard] = useState<CopiedObject | null>(null);
+  // Several objects copy together and keep their layout. Paste puts them all
+  // on the active layer; Duplicate leaves each copy on its object's layer.
+  const [clipboard, setClipboard] = useState<ClipboardEntry[] | null>(null);
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
-  const selectionEditable = activeSelection !== null && keepsSelection(activeTool);
+  const selectionEditable = activeSelection.length > 0 && keepsSelection(activeTool);
   const placeCopy = useCallback(
-    (copied: CopiedObject, layer: MapLayer, at?: { x: number; y: number }) => {
-      const copy = offsetCopy(layer, copied, at);
-      modifyMap((draft) => addObject(draft, layer.id, copy));
-      select({ kind: copy.kind, id: copy.object.id, layerId: layer.id });
+    (copied: ClipboardEntry[], layerId?: string, at?: { x: number; y: number }) => {
+      const copies = placeCopies(levelMap, copied, layerId, at);
+      modifyMap((draft) => {
+        for (const copy of copies) addObject(draft, copy.layerId, copy);
+      });
+      select(copies.map((copy) => ({ kind: copy.kind, id: copy.object.id, layerId: copy.layerId })));
       if (!keepsSelection(activeTool)) setActiveTool('select');
-      return copy;
+      return copies;
     },
-    [modifyMap, select, activeTool]
+    [levelMap, modifyMap, select, activeTool]
   );
   const handleCopy = useCallback(() => {
-    if (selectionEditable) setClipboard(copyObject(levelMap, activeSelection) ?? null);
+    if (selectionEditable) setClipboard(copyObjects(levelMap, activeSelection));
   }, [selectionEditable, levelMap, activeSelection]);
   const handlePaste = useCallback((at?: { x: number; y: number }) => {
-    if (clipboard && activeLayerEditable) setClipboard(placeCopy(clipboard, activeLayer, at));
-  }, [clipboard, activeLayerEditable, activeLayer, placeCopy]);
+    if (clipboard && activeLayerEditable) setClipboard(placeCopy(clipboard, activeLayerId, at));
+  }, [clipboard, activeLayerEditable, activeLayerId, placeCopy]);
   const rotateSelection = () => {
-    if (activeSelection) modifyMap((draft) => rotateObject(draft, activeSelection));
+    modifyMap((draft) => rotateObjects(draft, activeSelection));
   };
   const deleteSelection = () => {
-    if (!activeSelection) return;
-    modifyMap((draft) => deleteObject(draft, activeSelection));
-    setSelection(null);
+    modifyMap((draft) => deleteObjects(draft, activeSelection));
+    setSelection([]);
   };
   const handleDuplicate = useCallback(() => {
-    const copied = selectionEditable && copyObject(levelMap, activeSelection);
-    const layer = activeSelection && findLayer(levelMap, activeSelection.layerId);
-    if (copied && layer) placeCopy(copied, layer);
+    if (selectionEditable) placeCopy(copyObjects(levelMap, activeSelection));
   }, [selectionEditable, levelMap, activeSelection, placeCopy]);
 
   // Right-click menu on the map: actions for the object under the pointer,
@@ -638,9 +641,10 @@ export function App() {
   } | null>(null);
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const openContextMenu = ({ clientX, clientY, at, hit }: CanvasMenuRequest) => {
+    // Right-clicking one of several selected objects keeps them all
     if (hit) {
       if (!keepsSelection(activeTool)) setActiveTool('select');
-      select(hit);
+      if (!activeSelection.some((sel) => sameSelection(sel, hit))) select([hit]);
     }
     setContextMenu({ x: clientX, y: clientY, at, onObject: !!hit });
   };
@@ -648,10 +652,10 @@ export function App() {
   const openKeyboardMenu = useCallback(() => {
     const rect = mainRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const selected = selectionEditable ? findSelected(levelMap, activeSelection) : undefined;
+    const selected = selectionEditable ? findSelected(levelMap, primarySelection) : undefined;
     const centre = { x: (rect.width / 2 - viewport.x) / viewport.zoom / mapData.gridSize, y: (rect.height / 2 - viewport.y) / viewport.zoom / mapData.gridSize };
     const at = selected
-      ? activeSelection?.kind === 'label' ? { x: selected.x, y: selected.y } : { x: selected.x + 0.5, y: selected.y + 0.5 }
+      ? primarySelection?.kind === 'label' ? { x: selected.x, y: selected.y } : { x: selected.x + 0.5, y: selected.y + 0.5 }
       : (pointerRef.current ?? centre);
     const cell = mapData.gridSize * viewport.zoom;
     setContextMenu({
@@ -661,7 +665,7 @@ export function App() {
       onObject: !!selected,
       fromKeyboard: true,
     });
-  }, [selectionEditable, levelMap, activeSelection, viewport, mapData.gridSize]);
+  }, [selectionEditable, levelMap, primarySelection, viewport, mapData.gridSize]);
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -721,7 +725,7 @@ export function App() {
 
       // Selection editing with the select tool (open dialogs take Escape first)
       if (key === 'escape') {
-        setSelection(null);
+        setSelection([]);
         return;
       }
       if (key === '?') {
@@ -741,15 +745,15 @@ export function App() {
         goToNextLevel(key === 'pageup' ? -1 : 1);
         return;
       }
-      if (activeSelection && keepsSelection(activeTool)) {
+      if (selectionEditable) {
         if (key === 'delete' || key === 'backspace') {
           e.preventDefault();
-          modifyMap((draft) => deleteObject(draft, activeSelection));
-          setSelection(null);
+          modifyMap((draft) => deleteObjects(draft, activeSelection));
+          setSelection([]);
           return;
         }
         if (key === 'r') {
-          modifyMap((draft) => rotateObject(draft, activeSelection));
+          modifyMap((draft) => rotateObjects(draft, activeSelection));
           return;
         }
         const direction = ARROW_DIRECTIONS[e.key];
@@ -757,7 +761,7 @@ export function App() {
           e.preventDefault();
           if (!e.repeat) nudgeCountRef.current++;
           const [dx, dy] = direction;
-          modifyMap((draft) => nudgeObject(draft, activeSelection, dx, dy, e.shiftKey ? 1 : 0.5), {
+          modifyMap((draft) => nudgeObjects(draft, activeSelection, dx, dy, e.shiftKey ? 1 : 0.5), {
             coalesce: `nudge-${nudgeCountRef.current}`,
           });
           return;
@@ -884,7 +888,7 @@ export function App() {
     goToLevel(target.id);
     const back = stairsBackTo(target, activeLevelId);
     if (!back) return;
-    setSelection({ kind: 'stairs', id: back.stairs.id, layerId: back.layerId });
+    setSelection([{ kind: 'stairs', id: back.stairs.id, layerId: back.layerId }]);
     setActiveLayerId(back.layerId);
     if (canvasSize) {
       const g = mapData.gridSize;
@@ -1057,19 +1061,19 @@ export function App() {
     label,
     submenu: options.map((option) => ({ label: name(option), checked: option === value, onSelect: () => onChange(option) })),
   });
-  const selectedObject = selectionEditable ? findSelected(levelMap, activeSelection) : undefined;
+  const selectedObject = selectionEditable ? findSelected(levelMap, primarySelection) : undefined;
   // The selected object's type (or a label's style): submenu title, choices and current one
   const retypeSpec: [string, string[], string] | null =
-    !selectedObject ? null
-    : activeSelection?.kind === 'door' && 'type' in selectedObject ? ['Door Type', DOOR_TYPES, selectedObject.type]
-    : activeSelection?.kind === 'prop' && 'type' in selectedObject ? ['Prop', PROP_TYPES, selectedObject.type]
+    !selectedObject || activeSelection.length > 1 ? null
+    : primarySelection?.kind === 'door' && 'type' in selectedObject ? ['Door Type', DOOR_TYPES, selectedObject.type]
+    : primarySelection?.kind === 'prop' && 'type' in selectedObject ? ['Prop', PROP_TYPES, selectedObject.type]
     : 'style' in selectedObject ? ['Label Style', LABEL_STYLES, selectedObject.style ?? 'text']
     : null;
-  const retype = (type: string) => activeSelection && modifyMap((draft) => retypeObject(draft, activeSelection, type));
-  const objectMenu: MenuItem[] = !activeSelection || !selectedObject
+  const retype = (type: string) => primarySelection && modifyMap((draft) => retypeObject(draft, primarySelection, type));
+  const objectMenu: MenuItem[] = !selectedObject
     ? []
     : [
-        ...(activeSelection.kind === 'label' || activeSelection.kind === 'light'
+        ...(activeSelection.every((sel) => sel.kind === 'label' || sel.kind === 'light')
           ? []
           : [{ label: 'Rotate', shortcut: 'R', onSelect: rotateSelection }]),
         { label: 'Duplicate', shortcut: 'Ctrl+D', onSelect: handleDuplicate },
@@ -1199,7 +1203,7 @@ export function App() {
             shapeMode={shapeMode}
             onShapeModeChange={setShapeMode}
             selection={activeSelection}
-            onClearSelection={() => setSelection(null)}
+            onClearSelection={() => setSelection([])}
             onDuplicate={handleDuplicate}
             onCopy={handleCopy}
             mapData={levelMap}

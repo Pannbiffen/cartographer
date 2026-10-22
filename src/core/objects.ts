@@ -122,6 +122,32 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
   return null;
 }
 
+export function sameSelection(a: Selection, b: Selection): boolean {
+  return a.id === b.id && a.layerId === b.layerId;
+}
+
+/** Every object on a shown, unlocked layer whose outline overlaps a box in grid units */
+export function objectsInBox(map: LevelMap, box: { x: number; y: number; w: number; h: number }): Selection[] {
+  const found: Selection[] = [];
+  for (const layer of map.layers.filter(isLayerEditable)) {
+    const layerId = layer.id;
+    const objects: Selection[] = [
+      ...layer.doors.map((d) => ({ kind: 'door' as const, id: d.id, layerId })),
+      ...layer.stairs.map((s) => ({ kind: 'stairs' as const, id: s.id, layerId })),
+      ...layer.props.map((p) => ({ kind: 'prop' as const, id: p.id, layerId })),
+      ...layer.lights.map((l) => ({ kind: 'light' as const, id: l.id, layerId })),
+      ...layer.labels.map((l) => ({ kind: 'label' as const, id: l.id, layerId })),
+    ];
+    for (const sel of objects) {
+      const b = objectBounds(map, sel);
+      if (b && b.x <= box.x + box.w && b.x + b.w >= box.x && b.y <= box.y + box.h && b.y + b.h >= box.y) {
+        found.push(sel);
+      }
+    }
+  }
+  return found;
+}
+
 /** Selection outline in grid units */
 export function objectBounds(
   map: MapData | LevelMap,
@@ -214,6 +240,58 @@ export function nudgeObject(draft: MapData | LevelMap, sel: Selection, dx: numbe
   }
 }
 
+/** Where each selected object was, so a group can be moved from there */
+export interface ObjectOrigin {
+  sel: Selection;
+  x: number;
+  y: number;
+}
+
+export function objectOrigins(map: MapData | LevelMap, sels: Selection[]): ObjectOrigin[] {
+  return sels.flatMap((sel) => {
+    const object = findSelected(map, sel);
+    return object ? [{ sel, x: object.x, y: object.y }] : [];
+  });
+}
+
+/**
+ * Puts each object (dx, dy) from its origin, keeping a group's layout. Nothing
+ * moves if a door would land on an edge a door outside the group already uses.
+ */
+export function moveObjects(draft: MapData | LevelMap, origins: ObjectOrigin[], dx: number, dy: number) {
+  const moving = new Set(origins.map((o) => o.sel.id));
+  const blocked = origins.some((o) => {
+    const layer = o.sel.kind === 'door' ? findLayer(draft, o.sel.layerId) : undefined;
+    const door = layer && findDoor(layer, o.sel.id);
+    return (
+      door &&
+      layer.doors.some(
+        (d) => !moving.has(d.id) && d.x === o.x + dx && d.y === o.y + dy && d.orientation === door.orientation
+      )
+    );
+  });
+  if (blocked) return;
+  for (const { sel, x, y } of origins) {
+    const layer = findLayer(draft, sel.layerId);
+    const object = layer && findSelected(draft, sel);
+    if (layer && object) replaceObject(layer, { kind: sel.kind, object: { ...object, x: x + dx, y: y + dy } } as CopiedObject);
+  }
+}
+
+/** Nudges one object as `nudgeObject` does, or a group by whole cells */
+export function nudgeObjects(draft: MapData | LevelMap, sels: Selection[], dx: number, dy: number, labelStep: number) {
+  if (sels.length === 1) nudgeObject(draft, sels[0], dx, dy, labelStep);
+  else moveObjects(draft, objectOrigins(draft, sels), dx, dy);
+}
+
+export function rotateObjects(draft: MapData | LevelMap, sels: Selection[]) {
+  for (const sel of sels) rotateObject(draft, sel);
+}
+
+export function deleteObjects(draft: MapData | LevelMap, sels: Selection[]) {
+  for (const sel of sels) deleteObject(draft, sel);
+}
+
 /** Switches a door's or prop's type, or a label's style */
 export function retypeObject(draft: MapData | LevelMap, sel: Selection, type: string) {
   const layer = findLayer(draft, sel.layerId);
@@ -234,9 +312,53 @@ export type CopiedObject =
   | { kind: 'label'; object: PlacedLabel }
   | { kind: 'light'; object: PlacedLight };
 
-export function copyObject(map: MapData | LevelMap, sel: Selection): CopiedObject | undefined {
-  const object = findSelected(map, sel);
-  return object && ({ kind: sel.kind, object } as CopiedObject);
+/** A copied object and the layer it came from */
+export type ClipboardEntry = CopiedObject & { layerId: string };
+
+export function copyObjects(map: MapData | LevelMap, sels: Selection[]): ClipboardEntry[] {
+  return sels.flatMap((sel) => {
+    const object = findSelected(map, sel);
+    return object ? [{ kind: sel.kind, object, layerId: sel.layerId } as ClipboardEntry] : [];
+  });
+}
+
+/**
+ * The copies to paste: onto `layerId`, or each back onto its own layer. One
+ * object lands as `offsetCopy` puts it. A group keeps its layout and moves
+ * by whole cells: one to the right, or with its top-left corner under `at`,
+ * then further right while any of its doors would land on another door.
+ */
+export function placeCopies(
+  map: MapData | LevelMap,
+  entries: ClipboardEntry[],
+  layerId?: string,
+  at?: { x: number; y: number }
+): ClipboardEntry[] {
+  const target = (entry: ClipboardEntry) => findLayer(map, layerId ?? entry.layerId);
+  if (entries.length === 1) {
+    const layer = target(entries[0]);
+    return layer ? [{ ...offsetCopy(layer, entries[0], at), layerId: layer.id }] : [];
+  }
+  let dx = 1;
+  let dy = 0;
+  if (at) {
+    dx = Math.floor(at.x) - Math.floor(Math.min(...entries.map((e) => e.object.x)));
+    dy = Math.floor(at.y) - Math.floor(Math.min(...entries.map((e) => e.object.y)));
+  }
+  const doorTaken = (offset: number) =>
+    entries.some((e) => {
+      if (e.kind !== 'door') return false;
+      const { x, y, orientation } = e.object;
+      return !!target(e)?.doors.some((d) => d.x === x + offset && d.y === y + dy && d.orientation === orientation);
+    });
+  // Bounded, as every door stays on its own row or column
+  for (let i = 0; i < 1000 && doorTaken(dx); i++) dx++;
+  return entries.flatMap((e) => {
+    const layer = target(e);
+    if (!layer) return [];
+    const object = { ...e.object, id: newObjectId(e.kind), x: e.object.x + dx, y: e.object.y + dy };
+    return [{ kind: e.kind, object, layerId: layer.id } as ClipboardEntry];
+  });
 }
 
 /**
@@ -270,6 +392,14 @@ export function addObject(draft: MapData | LevelMap, layerId: string, copied: Co
   else if (copied.kind === 'prop') layer.props = [...layer.props, copied.object];
   else if (copied.kind === 'label') layer.labels = [...layer.labels, copied.object];
   else layer.lights = [...layer.lights, copied.object];
+}
+
+function replaceObject(layer: LayerContent, { kind, object }: CopiedObject) {
+  if (kind === 'door') replaceDoor(layer, object);
+  else if (kind === 'stairs') replaceStairs(layer, object);
+  else if (kind === 'prop') replaceProp(layer, object);
+  else if (kind === 'label') replaceLabel(layer, object);
+  else replaceLight(layer, object);
 }
 
 // Draft layers hold shallow copies, so objects are replaced rather than mutated

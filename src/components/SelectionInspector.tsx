@@ -13,7 +13,7 @@ import {
 import type { ModifyMap } from '../App';
 import { findLayer, withLayer } from '../core/layers';
 import {
-  deleteObject,
+  deleteObjects,
   findDoor,
   findLabel,
   findLight,
@@ -24,7 +24,7 @@ import {
   replaceLight,
   replaceProp,
   replaceStairs,
-  rotateObject,
+  rotateObjects,
 } from '../core/objects';
 import { Copy, CopyPlus, RotateCw, Trash2 } from 'lucide-react';
 import { Slider } from './Slider';
@@ -107,7 +107,7 @@ interface SelectionInspectorProps {
   levels: MapLevel[];
   activeLevelId: string;
   onTakeStairs: (stairs: Selection) => void;
-  selection: Selection | null;
+  selection: Selection[];
   hint?: string;
   // Focus the label text box when a label is selected (label tool only)
   focusLabelText?: boolean;
@@ -122,7 +122,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   levels,
   activeLevelId,
   onTakeStairs,
-  selection,
+  selection: selected,
   hint,
   focusLabelText = false,
   onModifyMap,
@@ -131,6 +131,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   onCopy,
 }) => {
   const labelInputRef = useRef<HTMLInputElement | null>(null);
+  const selection = selected.length === 1 ? selected[0] : null;
   const labelId = selection?.kind === 'label' ? selection.id : null;
   useEffect(() => {
     if (!labelId || !focusLabelText) return;
@@ -140,14 +141,56 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
     return () => window.clearTimeout(timer);
   }, [labelId, focusLabelText]);
 
+  // Rotate, Duplicate, Copy and Delete, for one object or several
+  const actions = (rotatable: boolean) => (
+    <div className="grid grid-cols-2 gap-1">
+      {rotatable && (
+        <button
+          onClick={() => onModifyMap((draft) => rotateObjects(draft, selected))}
+          className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}
+        >
+          <RotateCw className="w-3.5 h-3.5" />
+          Rotate (R)
+        </button>
+      )}
+      <button onClick={onDuplicate} className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}>
+        <CopyPlus className="w-3.5 h-3.5" />
+        Duplicate
+      </button>
+      <button onClick={onCopy} className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}>
+        <Copy className="w-3.5 h-3.5" />
+        Copy
+      </button>
+      <button
+        onClick={() => {
+          onModifyMap((draft) => deleteObjects(draft, selected));
+          onClearSelection();
+        }}
+        className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5 text-ui-danger`}
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+        Delete
+      </button>
+    </div>
+  );
+
+  if (selected.length > 1) {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="font-medium">Selected: {selected.length} objects</div>
+        <p className="text-ui-muted leading-snug">Drag or nudge them together. Shift+click one to leave it out.</p>
+        {actions(selected.some((sel) => sel.kind !== 'label' && sel.kind !== 'light'))}
+      </div>
+    );
+  }
+
   if (!selection) {
     return (
       <p className="text-ui-muted leading-snug">
         {hint ?? (
           <>
-            Click a door, staircase, prop, label or light to select it. Drag to move,{' '}
-            <kbd>R</kbd> to rotate,{' '}
-            <kbd>Delete</kbd> to remove.
+            Click a door, staircase, prop, label or light to select it; Shift+click or drag a box to select
+            several. Drag to move, <kbd>R</kbd> to rotate, <kbd>Delete</kbd> to remove.
           </>
         )}
       </p>
@@ -326,35 +369,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-1">
-        {!label && !light && (
-          <button
-            onClick={() => onModifyMap((draft) => rotateObject(draft, selection))}
-            className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-            Rotate (R)
-          </button>
-        )}
-        <button onClick={onDuplicate} className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}>
-          <CopyPlus className="w-3.5 h-3.5" />
-          Duplicate
-        </button>
-        <button onClick={onCopy} className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5`}>
-          <Copy className="w-3.5 h-3.5" />
-          Copy
-        </button>
-        <button
-          onClick={() => {
-            onModifyMap((draft) => deleteObject(draft, selection));
-            onClearSelection();
-          }}
-          className={`${BUTTON_CLASS} flex items-center justify-center gap-1.5 text-ui-danger`}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          Delete
-        </button>
-      </div>
+      {actions(!label && !light)}
     </div>
   );
 };

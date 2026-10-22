@@ -37,13 +37,18 @@ import {
   findDoor,
   findSelected,
   hitTestObject,
+  moveObjects,
   newObjectId,
   objectBounds,
+  objectOrigins,
+  objectsInBox,
   replaceDoor,
   replaceLabel,
   replaceLight,
   replaceProp,
   replaceStairs,
+  sameSelection,
+  type ObjectOrigin,
 } from '../core/objects';
 import { findLayer, isLayerEditable, withLayer } from '../core/layers';
 import {
@@ -91,8 +96,8 @@ interface MapCanvasProps {
   onHoverCoord?: (coord: { gx: number; gy: number } | null) => void;
   // Kept at the pointer's position in grid units (null off the canvas), for pasting under it
   pointerRef?: React.RefObject<{ x: number; y: number } | null>;
-  selection: Selection | null;
-  onSelect: (selection: Selection | null) => void;
+  selection: Selection[];
+  onSelect: (selection: Selection[]) => void;
   // Double-clicking stairs with the select tool goes to the level they lead to
   onTakeStairs?: (stairs: Selection) => void;
   // Right-click or long-press: where (screen and grid units) and the object there
@@ -167,13 +172,20 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const longPressRef = useRef<{ timer: number; x: number; y: number } | null>(null);
   // When a long-press last opened the menu, so the browser's own contextmenu event after it is ignored
   const longPressOpenedRef = useRef(0);
-  // Object being dragged with the select tool, and where the drag began
+  // Object being dragged with the select tool, and where the drag began.
+  // Several selected objects move together from their `group` origins.
   const moveDragRef = useRef<{
     sel: Selection;
     startCell: GridCoord;
     startWorld: { x: number; y: number };
     origin: GridCoord;
+    group?: ObjectOrigin[];
+    offset?: GridCoord;
+    moved?: boolean;
   } | null>(null);
+  // Box being dragged out with the select tool (grid units), and the
+  // selection it adds to (Shift held)
+  const selectBoxRef = useRef<{ start: Pair; end: Pair; base: Selection[] } | null>(null);
   // Drawing is blocked while the active layer is hidden or locked
   const layerEditable = isLayerEditable(findLayer(mapData, activeLayerId));
   const editLayer = useCallback(
@@ -345,22 +357,34 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       ctx.restore();
     }
 
-    // Selection outline
-    const bounds = selection ? objectBounds(mapData, selection) : null;
-    if (bounds) {
-      const pad = 4 / viewport.zoom;
-      ctx.save();
-      ctx.strokeStyle = '#c2513d';
-      ctx.lineWidth = 2 / viewport.zoom;
-      ctx.setLineDash([6 / viewport.zoom, 4 / viewport.zoom]);
+    // Selection outlines
+    const pad = 4 / viewport.zoom;
+    ctx.save();
+    ctx.strokeStyle = '#c2513d';
+    ctx.lineWidth = 2 / viewport.zoom;
+    ctx.setLineDash([6 / viewport.zoom, 4 / viewport.zoom]);
+    for (const sel of selection) {
+      const bounds = objectBounds(mapData, sel);
+      if (!bounds) continue;
       ctx.strokeRect(
         bounds.x * gridSize - pad,
         bounds.y * gridSize - pad,
         bounds.w * gridSize + pad * 2,
         bounds.h * gridSize + pad * 2
       );
-      ctx.restore();
     }
+    const box = selectBoxRef.current;
+    if (box) {
+      const [x0, y0] = box.start;
+      const [x1, y1] = box.end;
+      ctx.lineWidth = 1 / viewport.zoom;
+      ctx.fillStyle = 'rgba(194, 81, 61, 0.08)';
+      ctx.beginPath();
+      ctx.rect(Math.min(x0, x1) * gridSize, Math.min(y0, y1) * gridSize, Math.abs(x1 - x0) * gridSize, Math.abs(y1 - y0) * gridSize);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
 
     ctx.restore();
   }, [mapData, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, snapPoint, hexGrid, hexBrush]);
@@ -440,7 +464,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   }, [onViewportChange, zoomSpeed]);
 
   // With a selection being edited, arrow keys nudge it (App.tsx) instead
-  useKeyboardPan(onViewportChange, selection !== null && keepsSelection(activeTool));
+  useKeyboardPan(onViewportChange, selection.length > 0 && keepsSelection(activeTool));
 
   // Apply brush action to map cells around each centre cell
   const applyBrush = useCallback(
@@ -559,6 +583,16 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const drag = moveDragRef.current;
     if (!drag) return;
     const coalesce = { coalesce: `move-${strokeCountRef.current}` };
+    if (drag.group) {
+      // A group moves by whole cells, keeping its layout
+      const offset = { x: hover.gx - drag.startCell.x, y: hover.gy - drag.startCell.y };
+      if (drag.offset && offset.x === drag.offset.x && offset.y === drag.offset.y) return;
+      drag.offset = offset;
+      drag.moved = true;
+      const group = drag.group;
+      onModifyMap((draft) => moveObjects(draft, group, offset.x, offset.y), coalesce);
+      return;
+    }
     const layer = findLayer(mapData, drag.sel.layerId);
     if (!layer) return;
     const editDragged = (edit: Parameters<typeof withLayer>[2]) =>
@@ -651,6 +685,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         dragStartRef.current = null;
         circleCentreRef.current = null;
         moveDragRef.current = null;
+        selectBoxRef.current = null;
         openMenuAt(canvas, clientX, clientY);
         drawMap();
       }, LONG_PRESS_MS);
@@ -673,24 +708,39 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     currentHoverRef.current = hover;
 
     if (activeTool === 'select') {
+      // Shift+click adds an object to the selection or takes it out. Pressing
+      // on a selected object keeps the group, to drag it; elsewhere starts a box.
       const hit = hitTestObject(mapData, hover.worldX, hover.worldY);
-      onSelect(hit);
       const obj = findSelected(mapData, hit);
-      if (hit && obj) {
-        strokeCountRef.current++;
-        moveDragRef.current = {
-          sel: hit,
-          startCell: { x: gx, y: gy },
-          startWorld: { x: hover.worldX, y: hover.worldY },
-          origin: { x: obj.x, y: obj.y },
-        };
+      if (!hit || !obj) {
+        const at: Pair = [hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize];
+        selectBoxRef.current = { start: at, end: at, base: e.shiftKey ? selection : [] };
+        if (!e.shiftKey) onSelect([]);
+        return;
       }
+      const wasSelected = selection.some((sel) => sameSelection(sel, hit));
+      if (e.shiftKey && wasSelected) {
+        onSelect(selection.filter((sel) => !sameSelection(sel, hit)));
+        return;
+      }
+      const next = e.shiftKey ? [...selection, hit] : wasSelected ? selection : [hit];
+      // Keep the pressed object last, so the panel shows it
+      onSelect([...next.filter((sel) => !sameSelection(sel, hit)), hit]);
+      strokeCountRef.current++;
+      moveDragRef.current = {
+        sel: hit,
+        startCell: { x: gx, y: gy },
+        startWorld: { x: hover.worldX, y: hover.worldY },
+        origin: { x: obj.x, y: obj.y },
+        group: next.length > 1 ? objectOrigins(mapData, next) : undefined,
+        offset: { x: 0, y: 0 },
+      };
     } else if (activeTool === 'label') {
       // Clicking an existing label selects it; elsewhere places a new one
       const hit = hitTestObject(mapData, hover.worldX, hover.worldY);
       const existing = hit?.kind === 'label' ? findSelected(mapData, hit) : undefined;
       if (hit && existing) {
-        onSelect(hit);
+        onSelect([hit]);
         strokeCountRef.current++;
         moveDragRef.current = {
           sel: hit,
@@ -717,12 +767,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           style: labelStyle,
         });
       });
-      onSelect({ kind: 'label', id, layerId: activeLayerId });
+      onSelect([{ kind: 'label', id, layerId: activeLayerId }]);
     } else if (activeTool === 'light') {
       // Clicking a light selects it for editing or dragging; elsewhere places one
       const hit = hitTestObject(mapData, hover.worldX, hover.worldY);
       if (hit?.kind === 'light') {
-        onSelect(hit);
+        onSelect([hit]);
         strokeCountRef.current++;
         moveDragRef.current = {
           sel: hit,
@@ -739,7 +789,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         // A light only shows on a darkened map
         draft.lighting = true;
       });
-      onSelect({ kind: 'light', id, layerId: activeLayerId });
+      onSelect([{ kind: 'light', id, layerId: activeLayerId }]);
     } else if (!layerEditable) {
       return;
     } else if (activeTool === 'polygon' || activeTool === 'path') {
@@ -824,6 +874,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
 
     const hover = pointerToGrid(e);
+    if (selectBoxRef.current) {
+      selectBoxRef.current.end = [hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize];
+      currentHoverRef.current = hover;
+      drawMap();
+      return;
+    }
     if (moveDragRef.current) {
       moveSelectedTo(hover);
       currentHoverRef.current = hover;
@@ -891,6 +947,20 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const radius = circleRadius(centre, snapPoint(end), freePlacementRef.current);
       editLayer((draft) => applyShape(draft, [circlePolygon(centre[0], centre[1], radius)], shapeMode));
     }
+    const box = selectBoxRef.current;
+    if (box) {
+      const [x0, y0] = box.start;
+      const [x1, y1] = box.end;
+      const found = objectsInBox(mapData, { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) });
+      // A click without a drag only clears the selection
+      if (Math.hypot(x1 - x0, y1 - y0) >= 0.1) {
+        onSelect([...box.base, ...found.filter((sel) => !box.base.some((b) => sameSelection(b, sel)))]);
+      }
+    }
+    // Clicking one of several selected objects without moving them selects just it
+    const drag = moveDragRef.current;
+    if (drag?.group && !drag.moved && !e.shiftKey && e.type === 'pointerup') onSelect([drag.sel]);
+    selectBoxRef.current = null;
     circleCentreRef.current = null;
     dragStartRef.current = null;
     moveDragRef.current = null;
@@ -905,6 +975,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       dragStartRef.current ||
       circleCentreRef.current ||
       moveDragRef.current ||
+      selectBoxRef.current ||
       isPanningRef.current
     ) {
       return;
