@@ -77,6 +77,8 @@ interface MapCanvasProps {
   mapData: LevelMap;
   // The level under this one, drawn faintly behind it
   levelBelow?: LevelMap | null;
+  // How strongly it shows through, 0 to 1
+  levelBelowOpacity?: number;
   activeTool: ToolType;
   brushSize: number;
   selectedDoorType: DoorType;
@@ -133,13 +135,12 @@ const PREVIEW_FILLS: Partial<Record<ToolType, string>> = {
   water: 'rgba(60, 140, 180, 0.25)',
   foliage: 'rgba(80, 150, 80, 0.25)',
 };
-// How strongly the level below shows through
-const GHOST_OPACITY = 0.3;
 const DEFAULT_PREVIEW_FILL = 'rgba(210, 180, 140, 0.25)';
 
 export const MapCanvas: React.FC<MapCanvasProps> = ({
   mapData,
   levelBelow,
+  levelBelowOpacity = 0.3,
   activeTool,
   brushSize,
   selectedDoorType,
@@ -259,7 +260,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       mapCacheRef.current = { canvas: spare, key: null };
     }
     const cache = mapCacheRef.current;
-    const key = [mapData, levelBelow, viewport.x, viewport.y, viewport.zoom, canvas.width, canvas.height, dpr];
+    const key = [mapData, levelBelow, levelBelowOpacity, viewport.x, viewport.y, viewport.zoom, canvas.width, canvas.height, dpr];
     if (!cache.key || cache.key.some((part, i) => part !== key[i])) {
       if (cache.canvas.width !== canvas.width) cache.canvas.width = canvas.width;
       if (cache.canvas.height !== canvas.height) cache.canvas.height = canvas.height;
@@ -275,7 +276,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       mapCtx.translate(viewport.x, viewport.y);
       mapCtx.scale(viewport.zoom, viewport.zoom);
 
-      if (levelBelow) renderGhostLevel(mapCtx, levelBelow, GHOST_OPACITY);
+      if (levelBelow) renderGhostLevel(mapCtx, levelBelow, levelBelowOpacity);
 
       // Map layers, with grid lines limited to the visible area
       renderMap(mapCtx, mapData, {
@@ -427,7 +428,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     ctx.restore();
 
     ctx.restore();
-  }, [mapData, levelBelow, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, snapPoint, hexGrid, hexBrush]);
+  }, [mapData, levelBelow, levelBelowOpacity, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, snapPoint, hexGrid, hexBrush]);
 
   // Keep the canvas backing store matched to its on-screen size
   const drawRef = useRef(drawMap);

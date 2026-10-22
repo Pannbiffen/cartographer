@@ -749,7 +749,7 @@ export function App() {
       }
       if (key === 'pageup' || key === 'pagedown') {
         e.preventDefault();
-        goToNextLevel(key === 'pageup' ? -1 : 1);
+        goToNextLevel(key === 'pageup' ? 1 : -1);
         return;
       }
       if (selectionEditable) {
@@ -1007,28 +1007,28 @@ export function App() {
         { label: 'New Level', onSelect: handleAddLevel },
         { label: 'Delete Level', disabled: mapData.levels.length <= 1, onSelect: handleDeleteLevel },
         'separator',
-        { label: 'Previous Level', shortcut: 'Page Up', disabled: activeLevelIndex <= 0, onSelect: () => goToNextLevel(-1) },
         {
-          label: 'Next Level',
-          shortcut: 'Page Down',
+          label: 'Go Up a Level',
+          shortcut: 'Page Up',
           disabled: activeLevelIndex >= mapData.levels.length - 1,
           onSelect: () => goToNextLevel(1),
         },
+        { label: 'Go Down a Level', shortcut: 'Page Down', disabled: activeLevelIndex <= 0, onSelect: () => goToNextLevel(-1) },
         {
           label: 'Go to Level',
-          submenu: mapData.levels.map((level) => ({
+          submenu: [...mapData.levels].reverse().map((level) => ({
             label: level.name || 'Untitled level',
             checked: level.id === activeLevelId,
             onSelect: () => goToLevel(level.id),
           })),
         },
         'separator',
-        { label: 'Move Level Up', disabled: activeLevelIndex <= 0, onSelect: () => handleMoveLevel(-1) },
         {
-          label: 'Move Level Down',
+          label: 'Move Level Up',
           disabled: activeLevelIndex >= mapData.levels.length - 1,
           onSelect: () => handleMoveLevel(1),
         },
+        { label: 'Move Level Down', disabled: activeLevelIndex <= 0, onSelect: () => handleMoveLevel(-1) },
       ],
     },
     {
@@ -1183,6 +1183,7 @@ export function App() {
             <MapCanvas
               mapData={levelMap}
               levelBelow={levelBelow}
+              levelBelowOpacity={preferences.levelBelowOpacity}
               activeTool={activeTool}
               brushSize={brushSize}
               selectedDoorType={selectedDoorType}
@@ -1243,6 +1244,9 @@ export function App() {
             onAddLevel={handleAddLevel}
             onDeleteLevel={handleDeleteLevel}
             onMoveLevel={handleMoveLevel}
+            showLevelBelow={preferences.showLevelBelow}
+            levelBelowOpacity={preferences.levelBelowOpacity}
+            onLevelBelowChange={changePreferences}
             onTakeStairs={takeStairs}
             onModifyMap={modifyMap}
             activeLayerId={activeLayerId}

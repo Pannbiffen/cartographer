@@ -19,7 +19,7 @@
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.
 - **Room Numbers**: Keyed-dungeon markers in a circle or box that count up (1, 2, 3...) as you place them.
 - **Layers**: Split a map into layers (dungeon, water, terrain, objects...) that can be shown or hidden, locked, reordered, renamed and faded. Tools draw on the active layer; hidden layers are left out of exports.
-- **Levels**: Keep several connected maps in one project (dungeon levels, a building's floors, a town and its interiors), each with its own layers. Switch with the Levels panel, the Level menu or `Page Up` / `Page Down`. Link stairs to another level, then double-click them (or press "Take stairs") to go there; stairs on that level leading back are selected and brought into view. Exports draw the level you're on. View > Level Below shows the level before it faintly under the one you're drawing, to line up a building's floors (never in exports).
+- **Levels**: Keep several connected maps in one project (dungeon levels, a building's floors, a town and its interiors), each with its own layers, listed top floor first. Switch with the Levels panel, the Level menu or `Page Up` / `Page Down`. Link stairs to another level, then double-click them (or press "Take stairs") to go there; stairs on that level leading back are selected and brought into view. Exports draw the level you're on. "Show level below" (in the Levels panel or View > Level Below) draws the level beneath faintly, at an opacity you choose, to line up a building's floors (never in exports).
 - **Room Tools**: Freehand room brush, click-drag rectangle rooms, and click-drag L-shaped corridors.
 - **Free-form Shapes**: Polygon rooms with diagonal walls, circular rooms and winding paths of any width, snapped to the grid (hold `Shift` to place freely). Each one adds floor or cuts it away, and merges with everything else: walls, hatching, light shadows and VTT walls follow the new outline.
 - **Hex Grid**: Show a pointy- or flat-top hex grid instead of squares. The room brush and eraser then work in whole hexes, and shapes snap to hex centres and corners.
@@ -112,7 +112,7 @@ npm run preview
 | `L` | Text label |
 | `I` | Light |
 | `E` | Eraser |
-| `Page Up` / `Page Down` | Previous / next level |
+| `Page Up` / `Page Down` | Go up / down a level |
 | `G` | Toggle grid |
 | `M` | Show / hide the map settings drawer |
 | `Ctrl + Z` / `Cmd + Z` | Undo |

@@ -20,6 +20,8 @@ export interface Preferences {
   showMapSettings: boolean;
   // Draw the level before the active one faintly underneath it
   showLevelBelow: boolean;
+  // How strongly it shows through, 0 to 1
+  levelBelowOpacity: number;
   zoomSpeed: ZoomSpeed;
   // The look File > New starts a map with
   newMap: NewMapDefaults;
@@ -37,6 +39,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showPanel: true,
   showMapSettings: false,
   showLevelBelow: false,
+  levelBelowOpacity: 0.3,
   zoomSpeed: 'normal',
   newMap: DEFAULT_NEW_MAP,
 };

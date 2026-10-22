@@ -13,15 +13,17 @@ test('levels keep their own layers, and can be switched, renamed, reordered and 
   expect((await stats(page)).rooms).toBe(0);
   await page.getByLabel('Level name').fill('Cellar');
   await page.keyboard.press('Enter');
+  // Listed top level first, like floors seen from above
+  await expect(levels.getByRole('listitem')).toHaveText(['Cellar', 'Level 1']);
 
   // Drawing goes on the new level only
   await page.keyboard.press('r');
   await dragCells(page, [0, 0], [2, 1]);
   expect((await stats(page)).rooms).toBe(6);
-  await page.keyboard.press('PageUp');
+  await page.keyboard.press('PageDown');
   await expect(page.getByTestId('current-level')).toHaveText('Level 1');
   expect((await stats(page)).rooms).toBe(starterRooms);
-  await page.keyboard.press('PageDown');
+  await page.keyboard.press('PageUp');
   await expect(page.getByTestId('current-level')).toHaveText('Cellar');
 
   // Layers belong to the level they were added on
@@ -38,8 +40,9 @@ test('levels keep their own layers, and can be switched, renamed, reordered and 
   await expect(page.getByRole('dialog', { name: 'Export' })).toContainText('Exports the current level, “Cellar”');
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: 'Move level up' }).click();
-  await expect(levels.getByRole('listitem').first()).toHaveText('Cellar');
+  await expect(page.getByRole('button', { name: 'Move level up' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Move level down' }).click();
+  await expect(levels.getByRole('listitem')).toHaveText(['Level 1', 'Cellar']);
   await page.getByRole('button', { name: 'Delete level' }).click();
   await expect(page.getByTestId('current-level')).toBeHidden();
   expect((await stats(page)).rooms).toBe(starterRooms);
@@ -109,9 +112,11 @@ test('a version 2 file, with its layers at the top level, opens as one level', a
   expect(loaded).not.toHaveProperty('layers');
 });
 
-test('View > Level Below shows the level before the active one faintly, and is remembered', async ({ page }) => {
+test('the level below shows faintly, at a chosen opacity, from the View menu or the Levels panel', async ({ page }) => {
   await openApp(page);
   const levelBelow = page.getByRole('menuitemcheckbox', { name: 'Level Below' });
+  const panelToggle = page.getByRole('checkbox', { name: 'Show level below' });
+  const opacity = page.getByRole('slider', { name: 'Level below opacity' });
   const openViewMenu = async () => {
     await page.getByRole('menuitem', { name: 'View' }).click();
   };
@@ -135,6 +140,7 @@ test('View > Level Below shows the level before the active one faintly, and is r
   await openViewMenu();
   await expect(levelBelow).toBeDisabled();
   await page.keyboard.press('Escape');
+  await expect(panelToggle).toBeDisabled();
 
   // A floor cell of level 1; level 2 is empty there
   const map = await saveMap(page);
@@ -148,13 +154,19 @@ test('View > Level Below shows the level before the active one faintly, and is r
   await expect.poll(() => pixel(gx, gy)).not.toBe(empty);
   const faint = await pixel(gx, gy);
 
+  // The panel shows the same setting, and how strongly it shows through
+  await expect(panelToggle).toBeChecked();
+  await opacity.fill('0.8');
+  await expect.poll(() => pixel(gx, gy)).not.toBe(faint);
+  const strong = await pixel(gx, gy);
+
   // Drawing floor on this level covers the faint one
   await page.keyboard.press('r');
   await clickCell(page, gx, gy);
-  await expect.poll(() => pixel(gx, gy)).not.toBe(faint);
+  await expect.poll(() => pixel(gx, gy)).not.toBe(strong);
 
   // Level 1 has nothing under it, so it looks the same with or without
-  await page.keyboard.press('PageUp');
+  await page.keyboard.press('PageDown');
   await expect(page.getByTestId('current-level')).toHaveText('Level 1');
   const first = await pixel(gx, gy);
   await openViewMenu();
@@ -164,11 +176,15 @@ test('View > Level Below shows the level before the active one faintly, and is r
   await page.keyboard.press('Escape');
   expect(await pixel(gx, gy)).toBe(first);
 
+  await expect(panelToggle).not.toBeChecked();
+  await expect(opacity).toBeHidden();
+
   // The choice is kept for next time
-  await openViewMenu();
-  await levelBelow.click();
+  await panelToggle.check();
   await page.reload();
   await expect(page.getByTestId('map-stats')).toBeVisible();
   await openViewMenu();
   await expect(levelBelow).toBeChecked();
+  await page.keyboard.press('Escape');
+  await expect(opacity).toHaveValue('0.8');
 });

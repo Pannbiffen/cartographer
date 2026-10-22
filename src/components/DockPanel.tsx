@@ -59,6 +59,10 @@ interface DockPanelProps {
   onAddLevel: () => void;
   onDeleteLevel: () => void;
   onMoveLevel: (delta: 1 | -1) => void;
+  // The level below drawn faintly under the active one, and how strongly
+  showLevelBelow: boolean;
+  levelBelowOpacity: number;
+  onLevelBelowChange: (change: { showLevelBelow?: boolean; levelBelowOpacity?: number }) => void;
   onTakeStairs: (stairs: Selection) => void;
   onModifyMap: ModifyMap;
   activeLayerId: string;
@@ -102,20 +106,41 @@ const Choices = <T extends string>({
 
 const ICON_BUTTON_CLASS = `${BUTTON_CLASS} flex items-center justify-center`;
 
-// Level list (first level first), plus the active level's name
+// Level list (top level first, like floors seen from above), the active
+// level's name, and the faint level below
 const LevelsSection: React.FC<
   Pick<
     DockPanelProps,
-    'levels' | 'activeLevelId' | 'onSelectLevel' | 'onAddLevel' | 'onDeleteLevel' | 'onMoveLevel' | 'onModifyMap'
+    | 'levels'
+    | 'activeLevelId'
+    | 'onSelectLevel'
+    | 'onAddLevel'
+    | 'onDeleteLevel'
+    | 'onMoveLevel'
+    | 'onModifyMap'
+    | 'showLevelBelow'
+    | 'levelBelowOpacity'
+    | 'onLevelBelowChange'
   >
-> = ({ levels, activeLevelId, onSelectLevel, onAddLevel, onDeleteLevel, onMoveLevel, onModifyMap }) => {
+> = ({
+  levels,
+  activeLevelId,
+  onSelectLevel,
+  onAddLevel,
+  onDeleteLevel,
+  onMoveLevel,
+  onModifyMap,
+  showLevelBelow,
+  levelBelowOpacity,
+  onLevelBelowChange,
+}) => {
   const index = levels.findIndex((l) => l.id === activeLevelId);
   const active = levels[index];
 
   return (
     <Section title="Levels">
       <ul aria-label="Levels" className="border border-ui-border rounded-sm bg-ui-field">
-        {levels.map((level) => {
+        {[...levels].reverse().map((level) => {
           const isActive = level.id === activeLevelId;
           return (
             <li key={level.id} className={isActive ? 'bg-ui-accent text-white' : ''}>
@@ -138,8 +163,8 @@ const LevelsSection: React.FC<
         <button
           aria-label="Move level up"
           title="Move level up"
-          disabled={index <= 0}
-          onClick={() => onMoveLevel(-1)}
+          disabled={index >= levels.length - 1}
+          onClick={() => onMoveLevel(1)}
           className={ICON_BUTTON_CLASS}
         >
           <ArrowUp className="w-3.5 h-3.5" />
@@ -147,8 +172,8 @@ const LevelsSection: React.FC<
         <button
           aria-label="Move level down"
           title="Move level down"
-          disabled={index >= levels.length - 1}
-          onClick={() => onMoveLevel(1)}
+          disabled={index <= 0}
+          onClick={() => onMoveLevel(-1)}
           className={ICON_BUTTON_CLASS}
         >
           <ArrowDown className="w-3.5 h-3.5" />
@@ -183,6 +208,28 @@ const LevelsSection: React.FC<
             className={FIELD_CLASS}
           />
         </label>
+      )}
+
+      <label className={`flex items-center gap-2 ${levels.length < 2 ? 'text-ui-muted' : ''}`}>
+        <input
+          type="checkbox"
+          checked={showLevelBelow}
+          disabled={levels.length < 2}
+          onChange={(e) => onLevelBelowChange({ showLevelBelow: e.target.checked })}
+          className="accent-ui-accent"
+        />
+        <span>Show level below</span>
+      </label>
+      {showLevelBelow && levels.length > 1 && (
+        <Slider
+          label="Level below opacity"
+          value={levelBelowOpacity}
+          display={`${Math.round(levelBelowOpacity * 100)}%`}
+          min={0.1}
+          max={0.8}
+          step={0.05}
+          onChange={(v) => onLevelBelowChange({ levelBelowOpacity: v })}
+        />
       )}
     </Section>
   );
@@ -330,6 +377,9 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onAddLevel,
   onDeleteLevel,
   onMoveLevel,
+  showLevelBelow,
+  levelBelowOpacity,
+  onLevelBelowChange,
   onTakeStairs,
   onModifyMap,
   activeLayerId,
@@ -457,6 +507,9 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         onDeleteLevel={onDeleteLevel}
         onMoveLevel={onMoveLevel}
         onModifyMap={onModifyMap}
+        showLevelBelow={showLevelBelow}
+        levelBelowOpacity={levelBelowOpacity}
+        onLevelBelowChange={onLevelBelowChange}
       />
 
       <LayersSection
