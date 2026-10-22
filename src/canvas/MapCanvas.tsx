@@ -37,6 +37,7 @@ import { isTypingInField } from '../core/keyboard';
 import {
   findDoor,
   findSelected,
+  findWall,
   hitTestObject,
   moveObjects,
   newObjectId,
@@ -48,6 +49,7 @@ import {
   replaceLight,
   replaceProp,
   replaceStairs,
+  replaceWall,
   sameSelection,
   type ObjectOrigin,
 } from '../core/objects';
@@ -71,6 +73,7 @@ import {
   snapToHex,
   type Hex,
 } from '../core/geometry/hex';
+import { edgeKey, edgePath, nearestCorner, wallKey, wallTouchesCell } from '../core/geometry/walls';
 import type { ModifyMap } from '../App';
 
 interface MapCanvasProps {
@@ -177,6 +180,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const freePlacementRef = useRef<boolean>(false);
   // Hex under the pointer during a hex-grid brush stroke
   const lastHexRef = useRef<Hex | null>(null);
+  // Corner the wall stroke has reached, and whether it erases (Shift held)
+  const wallStrokeRef = useRef<{ corner: Pair; erase: boolean } | null>(null);
+  const wallEraseRef = useRef<boolean>(false);
   const strokeCountRef = useRef<number>(0);
   const longPressRef = useRef<{ timer: number; x: number; y: number } | null>(null);
   // When a long-press last opened the menu, so the browser's own contextmenu event after it is ignored
@@ -368,6 +374,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         if (edge.orientation === 'horizontal') ctx.lineTo(x + gridSize, y);
         else ctx.lineTo(x, y + gridSize);
         ctx.stroke();
+      } else if (activeTool === 'wall') {
+        // The corner the wall will start from or run to; red while erasing
+        const [cx, cy] = nearestCorner(mapData.gridType, hover.worldX / gridSize, hover.worldY / gridSize);
+        ctx.setLineDash([]);
+        ctx.fillStyle = wallEraseRef.current ? 'rgba(230, 80, 80, 0.8)' : 'rgba(139, 58, 43, 0.7)';
+        ctx.beginPath();
+        ctx.arc(cx * gridSize, cy * gridSize, 5 / viewport.zoom + 2, 0, Math.PI * 2);
+        ctx.fill();
       } else if (activeTool === 'room-rect' && dragStart) {
         const minX = Math.min(dragStart.x, here.x);
         const minY = Math.min(dragStart.y, here.y);
@@ -556,9 +570,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         (draft) => {
           applyShape(draft, shape, activeTool === 'eraser' ? 'cut' : 'add', floorTexture);
           if (activeTool !== 'eraser') return;
-          // Water, plants and objects go with the cells centred in the hexes
+          // Water, plants and objects go with the cells centred in the hexes,
+          // and walls with the hex edges
           for (const h of hexes.values()) {
             const [cx, cy] = hexCenter(hexGrid, h);
+            draft.walls = draft.walls.filter(
+              (w) => Math.hypot(w.x + w.dx / 2 - cx, w.y + w.dy / 2 - cy) > 0.5 + 1e-6
+            );
             for (let gy = Math.floor(cy) - 1; gy <= Math.floor(cy) + 1; gy++) {
               for (let gx = Math.floor(cx) - 1; gx <= Math.floor(cx) + 1; gx++) {
                 if (hexKey(hexAt(hexGrid, gx + 0.5, gy + 0.5)) === hexKey(h)) eraseCellContents(draft, gx, gy);
@@ -570,6 +588,30 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       );
     },
     [hexGrid, activeTool, brushSize, floorTexture, editLayer]
+  );
+
+  // Adds walls along the grid edges between two corners, or erases those there
+  const traceWalls = useCallback(
+    (from: Pair, to: Pair, erase: boolean) => {
+      const edges = edgePath(mapData.gridType, from, to);
+      if (edges.length === 0) return;
+      editLayer(
+        (draft) => {
+          const keys = new Set(edges.map(([a, b]) => edgeKey(a, b)));
+          if (erase) {
+            draft.walls = draft.walls.filter((w) => !keys.has(wallKey(w)));
+            return;
+          }
+          const taken = new Set(draft.walls.map(wallKey));
+          const added = edges
+            .filter(([a, b]) => !taken.has(edgeKey(a, b)))
+            .map(([a, b]) => ({ id: newObjectId('wall'), x: a[0], y: a[1], dx: b[0] - a[0], dy: b[1] - a[1] }));
+          if (added.length > 0) draft.walls = [...draft.walls, ...added];
+        },
+        { coalesce: `stroke-${strokeCountRef.current}` }
+      );
+    },
+    [mapData.gridType, editLayer]
   );
 
   // Adds the finished polygon or path to the active layer, or cuts it out
@@ -655,6 +697,22 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       return;
     }
 
+    if (drag.sel.kind === 'wall') {
+      // Walls move by whole cells, but not onto an edge another wall uses
+      const wall = findWall(layer, drag.sel.id);
+      if (!wall) return;
+      const moved = {
+        ...wall,
+        x: drag.origin.x + hover.gx - drag.startCell.x,
+        y: drag.origin.y + hover.gy - drag.startCell.y,
+      };
+      const key = wallKey(moved);
+      if ((moved.x !== wall.x || moved.y !== wall.y) && !layer.walls.some((w) => w.id !== wall.id && wallKey(w) === key)) {
+        editDragged((draft) => replaceWall(draft, moved));
+      }
+      return;
+    }
+
     if (drag.sel.kind === 'label') {
       // Labels move freely, in 1/8-cell steps
       const snap = (v: number) => Math.round(v * 8) / 8;
@@ -722,6 +780,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         isDrawingRef.current = false;
         dragStartRef.current = null;
         circleCentreRef.current = null;
+        wallStrokeRef.current = null;
         moveDragRef.current = null;
         selectBoxRef.current = null;
         openMenuAt(canvas, clientX, clientY);
@@ -857,10 +916,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const at: Pair = [hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize];
       const layer = findLayer(mapData, activeLayerId);
       if (!layer || !isFloorAt(layer, ...at)) return;
-      // Doors on any shown layer bound the room
-      const doors = visibleLayers(mapData).flatMap((l) => l.doors);
+      // Doors and walls on any shown layer bound the room
+      const shown = visibleLayers(mapData);
+      const [doors, walls] = [shown.flatMap((l) => l.doors), shown.flatMap((l) => l.walls)];
       editLayer((draft) => {
-        fillRoom(draft, doors, ...at, floorTexture);
+        fillRoom(draft, doors, walls, ...at, floorTexture);
       });
     } else if (activeTool === 'circle') {
       freePlacementRef.current = e.shiftKey;
@@ -874,6 +934,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       applyHexBrush([h]);
     } else if (activeTool === 'room-rect' || activeTool === 'tunnel') {
       dragStartRef.current = { x: gx, y: gy };
+      drawMap();
+    } else if (activeTool === 'wall') {
+      strokeCountRef.current++;
+      wallEraseRef.current = e.shiftKey;
+      wallStrokeRef.current = {
+        corner: nearestCorner(mapData.gridType, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize),
+        erase: e.shiftKey,
+      };
       drawMap();
     } else if (activeTool === 'door') {
       const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
@@ -956,6 +1024,15 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (pointerRef) pointerRef.current = { x: hover.worldX / mapData.gridSize, y: hover.worldY / mapData.gridSize };
     if (isShapeTool(activeTool)) freePlacementRef.current = e.shiftKey;
 
+    if (activeTool === 'wall') {
+      const stroke = wallStrokeRef.current;
+      wallEraseRef.current = stroke ? stroke.erase : e.shiftKey;
+      const corner = nearestCorner(mapData.gridType, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize);
+      if (stroke && (corner[0] !== stroke.corner[0] || corner[1] !== stroke.corner[1])) {
+        traceWalls(stroke.corner, corner, stroke.erase);
+        stroke.corner = corner;
+      }
+    }
     if (hexGrid && hexBrush && isDrawingRef.current) {
       const h = hexAt(hexGrid, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize);
       const last = lastHexRef.current;
@@ -1021,6 +1098,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (drag?.group && !drag.moved && !e.shiftKey && e.type === 'pointerup') onSelect([drag.sel]);
     selectBoxRef.current = null;
     circleCentreRef.current = null;
+    wallStrokeRef.current = null;
     dragStartRef.current = null;
     moveDragRef.current = null;
     isDrawingRef.current = false;
@@ -1033,6 +1111,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       isDrawingRef.current ||
       dragStartRef.current ||
       circleCentreRef.current ||
+      wallStrokeRef.current ||
       moveDragRef.current ||
       selectBoxRef.current ||
       isPanningRef.current
@@ -1091,6 +1170,7 @@ function eraseCellContents(layer: LayerContent, gx: number, gy: number) {
   delete layer.water[key];
   delete layer.foliage[key];
   layer.doors = layer.doors.filter((d) => !doorTouchesCell(d, gx, gy));
+  layer.walls = layer.walls.filter((w) => !wallTouchesCell(w, gx, gy));
   layer.stairs = layer.stairs.filter((s) => !stairsContainCell(s, gx, gy));
   layer.props = layer.props.filter((p) => p.x !== gx || p.y !== gy);
   layer.lights = layer.lights.filter((l) => l.x !== gx || l.y !== gy);

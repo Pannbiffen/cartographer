@@ -9,6 +9,7 @@ export type ToolType =
   | 'fill'
   | 'water' 
   | 'foliage' 
+  | 'wall'
   | 'door' 
   | 'stairs' 
   | 'prop' 
@@ -50,7 +51,7 @@ export type ShapeMode = 'add' | 'cut';
 // Plain text, or a room number keyed in a circle or box
 export type LabelStyle = 'text' | 'circle' | 'box';
 
-export type SelectableKind = 'door' | 'stairs' | 'prop' | 'label' | 'light';
+export type SelectableKind = 'door' | 'wall' | 'stairs' | 'prop' | 'label' | 'light';
 
 export interface Selection {
   kind: SelectableKind;
@@ -76,6 +77,18 @@ export interface PlacedDoor {
   y: number; // grid y
   orientation: 'horizontal' | 'vertical';
   type: DoorType;
+}
+
+/**
+ * A thin wall along one grid or hex edge, from corner (x, y) to corner
+ * (x + dx, y + dy), in grid units. A door on the same edge opens it.
+ */
+export interface PlacedWall {
+  id: string;
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
 }
 
 export interface PlacedStairs {
@@ -135,6 +148,7 @@ export interface LayerContent {
   water: { [key: string]: boolean }; // "x,y" => true for water cells
   foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
   doors: PlacedDoor[];
+  walls: PlacedWall[];
   stairs: PlacedStairs[];
   props: PlacedProp[];
   labels: PlacedLabel[];

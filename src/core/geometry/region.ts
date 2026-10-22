@@ -3,6 +3,7 @@
 import * as clipping from 'polygon-clipping';
 import type { FloorTexture, GridCoord, LayerContent, MapLayer, Pair, Polygon, Ring, ShapeMode } from '../../types/map';
 import { extractWallSegments, type WallSegment } from './hatching';
+import { thinWallSegments } from './walls';
 
 // The package's types list named exports, but its ES build only has a default one
 const { union, difference, intersection } = (clipping as unknown as { default: typeof clipping }).default;
@@ -186,8 +187,15 @@ export function floorPath(floor: Polygon[], gridSize: number): Path2D {
   return path;
 }
 
-/** Walls around the floor of all the given layers together (what blocks light and VTT tokens) */
+/**
+ * Walls around the floor of all the given layers together, plus their thin
+ * walls (what blocks light and VTT tokens)
+ */
 export function combinedWalls(layers: MapLayer[], gridSize: number): WallSegment[] {
+  return [...floorWalls(layers, gridSize), ...thinWallSegments(layers.flatMap((l) => l.walls), layers.flatMap((l) => l.doors), gridSize)];
+}
+
+function floorWalls(layers: MapLayer[], gridSize: number): WallSegment[] {
   if (!layers.some(hasShapes)) {
     return extractWallSegments(Object.assign({}, ...layers.map((l) => l.rooms)), gridSize);
   }

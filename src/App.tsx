@@ -1131,8 +1131,9 @@ export function App() {
   const menuAt = contextMenu?.at;
   const spotTexture = menuAt && activeLayerEditable ? textureAt(activeLayer, menuAt.x, menuAt.y) : null;
   const fillAt = (at: { x: number; y: number }, texture: FloorTexture) => {
-    const doors = visibleLayers(levelMap).flatMap((l) => l.doors);
-    modifyMap((draft) => withLayer(draft, activeLayerId, (layer) => fillRoom(layer, doors, at.x, at.y, texture)));
+    const shown = visibleLayers(levelMap);
+    const [doors, walls] = [shown.flatMap((l) => l.doors), shown.flatMap((l) => l.walls)];
+    modifyMap((draft) => withLayer(draft, activeLayerId, (layer) => fillRoom(layer, doors, walls, at.x, at.y, texture)));
   };
   const mapMenu: MenuItem[] = [
     {

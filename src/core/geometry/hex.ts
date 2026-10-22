@@ -143,3 +143,34 @@ export function hexGridPath(
     }
   }
 }
+
+// Length of a hex side, from corner to neighbouring corner
+const SIDE = 1 / Math.sqrt(3);
+
+/** The hex corner nearest a point, for snapping walls to hex edges */
+export function nearestHexCorner(type: GridType, x: number, y: number): Pair {
+  let best: Pair = [x, y];
+  let bestDist = Infinity;
+  for (const c of hexCorners(type, hexAt(type, x, y))) {
+    const d = Math.hypot(c[0] - x, c[1] - y);
+    if (d < bestDist) {
+      best = c;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
+/** The three corners one hex edge away from a hex corner */
+export function hexCornerNeighbours(type: GridType, corner: Pair): Pair[] {
+  const [x, y] = corner;
+  const found = new Map<string, Pair>();
+  // The hexes meeting at the corner lie a little way off it on every side
+  for (let n = 0; n < 6; n++) {
+    const a = (n / 6) * Math.PI * 2 + 0.3;
+    for (const c of hexCorners(type, hexAt(type, x + Math.cos(a) * 0.2, y + Math.sin(a) * 0.2))) {
+      if (Math.abs(Math.hypot(c[0] - x, c[1] - y) - SIDE) < 1e-6) found.set(`${c[0].toFixed(6)},${c[1].toFixed(6)}`, c);
+    }
+  }
+  return [...found.values()];
+}

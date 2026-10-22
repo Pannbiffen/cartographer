@@ -1,5 +1,6 @@
 // The fill tool: re-textures the room under a point, up to its walls and doors
-import type { FloorTexture, MapLayer, PlacedDoor } from '../../types/map';
+import type { FloorTexture, MapLayer, PlacedDoor, PlacedWall } from '../../types/map';
+import { closedWalls, doorEdgeKey, wallDoorEdge } from '../geometry/walls';
 import { cellPolygons, floorPieceAt, hasShapes, layerFloor, paintArea, pointInPolygons } from '../geometry/region';
 
 // A fill never spreads further than this (an open outdoor map could be huge)
@@ -26,10 +27,18 @@ export function textureAt(layer: MapLayer, x: number, y: number): FloorTexture |
 
 /**
  * Lays `texture` over the floor connected to (x, y), spreading cell by cell
- * but never through a door (archways are open, so it passes those). Returns
- * false if there is no floor there.
+ * but never through a door or a thin wall along a cell edge (archways are
+ * open, so it passes those, even on a wall). Returns false if there is no
+ * floor there.
  */
-export function fillRoom(layer: MapLayer, doors: PlacedDoor[], x: number, y: number, texture: FloorTexture): boolean {
+export function fillRoom(
+  layer: MapLayer,
+  doors: PlacedDoor[],
+  walls: PlacedWall[],
+  x: number,
+  y: number,
+  texture: FloorTexture
+): boolean {
   if (!isFloorAt(layer, x, y)) return false;
   const shaped = hasShapes(layer);
   const floor = shaped ? layerFloor(layer) : [];
@@ -37,9 +46,11 @@ export function fillRoom(layer: MapLayer, doors: PlacedDoor[], x: number, y: num
     ? (gx: number, gy: number) => SAMPLES.some(([sx, sy]) => pointInPolygons(floor, gx + sx, gy + sy))
     : (gx: number, gy: number) => !!layer.rooms[`${gx},${gy}`];
   // Door edges as "h,x,y" (the top edge of cell x,y) or "v,x,y" (its left edge)
-  const closed = new Set(
-    doors.filter((d) => d.type !== 'archway').map((d) => `${d.orientation === 'horizontal' ? 'h' : 'v'},${d.x},${d.y}`)
-  );
+  const closed = new Set(doors.filter((d) => d.type !== 'archway').map(doorEdgeKey));
+  for (const wall of closedWalls(walls, doors)) {
+    const edge = wallDoorEdge(wall);
+    if (edge) closed.add(doorEdgeKey(edge));
+  }
 
   const start = [Math.floor(x), Math.floor(y)];
   const cells = new Map<string, [number, number]>([[`${start[0]},${start[1]}`, [start[0], start[1]]]]);

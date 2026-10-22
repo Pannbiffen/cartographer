@@ -5,7 +5,7 @@ import type { LayerContent, LevelMap, MapData, MapLayer, MapLevel } from '../typ
 type Layered = Pick<MapLevel, 'layers'>;
 
 export function emptyContent(): LayerContent {
-  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, foliage: {}, doors: [], stairs: [], props: [], labels: [], lights: [] };
+  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, foliage: {}, doors: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
 }
 
 export function newLayer(id: string, name: string, content: Partial<LayerContent> = {}): MapLayer {
@@ -35,6 +35,7 @@ export function cloneLayer(layer: MapLayer): MapLayer {
     water: { ...layer.water },
     foliage: { ...layer.foliage },
     doors: [...layer.doors],
+    walls: [...layer.walls],
     stairs: [...layer.stairs],
     props: [...layer.props],
     labels: [...layer.labels],
@@ -121,6 +122,7 @@ function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string
     water: stored.water ?? {},
     foliage: stored.foliage ?? {},
     doors: stored.doors ?? [],
+    walls: stored.walls ?? [],
     stairs: stored.stairs ?? [],
     props: stored.props ?? [],
     labels: stored.labels ?? [],

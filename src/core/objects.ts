@@ -9,11 +9,13 @@ import type {
   PlacedLight,
   PlacedProp,
   PlacedStairs,
+  PlacedWall,
   Selection,
 } from '../types/map';
 import { nearestDoorEdge, stairsContainCell } from './tools/toolGeometry';
 import { measureLabel } from './renderers/labelRenderer';
 import { findLayer, isLayerEditable } from './layers';
+import { distanceToWall, wallKey } from './geometry/walls';
 
 // How close (in cells) the pointer must be to a door's wall edge to pick it
 const DOOR_HIT_DISTANCE = 0.3;
@@ -24,6 +26,9 @@ export function newObjectId(prefix: string): string {
 
 export function findDoor(layer: LayerContent, id: string): PlacedDoor | undefined {
   return layer.doors.find((d) => d.id === id);
+}
+export function findWall(layer: LayerContent, id: string): PlacedWall | undefined {
+  return layer.walls.find((w) => w.id === id);
 }
 export function findStairs(layer: LayerContent, id: string): PlacedStairs | undefined {
   return layer.stairs.find((s) => s.id === id);
@@ -50,10 +55,11 @@ function labelBounds(label: PlacedLabel, gridSize: number) {
 export function findSelected(
   map: MapData | LevelMap,
   sel: Selection | null
-): PlacedDoor | PlacedStairs | PlacedProp | PlacedLabel | PlacedLight | undefined {
+): PlacedDoor | PlacedWall | PlacedStairs | PlacedProp | PlacedLabel | PlacedLight | undefined {
   const layer = sel ? findLayer(map, sel.layerId) : undefined;
   if (!sel || !layer) return undefined;
   if (sel.kind === 'door') return findDoor(layer, sel.id);
+  if (sel.kind === 'wall') return findWall(layer, sel.id);
   if (sel.kind === 'stairs') return findStairs(layer, sel.id);
   if (sel.kind === 'label') return findLabel(layer, sel.id);
   if (sel.kind === 'light') return findLight(layer, sel.id);
@@ -62,8 +68,8 @@ export function findSelected(
 
 /**
  * Topmost object under a world position on a shown, unlocked layer. Labels
- * are drawn above every layer, so they are hit first; then doors, lights,
- * props and stairs, from the top layer down.
+ * are drawn above every layer, so they are hit first; then doors, walls,
+ * lights, props and stairs, from the top layer down.
  */
 export function hitTestObject(map: LevelMap, worldX: number, worldY: number): Selection | null {
   const layers = map.layers.filter(isLayerEditable).reverse();
@@ -106,6 +112,12 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
     );
     if (door) return { kind: 'door', id: door.id, layerId };
   }
+  const px = worldX / gridSize;
+  const py = worldY / gridSize;
+  for (let i = layer.walls.length - 1; i >= 0; i--) {
+    const w = layer.walls[i];
+    if (distanceToWall(w, px, py) <= DOOR_HIT_DISTANCE) return { kind: 'wall', id: w.id, layerId };
+  }
 
   for (let i = layer.lights.length - 1; i >= 0; i--) {
     const l = layer.lights[i];
@@ -133,6 +145,7 @@ export function objectsInBox(map: LevelMap, box: { x: number; y: number; w: numb
     const layerId = layer.id;
     const objects: Selection[] = [
       ...layer.doors.map((d) => ({ kind: 'door' as const, id: d.id, layerId })),
+      ...layer.walls.map((w) => ({ kind: 'wall' as const, id: w.id, layerId })),
       ...layer.stairs.map((s) => ({ kind: 'stairs' as const, id: s.id, layerId })),
       ...layer.props.map((p) => ({ kind: 'prop' as const, id: p.id, layerId })),
       ...layer.lights.map((l) => ({ kind: 'light' as const, id: l.id, layerId })),
@@ -162,6 +175,19 @@ export function objectBounds(
       ? { x: d.x, y: d.y - 0.2, w: 1, h: 0.4 }
       : { x: d.x - 0.2, y: d.y, w: 0.4, h: 1 };
   }
+  if (sel.kind === 'wall') {
+    const w = findWall(layer, sel.id);
+    if (!w) return null;
+    // As thick as a door's outline across the wall
+    const padX = Math.abs(w.dx) < 0.4 ? 0.2 : 0;
+    const padY = Math.abs(w.dy) < 0.4 ? 0.2 : 0;
+    return {
+      x: Math.min(w.x, w.x + w.dx) - padX,
+      y: Math.min(w.y, w.y + w.dy) - padY,
+      w: Math.abs(w.dx) + padX * 2,
+      h: Math.abs(w.dy) + padY * 2,
+    };
+  }
   if (sel.kind === 'stairs') {
     const s = findStairs(layer, sel.id);
     return s ? { x: s.x, y: s.y, w: s.width, h: s.height } : null;
@@ -187,6 +213,10 @@ export function rotateObject(draft: MapData | LevelMap, sel: Selection) {
       ...d,
       orientation: d.orientation === 'horizontal' ? 'vertical' : 'horizontal',
     });
+  } else if (sel.kind === 'wall') {
+    // A quarter turn about its first corner, which only stays on a square grid
+    const w = findWall(layer, sel.id);
+    if (w && Number.isInteger(w.dx) && Number.isInteger(w.dy)) replaceWall(layer, { ...w, dx: -w.dy, dy: w.dx });
   } else if (sel.kind === 'stairs') {
     const s = findStairs(layer, sel.id);
     if (!s) return;
@@ -203,6 +233,7 @@ export function deleteObject(draft: MapData | LevelMap, sel: Selection) {
   const layer = findLayer(draft, sel.layerId);
   if (!layer) return;
   if (sel.kind === 'door') layer.doors = layer.doors.filter((d) => d.id !== sel.id);
+  else if (sel.kind === 'wall') layer.walls = layer.walls.filter((w) => w.id !== sel.id);
   else if (sel.kind === 'stairs') layer.stairs = layer.stairs.filter((s) => s.id !== sel.id);
   else if (sel.kind === 'label') layer.labels = layer.labels.filter((l) => l.id !== sel.id);
   else if (sel.kind === 'light') layer.lights = layer.lights.filter((l) => l.id !== sel.id);
@@ -211,8 +242,8 @@ export function deleteObject(draft: MapData | LevelMap, sel: Selection) {
 
 /**
  * Moves the selected object one step in direction (dx, dy): labels by
- * `labelStep` cells, grid-snapped objects by a whole cell. A door won't move
- * onto an edge another door already uses.
+ * `labelStep` cells, grid-snapped objects by a whole cell. A door or wall
+ * won't move onto an edge another one already uses.
  */
 export function nudgeObject(draft: MapData | LevelMap, sel: Selection, dx: number, dy: number, labelStep: number) {
   const layer = findLayer(draft, sel.layerId);
@@ -228,6 +259,12 @@ export function nudgeObject(draft: MapData | LevelMap, sel: Selection, dx: numbe
       (o) => o.id !== d.id && o.x === moved.x && o.y === moved.y && o.orientation === moved.orientation
     );
     if (!occupied) replaceDoor(layer, moved);
+  } else if (sel.kind === 'wall') {
+    const w = findWall(layer, sel.id);
+    if (!w) return;
+    const moved = { ...w, x: w.x + dx, y: w.y + dy };
+    const key = wallKey(moved);
+    if (!layer.walls.some((o) => o.id !== w.id && wallKey(o) === key)) replaceWall(layer, moved);
   } else if (sel.kind === 'stairs') {
     const s = findStairs(layer, sel.id);
     if (s) replaceStairs(layer, { ...s, x: s.x + dx, y: s.y + dy });
@@ -307,6 +344,7 @@ export function retypeObject(draft: MapData | LevelMap, sel: Selection, type: st
 /** An object on the clipboard, with its kind so it can be pasted back */
 export type CopiedObject =
   | { kind: 'door'; object: PlacedDoor }
+  | { kind: 'wall'; object: PlacedWall }
   | { kind: 'stairs'; object: PlacedStairs }
   | { kind: 'prop'; object: PlacedProp }
   | { kind: 'label'; object: PlacedLabel }
@@ -388,6 +426,7 @@ export function addObject(draft: MapData | LevelMap, layerId: string, copied: Co
   const layer = findLayer(draft, layerId);
   if (!layer) return;
   if (copied.kind === 'door') layer.doors = [...layer.doors, copied.object];
+  else if (copied.kind === 'wall') layer.walls = [...layer.walls, copied.object];
   else if (copied.kind === 'stairs') layer.stairs = [...layer.stairs, copied.object];
   else if (copied.kind === 'prop') layer.props = [...layer.props, copied.object];
   else if (copied.kind === 'label') layer.labels = [...layer.labels, copied.object];
@@ -396,6 +435,7 @@ export function addObject(draft: MapData | LevelMap, layerId: string, copied: Co
 
 function replaceObject(layer: LayerContent, { kind, object }: CopiedObject) {
   if (kind === 'door') replaceDoor(layer, object);
+  else if (kind === 'wall') replaceWall(layer, object);
   else if (kind === 'stairs') replaceStairs(layer, object);
   else if (kind === 'prop') replaceProp(layer, object);
   else if (kind === 'label') replaceLabel(layer, object);
@@ -405,6 +445,9 @@ function replaceObject(layer: LayerContent, { kind, object }: CopiedObject) {
 // Draft layers hold shallow copies, so objects are replaced rather than mutated
 export function replaceDoor(layer: LayerContent, door: PlacedDoor) {
   layer.doors = layer.doors.map((d) => (d.id === door.id ? door : d));
+}
+export function replaceWall(layer: LayerContent, wall: PlacedWall) {
+  layer.walls = layer.walls.map((w) => (w.id === wall.id ? wall : w));
 }
 export function replaceStairs(layer: LayerContent, stairs: PlacedStairs) {
   layer.stairs = layer.stairs.map((s) => (s.id === stairs.id ? stairs : s));

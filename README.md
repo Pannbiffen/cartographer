@@ -27,6 +27,7 @@
 - **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
 - **Lighting**: Place lights with their own colour, radius and intensity; the rest of the map goes dark and walls cast shadows. Torches give off light too.
+- **Walls**: Drag along the grid with the Wall tool to put thin walls inside or between rooms, such as splitting a hall in two (on hex grids they follow hex edges). They're drawn in the room wall style, block light, stop the Fill tool and export as VTT walls; a door on one opens it. `Shift`+drag erases them, and they can be selected, moved and deleted like doors.
 - **Doors, Stairs & Props**: Doors snap to the nearest wall edge (standard, double, secret, portcullis, archway), stairs, pillars, chests, tables, altars, torches, barrels and sarcophagi.
 - **Procedural Generators**:
   - BSP Dungeon Generator (rooms + corridors)
@@ -106,6 +107,7 @@ npm run preview
 | `Enter` / `Backspace` / `Esc` (while drawing a polygon or path) | Finish / remove last point / cancel |
 | `W` | Water |
 | `F` | Foliage & terrain |
+| `A` | Wall (`Shift` + drag erases walls) |
 | `D` | Door |
 | `S` | Stairs |
 | `P` | Props |

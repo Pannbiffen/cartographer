@@ -499,6 +499,11 @@ export const DockPanel: React.FC<DockPanelProps> = ({
           </p>
         )}
 
+        {activeTool === 'wall' && (
+          <p className="text-ui-muted leading-snug">
+            Drag along the grid lines to draw walls; Shift+drag erases them. A door placed on a wall opens it.
+          </p>
+        )}
         {activeTool === 'door' && (
           <Choices label="Door type" options={DOOR_TYPES} value={selectedDoorType} columns={2} onChange={onDoorTypeChange} />
         )}

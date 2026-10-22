@@ -19,6 +19,7 @@ import {
   findLight,
   findProp,
   findStairs,
+  findWall,
   replaceDoor,
   replaceLabel,
   replaceLight,
@@ -189,7 +190,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
       <p className="text-ui-muted leading-snug">
         {hint ?? (
           <>
-            Click a door, staircase, prop, label or light to select it; Shift+click or drag a box to select
+            Click a door, wall, staircase, prop, label or light to select it; Shift+click or drag a box to select
             several. Drag to move, <kbd>R</kbd> to rotate, <kbd>Delete</kbd> to remove.
           </>
         )}
@@ -200,6 +201,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   const layer = findLayer(mapData, selection.layerId);
   if (!layer) return null;
   const door = selection.kind === 'door' ? findDoor(layer, selection.id) : undefined;
+  const wall = selection.kind === 'wall' ? findWall(layer, selection.id) : undefined;
   const stairs = selection.kind === 'stairs' ? findStairs(layer, selection.id) : undefined;
   const prop = selection.kind === 'prop' ? findProp(layer, selection.id) : undefined;
   const label = selection.kind === 'label' ? findLabel(layer, selection.id) : undefined;
@@ -225,7 +227,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="font-medium capitalize">
-        Selected: {door ? `${door.type} door` : stairs ? 'stairs' : label ? 'label' : light ? 'light' : prop?.type}
+        Selected: {door ? `${door.type} door` : wall ? 'wall' : stairs ? 'stairs' : label ? 'label' : light ? 'light' : prop?.type}
       </div>
 
       {door && (

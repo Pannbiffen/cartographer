@@ -16,6 +16,8 @@ import { renderFloorTextures } from './floorRenderer';
 import { renderLighting } from './lightingRenderer';
 import { floorPath, floorSegments, hasShapes, layerFloor } from '../geometry/region';
 import { hexGridPath, isHexGrid } from '../geometry/hex';
+import { thinWallSegments } from '../geometry/walls';
+import { visibleLayers } from '../layers';
 
 export interface GridRange {
   minX: number;
@@ -122,8 +124,13 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
     renderWaterRipples(ctx, waterSegments, theme.waterRipples);
   }
 
-  // 4. Thick wall outlines
+  // 4. Thick wall outlines, and thin walls in the same style; a door on
+  //    any shown layer opens a thin wall where it sits
   renderWallOutlines(ctx, wallSegments, mapData.wallStyle, theme.ink);
+  if (layer.walls.length > 0) {
+    const doors = visibleLayers(mapData).flatMap((l) => l.doors);
+    renderWallOutlines(ctx, thinWallSegments(layer.walls, doors, gridSize), mapData.wallStyle, theme.ink);
+  }
 
   // 5. Foliage (trees, bushes, boulders)
   for (const key of Object.keys(layer.foliage)) {

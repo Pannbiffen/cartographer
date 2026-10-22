@@ -1,6 +1,7 @@
 // Shared option lists and styles for the toolbox, menus and panels
 import type { LucideIcon } from 'lucide-react';
 import {
+  BrickWall,
   DoorOpen,
   Eraser,
   Footprints,
@@ -50,6 +51,7 @@ export const TOOLS: ToolInfo[] = [
   { id: 'fill', label: 'Fill Room', icon: PaintBucket, shortcut: 'K' },
   { id: 'water', label: 'Water', icon: Waves, shortcut: 'W' },
   { id: 'foliage', label: 'Foliage & Terrain', icon: Trees, shortcut: 'F' },
+  { id: 'wall', label: 'Wall', icon: BrickWall, shortcut: 'A' },
   { id: 'door', label: 'Door / Portal', icon: DoorOpen, shortcut: 'D' },
   { id: 'stairs', label: 'Stairs', icon: Footprints, shortcut: 'S' },
   { id: 'prop', label: 'Dungeon Props', icon: Sparkles, shortcut: 'P' },
