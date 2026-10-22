@@ -217,3 +217,68 @@ test('textured areas out of view cost nothing to draw', async ({ page }) => {
   expect(await curvesPerFrame()).toBe(both);
   expect(errors).toEqual([]);
 });
+
+test('zoomed out, textures fill from a tile drawn once, however far the view pans', async ({ page }) => {
+  const errors = trackErrors(page);
+  // Count the curves cobbles are drawn with (always off screen, on a tile or
+  // scratch canvas), and the patterns filled from tiles
+  await page.addInitScript(() => {
+    const w = window as unknown as { curves: number; patterns: number };
+    w.curves = 0;
+    w.patterns = 0;
+    const proto = CanvasRenderingContext2D.prototype;
+    const curve = proto.quadraticCurveTo;
+    proto.quadraticCurveTo = function (...args) {
+      if (!this.canvas.isConnected) w.curves++;
+      return curve.apply(this, args);
+    };
+    const createPattern = proto.createPattern;
+    proto.createPattern = function (...args) {
+      w.patterns++;
+      return createPattern.apply(this, args);
+    };
+  });
+  await openApp(page);
+  const counts = () =>
+    page.evaluate(() => {
+      const { curves, patterns } = window as unknown as { curves: number; patterns: number };
+      return { curves, patterns };
+    });
+  const reset = () => page.evaluate(() => Object.assign(window, { curves: 0, patterns: 0 }));
+  const hover = async () => {
+    // Hovering redraws the map
+    const p = await gridPoint(page, -12, -3);
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.move(p.x + 3, p.y);
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+  };
+
+  await page.keyboard.press('c');
+  await page.getByRole('button', { name: 'cobbles' }).click();
+  await dragFrom(page, [-12, -4], [-12, 2]);
+  expect((await topLayer(page)).floorAreas.cobbles).toHaveLength(1);
+
+  const a = await gridPoint(page, -12, -4);
+  await page.mouse.move(a.x, a.y);
+  for (let i = 0; i < 14; i++) await page.mouse.wheel(0, 100);
+  await expect.poll(async () => (await view(page)).zoom).toBe(0.2);
+
+  // The first frame at this zoom draws the tile; later ones only fill from it
+  await hover();
+  await reset();
+  await hover();
+  const still = await counts();
+  expect(still.patterns).toBeGreaterThan(0);
+  expect(still.curves).toBe(0);
+
+  // Panning keeps the tile
+  await reset();
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(300);
+  await page.keyboard.up('ArrowRight');
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  const panned = await counts();
+  expect(panned.patterns).toBeGreaterThan(1);
+  expect(panned.curves).toBe(0);
+  expect(errors).toEqual([]);
+});
