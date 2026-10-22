@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, gridPoint, saveMap, trackErrors } from './helpers';
+import { openApp, gridPoint, saveMap, trackErrors, view } from './helpers';
 
 // The starter map leaves rows y >= 8 and the block x -15..-8, y -8..0 empty
 
@@ -173,3 +173,47 @@ function ringArea(ring: [number, number][]): number {
   for (let i = 0; i < ring.length - 1; i++) sum += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
   return Math.abs(sum / 2);
 }
+
+test('textured areas out of view cost nothing to draw', async ({ page }) => {
+  const errors = trackErrors(page);
+  // Count the curves cobbles are drawn with
+  await page.addInitScript(() => {
+    const w = window as unknown as { curves: number };
+    w.curves = 0;
+    const curve = CanvasRenderingContext2D.prototype.quadraticCurveTo;
+    CanvasRenderingContext2D.prototype.quadraticCurveTo = function (...args) {
+      w.curves++;
+      return curve.apply(this, args);
+    };
+  });
+  await openApp(page);
+  const curvesPerFrame = async () => {
+    await page.evaluate(() => ((window as unknown as { curves: number }).curves = 0));
+    // Hovering redraws the map
+    const p = await gridPoint(page, -12, -3);
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.move(p.x + 3, p.y);
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    return page.evaluate(() => (window as unknown as { curves: number }).curves);
+  };
+
+  await page.keyboard.press('c');
+  await page.getByRole('button', { name: 'cobbles' }).click();
+  await dragFrom(page, [-12, -4], [-12, -1]);
+  await dragFrom(page, [0, 9], [4, 9]);
+  expect((await topLayer(page)).floorAreas.cobbles).toHaveLength(2);
+
+  // Zoomed in on the first circle, the second is far out of view
+  const a = await gridPoint(page, -12, -4);
+  await page.mouse.move(a.x, a.y);
+  for (let i = 0; i < 14; i++) await page.mouse.wheel(0, -100);
+  await expect.poll(async () => (await view(page)).zoom).toBe(4);
+  const both = await curvesPerFrame();
+  expect(both).toBeGreaterThan(0);
+
+  // Drawing it costs nothing: textures far apart used to fill the whole box between them
+  await page.keyboard.press('Control+z');
+  expect((await topLayer(page)).floorAreas.cobbles).toHaveLength(1);
+  expect(await curvesPerFrame()).toBe(both);
+  expect(errors).toEqual([]);
+});

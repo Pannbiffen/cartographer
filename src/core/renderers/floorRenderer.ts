@@ -130,14 +130,17 @@ const PATTERNS: Record<Exclude<FloorTexture, 'plain'>, PatternFn> = {
 const TEXTURE_ALPHA: Partial<Record<FloorTexture, number>> = { dirt: 0.35, cobbles: 0.55, flagstones: 0.5 };
 
 /** Draws each floor cell's texture, clipped to the cells that carry it, then
- * the textured areas of free-form floor over them */
+ * the textured areas of free-form floor over them. Only cells in view are drawn. */
 export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerContent, gridSize: number, inkColor: string) {
   const { rooms, floors, floorAreas } = layer;
+  const view = viewCells(ctx, gridSize);
+  const inView = (gx: number, gy: number) => gx >= view.minX && gx < view.maxX && gy >= view.minY && gy < view.maxY;
   const groups = new Map<FloorTexture, [number, number][]>();
   for (const key of Object.keys(floors)) {
     const texture = floors[key];
     if (!rooms[key] || texture === 'plain' || !PATTERNS[texture]) continue;
     const cell = key.split(',').map(Number) as [number, number];
+    if (!inView(...cell)) continue;
     const cells = groups.get(texture);
     if (cells) cells.push(cell);
     else groups.set(texture, [cell]);
@@ -160,16 +163,58 @@ export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerC
 
   for (const [texture, polygons] of areas) {
     if (!PATTERNS[texture as Exclude<FloorTexture, 'plain'>] || polygons.length === 0) continue;
-    const b = polygonBounds(polygons);
+    // The cells under each polygon, not the box around them all: areas far
+    // apart would otherwise fill the whole space between them
+    const keys = new Set<string>();
     const cells: [number, number][] = [];
-    for (let gy = Math.floor(b.minY); gy < Math.ceil(b.maxY); gy++) {
-      for (let gx = Math.floor(b.minX); gx < Math.ceil(b.maxX); gx++) cells.push([gx, gy]);
+    for (const polygon of polygons) {
+      const b = polygonBounds([polygon]);
+      for (let gy = Math.max(Math.floor(b.minY), view.minY); gy < Math.min(Math.ceil(b.maxY), view.maxY); gy++) {
+        for (let gx = Math.max(Math.floor(b.minX), view.minX); gx < Math.min(Math.ceil(b.maxX), view.maxX); gx++) {
+          const key = `${gx},${gy}`;
+          if (keys.has(key)) continue;
+          keys.add(key);
+          cells.push([gx, gy]);
+        }
+      }
     }
-    drawPattern(ctx, texture, floorPath(polygons, gridSize), cells, gridSize, inkColor);
+    if (cells.length > 0) drawPattern(ctx, texture, floorPath(polygons, gridSize), cells, gridSize, inkColor);
   }
 }
 
-/** Draws a texture over the given cells, clipped to `clip` */
+/** The cells the canvas shows (a whole export, or the view on screen), from its transform */
+function viewCells(ctx: CanvasRenderingContext2D, gridSize: number) {
+  const inverse = ctx.getTransform().inverse();
+  const { width, height } = ctx.canvas;
+  const corners = [
+    inverse.transformPoint({ x: 0, y: 0 }),
+    inverse.transformPoint({ x: width, y: 0 }),
+    inverse.transformPoint({ x: 0, y: height }),
+    inverse.transformPoint({ x: width, y: height }),
+  ];
+  const xs = corners.map((p) => p.x / gridSize);
+  const ys = corners.map((p) => p.y / gridSize);
+  // A cell further out, as patterns reach a little past their own cell
+  return {
+    minX: Math.floor(Math.min(...xs)) - 1,
+    minY: Math.floor(Math.min(...ys)) - 1,
+    maxX: Math.ceil(Math.max(...xs)) + 1,
+    maxY: Math.ceil(Math.max(...ys)) + 1,
+  };
+}
+
+// Cells drawn per path: canvas paths get slower to build the longer they get,
+// so a large area is drawn in many short paths
+const CELLS_PER_PATH = 16;
+
+// Scratch canvas a pattern is drawn on before it is clipped and blended in
+let patternCanvas: HTMLCanvasElement | null = null;
+
+/**
+ * Draws a texture over the given cells, clipped to `clip`. The short paths
+ * go onto a scratch canvas, which is clipped and blended in once: clipping
+ * each path to a curved outline costs far more than drawing it.
+ */
 function drawPattern(
   ctx: CanvasRenderingContext2D,
   texture: FloorTexture,
@@ -178,18 +223,53 @@ function drawPattern(
   gridSize: number,
   inkColor: string
 ) {
-  ctx.save();
-  ctx.clip(clip, 'evenodd');
-  ctx.strokeStyle = inkColor;
-  ctx.fillStyle = inkColor;
-  ctx.lineWidth = 0.9;
-  ctx.lineJoin = 'round';
-  ctx.globalAlpha = TEXTURE_ALPHA[texture] ?? 0.4;
-  ctx.beginPath();
+  // The cells' extent in canvas pixels, a cell wider as patterns reach past their cells
+  const transform = ctx.getTransform();
+  const xs = cells.map(([gx]) => gx);
+  const ys = cells.map(([, gy]) => gy);
+  const corners = [
+    [Math.min(...xs) - 1, Math.min(...ys) - 1],
+    [Math.max(...xs) + 2, Math.min(...ys) - 1],
+    [Math.min(...xs) - 1, Math.max(...ys) + 2],
+    [Math.max(...xs) + 2, Math.max(...ys) + 2],
+  ].map(([gx, gy]) => transform.transformPoint({ x: gx * gridSize, y: gy * gridSize }));
+  const left = Math.max(0, Math.floor(Math.min(...corners.map((p) => p.x))));
+  const top = Math.max(0, Math.floor(Math.min(...corners.map((p) => p.y))));
+  const right = Math.min(ctx.canvas.width, Math.ceil(Math.max(...corners.map((p) => p.x))));
+  const bottom = Math.min(ctx.canvas.height, Math.ceil(Math.max(...corners.map((p) => p.y))));
+  if (right <= left || bottom <= top) return;
+
+  patternCanvas ??= document.createElement('canvas');
+  const width = right - left;
+  const height = bottom - top;
+  if (patternCanvas.width < width || patternCanvas.height < height) {
+    patternCanvas.width = Math.max(patternCanvas.width, width);
+    patternCanvas.height = Math.max(patternCanvas.height, height);
+  }
+  const pctx = patternCanvas.getContext('2d');
+  if (!pctx) return;
+  pctx.setTransform(1, 0, 0, 1, 0, 0);
+  pctx.globalCompositeOperation = 'source-over';
+  pctx.clearRect(0, 0, width, height);
+  pctx.setTransform(new DOMMatrix([1, 0, 0, 1, -left, -top]).multiply(transform));
+  pctx.strokeStyle = inkColor;
+  pctx.fillStyle = inkColor;
+  pctx.lineWidth = 0.9;
+  pctx.lineJoin = 'round';
   const draw = PATTERNS[texture as Exclude<FloorTexture, 'plain'>];
   const seen = new Set<string>();
-  for (const [gx, gy] of cells) draw(ctx, gx, gy, gridSize, seen);
-  if (texture === 'dirt') ctx.fill();
-  else ctx.stroke();
+  for (let start = 0; start < cells.length; start += CELLS_PER_PATH) {
+    pctx.beginPath();
+    for (const [gx, gy] of cells.slice(start, start + CELLS_PER_PATH)) draw(pctx, gx, gy, gridSize, seen);
+    if (texture === 'dirt') pctx.fill();
+    else pctx.stroke();
+  }
+  pctx.globalCompositeOperation = 'destination-in';
+  pctx.fill(clip, 'evenodd');
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha *= TEXTURE_ALPHA[texture] ?? 0.4;
+  ctx.drawImage(patternCanvas, 0, 0, width, height, left, top, width, height);
   ctx.restore();
 }
