@@ -19,7 +19,7 @@ import { THEMES } from '../core/theme';
 import { wheelZoomFactor, zoomAbout, type ZoomSpeed } from '../core/viewport';
 import { useKeyboardPan } from './useKeyboardPan';
 import { keepsSelection, laysFloor } from '../components/options';
-import { renderGhostLevel, renderMap } from '../core/renderers/mapRenderer';
+import { renderGhostLevel, renderMap, renderMapGround } from '../core/renderers/mapRenderer';
 import { renderLightMarkers } from '../core/renderers/lightingRenderer';
 import { DEFAULT_LIGHT } from '../core/lighting';
 import { nextRoomNumber } from '../core/renderers/labelRenderer';
@@ -279,6 +279,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       mapCtx.translate(viewport.x, viewport.y);
       mapCtx.scale(viewport.zoom, viewport.zoom);
 
+      // The ground goes under the faint levels below, so it doesn't hide them
+      renderMapGround(mapCtx, mapData);
       for (const below of levelsBelow ?? []) renderGhostLevel(mapCtx, below.map, below.opacity);
 
       // Map layers, with grid lines limited to the visible area
@@ -287,7 +289,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         minY: Math.floor(-viewport.y / viewport.zoom / gridSize) - 1,
         maxX: Math.ceil((width - viewport.x) / viewport.zoom / gridSize) + 1,
         maxY: Math.ceil((height - viewport.y) / viewport.zoom / gridSize) + 1,
-      });
+      }, { ground: false });
       renderLightMarkers(mapCtx, mapData, viewport.zoom, theme.ink);
       mapCtx.restore();
       cache.key = key;

@@ -91,6 +91,19 @@ export const FLOOR_TEXTURES: FloorTexture[] = [
   'sand',
   'grass',
 ];
+// An outdoor map's ground texture, or 'indoor' for blank paper
+export type GroundChoice = FloorTexture | 'indoor';
+export const GROUND_CHOICES: [GroundChoice, string][] = [
+  ['indoor', 'None (indoor map)'],
+  ...FLOOR_TEXTURES.filter((t) => t !== 'plain').map((t): [GroundChoice, string] => [t, `${t.charAt(0).toUpperCase() + t.slice(1)} (outdoor)`]),
+];
+export function groundChoice(look: { outdoor: boolean; ground: FloorTexture }): GroundChoice {
+  return look.outdoor ? look.ground : 'indoor';
+}
+/** The `outdoor` and `ground` settings for a ground choice (indoor keeps the last ground) */
+export function groundSettings(choice: GroundChoice): { outdoor: boolean; ground?: FloorTexture } {
+  return choice === 'indoor' ? { outdoor: false } : { outdoor: true, ground: choice };
+}
 export const HATCH_STYLES: [HatchStyle, string][] = [
   ['dyson', 'Pen strokes'],
   ['crosshatch', 'Crosshatch'],

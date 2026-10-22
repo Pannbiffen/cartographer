@@ -162,6 +162,8 @@ function createDefaultStarterMap(): MapData {
     hatchLength: 14,
     hatchStyle: 'dyson',
     wallStyle: 'bold',
+    outdoor: false,
+    ground: 'grass',
     lighting: false,
     darkness: 0.75,
     levels: [

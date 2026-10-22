@@ -12,7 +12,7 @@ import {
 } from '../geometry/hatching';
 import { renderDoor, renderStairs, renderProp } from './propsRenderer';
 import { renderLabel } from './labelRenderer';
-import { renderFloorTextures } from './floorRenderer';
+import { renderFloorTextures, renderGround } from './floorRenderer';
 import { renderLighting } from './lightingRenderer';
 import { floorPath, floorSegments, hasShapes, layerFloor } from '../geometry/region';
 import { hexGridPath, isHexGrid } from '../geometry/hex';
@@ -165,18 +165,21 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
  * Draws all shown map layers in world coordinates (the caller sets up
  * pan/zoom and fills the background). Grid lines are drawn over `gridRange`
  * when given. Pass `lighting: false` to leave out darkness and lights even
- * when the map has them on (VTT exports light the map themselves), and
- * `labels: false` to leave out the text.
+ * when the map has them on (VTT exports light the map themselves),
+ * `labels: false` to leave out the text, and `ground: false` to leave out an
+ * outdoor map's ground (drawn first with `renderMapGround`).
  */
 export function renderMap(
   ctx: CanvasRenderingContext2D,
   mapData: LevelMap,
   gridRange: GridRange | null,
-  { lighting = true, labels = true }: { lighting?: boolean; labels?: boolean } = {}
+  { lighting = true, labels = true, ground = true }: { lighting?: boolean; labels?: boolean; ground?: boolean } = {}
 ) {
   const theme = THEMES[mapData.theme] || THEMES.parchment;
   const gridSize = mapData.gridSize;
   const layers = mapData.layers.filter((l) => l.visible && l.opacity > 0);
+
+  if (ground) renderMapGround(ctx, mapData);
 
   // A see-through layer is drawn whole and then blended, so its own
   // overlapping strokes don't show through each other
@@ -232,9 +235,19 @@ export function renderMap(
   }
 }
 
-/** Draws a level faintly, for showing under the one being edited: no grid, light or text */
+/** An outdoor map's ground, over everything the canvas shows; nothing indoors */
+export function renderMapGround(ctx: CanvasRenderingContext2D, mapData: LevelMap) {
+  if (!mapData.outdoor) return;
+  const theme = THEMES[mapData.theme] || THEMES.parchment;
+  renderGround(ctx, mapData.ground, mapData.gridSize, theme.ink);
+}
+
+/**
+ * Draws a level faintly, for showing under the one being edited: no grid,
+ * light, text or ground (which would hide the levels under it)
+ */
 export function renderGhostLevel(ctx: CanvasRenderingContext2D, mapData: LevelMap, opacity: number) {
   drawWithOpacity(ctx, opacity, (ghostCtx) =>
-    renderMap(ghostCtx, mapData, null, { lighting: false, labels: false })
+    renderMap(ghostCtx, mapData, null, { lighting: false, labels: false, ground: false })
   );
 }

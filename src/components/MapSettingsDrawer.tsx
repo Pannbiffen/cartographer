@@ -4,7 +4,7 @@ import type { GridType, MapData, ThemeType } from '../types/map';
 import type { ModifyMap } from '../App';
 import { StylePresets } from './StylePresets';
 import { Slider } from './Slider';
-import { FIELD_CLASS, GRID_TYPES, HATCH_STYLES, THEME_NAMES, WALL_STYLES } from './options';
+import { FIELD_CLASS, GRID_TYPES, GROUND_CHOICES, groundChoice, groundSettings, HATCH_STYLES, THEME_NAMES, WALL_STYLES } from './options';
 
 interface MapSettingsDrawerProps {
   open: boolean;
@@ -93,6 +93,12 @@ export const MapSettingsDrawer: React.FC<MapSettingsDrawerProps> = ({ open, onTo
               ))}
             </select>
           </label>
+          <Picker
+            label="Ground"
+            options={GROUND_CHOICES}
+            value={groundChoice(mapData)}
+            onChange={(v) => onModifyMap((draft) => { Object.assign(draft, groundSettings(v)); })}
+          />
         </Column>
 
         <Column title="Style presets" minWidth="min-w-56">

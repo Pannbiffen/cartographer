@@ -18,6 +18,7 @@ const THEMES = ['parchment', 'blueprint', 'slate', 'monochrome'];
 const WALL_STYLES = ['bold', 'fine', 'rough'];
 const HATCH_STYLES = ['dyson', 'crosshatch', 'stipple', 'shadow', 'none'];
 const GRID_TYPES = ['square', 'hex-pointy', 'hex-flat'];
+const FLOOR_TEXTURES = ['plain', 'flagstones', 'slabs', 'planks', 'cobbles', 'tiles', 'marble', 'carpet', 'dirt', 'sand', 'grass'];
 
 const num = (v: unknown, min: number, max: number, fallback: number) =>
   typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
@@ -37,6 +38,8 @@ function cleanLook(raw: unknown): NewMapDefaults {
     gridType: oneOf(r.gridType, GRID_TYPES, d.gridType),
     showGrid: typeof r.showGrid === 'boolean' ? r.showGrid : d.showGrid,
     gridOpacity: num(r.gridOpacity, 0.05, 0.8, d.gridOpacity),
+    outdoor: typeof r.outdoor === 'boolean' ? r.outdoor : d.outdoor,
+    ground: oneOf(r.ground, FLOOR_TEXTURES, d.ground),
   };
 }
 

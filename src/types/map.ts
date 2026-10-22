@@ -176,6 +176,10 @@ export interface MapSettings {
   hatchLength: number; // pixels
   hatchStyle: HatchStyle;
   wallStyle: WallStyle;
+  // Outdoor maps are ground everywhere, in the `ground` texture, with rooms
+  // drawn on it; indoor maps are blank paper that rooms are dug out of
+  outdoor: boolean;
+  ground: FloorTexture;
   lighting: boolean; // darken the map so lights and torches show
   darkness: number; // 0 to 1, away from any light
 }

@@ -359,6 +359,20 @@ export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerC
   }
 }
 
+/** Lays a texture over everything the canvas shows: an outdoor map's ground */
+export function renderGround(ctx: CanvasRenderingContext2D, texture: FloorTexture, gridSize: number, inkColor: string) {
+  if (!isPattern(texture)) return;
+  const view = viewCells(ctx, gridSize);
+  const clip = new Path2D();
+  clip.rect(view.minX * gridSize, view.minY * gridSize, (view.maxX - view.minX) * gridSize, (view.maxY - view.minY) * gridSize);
+  const cells = () => {
+    const list: [number, number][] = [];
+    for (let gy = view.minY; gy < view.maxY; gy++) for (let gx = view.minX; gx < view.maxX; gx++) list.push([gx, gy]);
+    return list;
+  };
+  drawTexture(ctx, texture, clip, cells, gridSize, inkColor);
+}
+
 /** The cells the canvas shows, from its transform */
 function viewCells(ctx: CanvasRenderingContext2D, gridSize: number) {
   const view = viewRect(ctx);

@@ -8,6 +8,9 @@ import {
   BUTTON_CLASS,
   FIELD_CLASS,
   GRID_TYPES,
+  GROUND_CHOICES,
+  groundChoice,
+  groundSettings,
   HATCH_STYLES,
   THEME_NAMES,
   WALL_STYLES,
@@ -223,6 +226,12 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
           options={GRID_TYPES}
           value={newMap.gridType}
           onChange={(gridType) => changeNewMap({ gridType })}
+        />
+        <Select
+          label="Ground"
+          options={GROUND_CHOICES}
+          value={groundChoice(newMap)}
+          onChange={(v) => changeNewMap(groundSettings(v))}
         />
         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
           <Slider

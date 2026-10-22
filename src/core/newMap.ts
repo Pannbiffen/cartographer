@@ -4,7 +4,16 @@ import { newLevel, newLevelId } from './levels';
 
 export type NewMapDefaults = Pick<
   MapData,
-  'theme' | 'wallStyle' | 'hatchStyle' | 'hatchLength' | 'hatchDensity' | 'gridType' | 'showGrid' | 'gridOpacity'
+    | 'theme'
+  | 'wallStyle'
+  | 'hatchStyle'
+  | 'hatchLength'
+  | 'hatchDensity'
+  | 'gridType'
+  | 'showGrid'
+  | 'gridOpacity'
+  | 'outdoor'
+  | 'ground'
 >;
 
 export const NEW_MAP_KEYS: (keyof NewMapDefaults)[] = [
@@ -16,6 +25,8 @@ export const NEW_MAP_KEYS: (keyof NewMapDefaults)[] = [
   'gridType',
   'showGrid',
   'gridOpacity',
+  'outdoor',
+  'ground',
 ];
 
 export const DEFAULT_NEW_MAP: NewMapDefaults = {
@@ -27,6 +38,8 @@ export const DEFAULT_NEW_MAP: NewMapDefaults = {
   gridType: 'square',
   showGrid: true,
   gridOpacity: 0.22,
+  outdoor: false,
+  ground: 'grass',
 };
 
 /** The new-map settings of an existing map, e.g. to reuse its look */
