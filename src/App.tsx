@@ -1129,7 +1129,7 @@ export function App() {
             checked: texture === spotTexture,
             onSelect: () => fillAt(menuAt, texture),
           })),
-        }]
+        }, { label: 'Pick Floor Texture', onSelect: () => setFloorTexture(spotTexture) }]
       : []),
     ...(toolSettings.length ? ['separator' as const, ...toolSettings] : []),
     'separator',
@@ -1191,6 +1191,7 @@ export function App() {
               onSelect={select}
               onTakeStairs={takeStairs}
               onOpenMenu={openContextMenu}
+              onPickFloorTexture={setFloorTexture}
             />
           </main>
 

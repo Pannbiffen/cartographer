@@ -18,7 +18,7 @@ import type {
 import { THEMES } from '../core/theme';
 import { wheelZoomFactor, zoomAbout, type ZoomSpeed } from '../core/viewport';
 import { useKeyboardPan } from './useKeyboardPan';
-import { keepsSelection } from '../components/options';
+import { keepsSelection, laysFloor } from '../components/options';
 import { renderMap } from '../core/renderers/mapRenderer';
 import { renderLightMarkers } from '../core/renderers/lightingRenderer';
 import { DEFAULT_LIGHT } from '../core/lighting';
@@ -32,7 +32,7 @@ import {
   stairsContainCell,
   lineCells,
 } from '../core/tools/toolGeometry';
-import { fillRoom, isFloorAt } from '../core/tools/fill';
+import { fillRoom, isFloorAt, textureAt } from '../core/tools/fill';
 import { isTypingInField } from '../core/keyboard';
 import {
   findDoor,
@@ -103,6 +103,8 @@ interface MapCanvasProps {
   onTakeStairs?: (stairs: Selection) => void;
   // Right-click or long-press: where (screen and grid units) and the object there
   onOpenMenu?: (menu: CanvasMenuRequest) => void;
+  // Alt+click with a floor tool: the floor texture under the pointer
+  onPickFloorTexture?: (texture: FloorTexture) => void;
 }
 
 export interface CanvasMenuRequest {
@@ -153,10 +155,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   onSelect,
   onTakeStairs,
   onOpenMenu,
+  onPickFloorTexture,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isPanningRef = useRef<boolean>(false);
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  // An Alt+press with a floor tool picks the texture there, unless it pans
+  const pickRef = useRef<{ at: Pair; clientX: number; clientY: number } | null>(null);
   const isDrawingRef = useRef<boolean>(false);
   // Start cell of a click-drag shape (rectangle room or tunnel)
   const dragStartRef = useRef<GridCoord | null>(null);
@@ -699,6 +704,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       isPanningRef.current = true;
       setIsPanning(true);
       panStartRef.current = { x: e.clientX - viewport.x, y: e.clientY - viewport.y };
+      const { worldX, worldY } = pointerToGrid(e);
+      pickRef.current =
+        e.button === 0 && e.altKey && !spaceHeldRef.current && laysFloor(activeTool, shapeMode)
+          ? { at: [worldX / mapData.gridSize, worldY / mapData.gridSize], clientX: e.clientX, clientY: e.clientY }
+          : null;
       drawMap();
       return;
     }
@@ -937,6 +947,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (isPanningRef.current) {
       isPanningRef.current = false;
       setIsPanning(false);
+      const pick = pickRef.current;
+      pickRef.current = null;
+      const layer = findLayer(mapData, activeLayerId);
+      if (pick && layer && Math.hypot(e.clientX - pick.clientX, e.clientY - pick.clientY) < 4) {
+        const texture = textureAt(layer, ...pick.at);
+        if (texture) onPickFloorTexture?.(texture);
+      }
     }
 
     const start = dragStartRef.current;

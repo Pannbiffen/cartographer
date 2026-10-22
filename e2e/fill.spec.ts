@@ -94,3 +94,29 @@ test('the fill tool re-textures free-form floor, and stops at a door', async ({ 
   expect(layer.floors['-9,-5']).toBeUndefined();
   expect(errors).toEqual([]);
 });
+
+test('Alt+click and the right-click menu pick up the floor texture', async ({ page }) => {
+  await openApp(page);
+  await page.keyboard.press('r');
+  await page.getByRole('button', { name: 'dirt' }).click();
+  await dragCells(page, [-15, -7], [-14, -7]);
+  await page.getByRole('button', { name: 'plain' }).click();
+
+  // Alt+click with a room tool takes the texture under the pointer...
+  const textured = await cellCenter(page, -15, -7);
+  await page.keyboard.down('Alt');
+  await page.mouse.click(textured.x, textured.y);
+  await page.keyboard.up('Alt');
+  await expect(page.getByRole('button', { name: 'dirt' })).toHaveAttribute('aria-pressed', 'true');
+  // ...and draws nothing
+  expect(Object.keys(await floors(page))).toEqual(['-15,-7', '-14,-7']);
+  await dragCells(page, [-12, -7], [-11, -7]);
+  expect((await floors(page))['-11,-7']).toBe('dirt');
+
+  // The menu does the same from any tool
+  await page.keyboard.press('k');
+  await page.getByRole('button', { name: 'tiles' }).click();
+  await page.mouse.click(textured.x, textured.y, { button: 'right' });
+  await page.getByRole('menuitem', { name: 'Pick Floor Texture' }).click();
+  await expect(page.getByRole('button', { name: 'dirt' })).toHaveAttribute('aria-pressed', 'true');
+});

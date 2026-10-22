@@ -23,7 +23,7 @@
 - **Room Tools**: Freehand room brush, click-drag rectangle rooms, and click-drag L-shaped corridors.
 - **Free-form Shapes**: Polygon rooms with diagonal walls, circular rooms and winding paths of any width, snapped to the grid (hold `Shift` to place freely). Each one adds floor or cuts it away, and merges with everything else: walls, hatching, light shadows and VTT walls follow the new outline.
 - **Hex Grid**: Show a pointy- or flat-top hex grid instead of squares. The room brush and eraser then work in whole hexes, and shapes snap to hex centres and corners.
-- **Floor Textures**: Procedurally drawn flagstones, wooden planks, cobbles, tiles or dirt, chosen per room as you draw it, with any room tool (cells, polygons, circles, paths and hexes). The Fill tool (or right-click > Fill Room With) re-textures a whole room in one click, up to its walls and doors.
+- **Floor Textures**: Procedurally drawn flagstones, wooden planks, cobbles, tiles or dirt, chosen per room as you draw it, with any room tool (cells, polygons, circles, paths and hexes). The Fill tool (or right-click > Fill Room With) re-textures a whole room in one click, up to its walls and doors; `Alt`+click (or right-click > Pick Floor Texture) picks up the texture under the pointer.
 - **Water**: Paint lakes, rivers, moats and indoor pools with shoreline ripple lines.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
 - **Lighting**: Place lights with their own colour, radius and intensity; the rest of the map goes dark and walls cast shadows. Torches give off light too.
@@ -102,6 +102,7 @@ npm run preview
 | `C` | Circle room |
 | `H` | Free path |
 | `K` | Fill room with the chosen floor texture |
+| `Alt` + click (room and fill tools) | Pick the floor texture under the pointer |
 | `Enter` / `Backspace` / `Esc` (while drawing a polygon or path) | Finish / remove last point / cancel |
 | `W` | Water |
 | `F` | Foliage & terrain |

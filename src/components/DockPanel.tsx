@@ -92,7 +92,7 @@ const Choices = <T extends string>({
     <div className="mb-1">{label}</div>
     <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
       {options.map((option) => (
-        <button key={option} onClick={() => onChange(option)} className={optionButtonClass(value === option)}>
+        <button key={option} aria-pressed={value === option} onClick={() => onChange(option)} className={optionButtonClass(value === option)}>
           {option}
         </button>
       ))}
