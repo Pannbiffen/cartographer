@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openApp, gridPoint, saveMap, view } from './helpers';
+import { openApp, dragCells, gridPoint, saveMap, view } from './helpers';
 
 test('menus run commands and show their state', async ({ page }) => {
   await openApp(page);
@@ -31,6 +31,35 @@ test('menus run commands and show their state', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: 'Export' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('dialogs take keyboard focus, keep Tab inside and give focus back', async ({ page }) => {
+  await openApp(page);
+  const trigger = page.getByRole('button', { name: 'Export' });
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Export' });
+  await expect(dialog).toBeFocused();
+  const focusInside = () => dialog.evaluate((el) => el.contains(document.activeElement));
+
+  // Shift+Tab from the dialog wraps to its last control; Tab from there to the first
+  await page.keyboard.press('Shift+Tab');
+  expect(await focusInside()).toBe(true);
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Close' }).first()).toBeFocused();
+  for (let i = 0; i < 30; i++) {
+    await page.keyboard.press('Tab');
+    expect(await focusInside()).toBe(true);
+  }
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+
+  // A control with autoFocus keeps it
+  await dragCells(page, [7, 6], [10, 6]);
+  await page.keyboard.press('Control+Alt+n');
+  await expect(page.getByRole('dialog', { name: /\?$/ }).getByRole('button', { name: 'Save first' })).toBeFocused();
 });
 
 test('the keyboard shortcuts dialog lists menu, tool and map shortcuts', async ({ page }) => {

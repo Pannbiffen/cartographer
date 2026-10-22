@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
 // Close callbacks of the open dialogs, the most recently opened last
@@ -11,6 +11,26 @@ function handleEscape(e: KeyboardEvent) {
   e.preventDefault();
   e.stopPropagation();
   top.current();
+}
+
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Tab and Shift+Tab wrap around inside the dialog instead of leaving it
+function keepTabInside(e: React.KeyboardEvent, panel: HTMLElement) {
+  if (e.key !== 'Tab' || e.defaultPrevented) return;
+  const items = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+  const first = items[0];
+  const last = items[items.length - 1];
+  const active = document.activeElement;
+  const wrapTo = !first
+    ? panel
+    : e.shiftKey
+      ? (active === first || active === panel) && last
+      : (active === last || !panel.contains(active)) && first;
+  if (!wrapTo) return;
+  e.preventDefault();
+  wrapTo.focus();
 }
 
 interface DialogProps {
@@ -27,6 +47,19 @@ export const Dialog: React.FC<DialogProps> = ({ title, onClose, children, wide }
   useEffect(() => {
     closeRef.current = onClose;
   });
+  // Focus moves into the dialog (unless a field in it took it with
+  // autoFocus) and goes back where it was when the dialog closes. The element
+  // to return to is read while rendering, before autoFocus moves focus.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [previous] = useState(() => document.activeElement as HTMLElement | null);
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) panel.focus();
+    return () => {
+      // StrictMode's trial unmount leaves the dialog in the page
+      if (!panel?.isConnected && previous?.isConnected) previous.focus();
+    };
+  }, [previous]);
   useEffect(() => {
     openDialogs.push(closeRef);
     if (openDialogs.length === 1) window.addEventListener('keydown', handleEscape, true);
@@ -40,11 +73,15 @@ export const Dialog: React.FC<DialogProps> = ({ title, onClose, children, wide }
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
       onPointerDown={(e) => e.target === e.currentTarget && onClose()}
+      onKeyDown={(e) => panelRef.current && keepTabInside(e, panelRef.current)}
     >
       <div
+        ref={panelRef}
         role="dialog"
+        aria-modal="true"
         aria-label={title}
-        className={`w-full ${wide ? 'max-w-[48rem]' : 'max-w-[34rem]'} max-h-full overflow-y-auto bg-ui border border-ui-border shadow-xl text-ui-text`}
+        tabIndex={-1}
+        className={`w-full outline-none ${wide ? 'max-w-[48rem]' : 'max-w-[34rem]'} max-h-full overflow-y-auto bg-ui border border-ui-border shadow-xl text-ui-text`}
       >
         <div className="flex items-center justify-between h-7 pl-3 pr-1 bg-ui-sunken border-b border-ui-border">
           <h2 className="font-semibold">{title}</h2>
