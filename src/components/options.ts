@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import type {
   DoorType,
+  FillWith,
   FloorTexture,
   GridType,
   HatchStyle,
@@ -72,11 +73,17 @@ export function keepsSelection(tool: ToolType): boolean {
   return tool === 'select' || tool === 'label' || tool === 'light';
 }
 
+/** Tools that lay the liquid picked in the panel */
+export function laysLiquid(tool: ToolType, fillWith: FillWith): boolean {
+  return tool === 'water' || tool === 'river' || (tool === 'fill' && fillWith === 'liquid');
+}
+
 /** Tools that lay floor (or re-texture it), in the floor texture picked in the panel */
-export function laysFloor(tool: ToolType, shapeMode: ShapeMode): boolean {
+export function laysFloor(tool: ToolType, shapeMode: ShapeMode, fillWith: FillWith): boolean {
   if (tool === 'polygon' || tool === 'circle' || tool === 'path') return shapeMode === 'add';
+  if (tool === 'fill') return fillWith === 'floor';
   // Walls that close off an area make it a room
-  return tool === 'room-brush' || tool === 'room-rect' || tool === 'tunnel' || tool === 'fill' || tool === 'wall';
+  return tool === 'room-brush' || tool === 'room-rect' || tool === 'tunnel' || tool === 'wall';
 }
 
 export const WATER_STYLES: WaterStyle[] = ['solid', 'see-through', 'lava'];

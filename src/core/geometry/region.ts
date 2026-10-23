@@ -201,6 +201,32 @@ export function eraseWater(layer: LayerContent, area: Polygon[]) {
   }
 }
 
+/**
+ * Takes an area out of every liquid. `cells`, if given, are the cells the
+ * area covers whole, which simply go; otherwise liquid cells near the area
+ * become free-form liquid less the area.
+ */
+export function drainWater(layer: LayerContent, area: Polygon[], cells?: string[]) {
+  if (area.length === 0) return;
+  const before = liquids(layer);
+  try {
+    for (const style of LIQUIDS) {
+      const kind = kindOf(style);
+      if (!cells) {
+        if (hasWater(layer, style)) clearStyle(layer, area, style);
+        continue;
+      }
+      const left = { ...layer[kind.cells] };
+      for (const key of cells) delete left[key];
+      layer[kind.cells] = left;
+      if (layer[kind.areas].length > 0) layer[kind.areas] = difference(layer[kind.areas], area);
+    }
+  } catch (err) {
+    console.warn('Could not drain water', err);
+    Object.assign(layer, before);
+  }
+}
+
 /** The style of the water at (x, y) in grid units, or null if there is none */
 export function waterStyleAt(layer: MapLayer, x: number, y: number): WaterStyle | null {
   for (const style of LIQUIDS) {

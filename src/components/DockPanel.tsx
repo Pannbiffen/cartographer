@@ -11,6 +11,7 @@ import type {
   MapLayer,
   MapLevel,
   Selection,
+  FillWith,
   ShapeMode,
   WaterStyle,
 } from '../types/map';
@@ -29,6 +30,7 @@ import {
   WATER_STYLES,
   keepsSelection,
   laysFloor,
+  laysLiquid,
   optionButtonClass,
 } from './options';
 import type { ModifyMap } from '../App';
@@ -56,6 +58,8 @@ interface DockPanelProps {
   onLabelStyleChange: (style: LabelStyle) => void;
   shapeMode: ShapeMode;
   onShapeModeChange: (mode: ShapeMode) => void;
+  fillWith: FillWith;
+  onFillWithChange: (fillWith: FillWith) => void;
   river: RiverSettings;
   onRiverChange: (river: RiverSettings) => void;
   road: RiverSettings;
@@ -510,6 +514,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onLabelStyleChange,
   shapeMode,
   onShapeModeChange,
+  fillWith,
+  onFillWithChange,
   river,
   onRiverChange,
   road,
@@ -624,14 +630,17 @@ export const DockPanel: React.FC<DockPanelProps> = ({
           />
         )}
 
+        {activeTool === 'fill' && (
+          <Choices label="Fill with" options={['floor', 'liquid'] as FillWith[]} value={fillWith} columns={2} onChange={onFillWithChange} />
+        )}
+        {laysLiquid(activeTool, fillWith) && (
+          <Choices label="Liquid" options={WATER_STYLES} value={waterStyle} columns={3} onChange={onWaterStyleChange} />
+        )}
         {(activeTool === 'water' || activeTool === 'river') && (
-          <>
-            <Choices label="Liquid" options={WATER_STYLES} value={waterStyle} columns={3} onChange={onWaterStyleChange} />
-            <p className="text-ui-muted leading-snug">
-              Solid water hides the ground beneath; see-through water shows the floor through it; lava covers it
-              in molten rock. Right-click a pool to change what it holds.
-            </p>
-          </>
+          <p className="text-ui-muted leading-snug">
+            Solid water hides the ground beneath; see-through water shows the floor through it; lava covers it in
+            molten rock. Right-click a pool to change what it holds.
+          </p>
         )}
         {winding && onWindingChange && (
           <>
@@ -691,7 +700,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
             {activeTool === 'eraser' ? 'Erases' : activeTool === 'paint' ? 'Paints' : 'Paints floor in'} whole hexes on the hex grid.
           </p>
         )}
-        {laysFloor(activeTool, shapeMode) && (
+        {laysFloor(activeTool, shapeMode, fillWith) && (
           <Choices label="Floor" options={FLOOR_TEXTURES} value={floorTexture} columns={2} onChange={onFloorTextureChange} />
         )}
         {(activeTool === 'paint' || activeTool === 'road') && (
@@ -705,7 +714,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         )}
         {activeTool === 'fill' && (
           <p className="text-ui-muted leading-snug">
-            Click a room to lay this floor across it, up to its walls and doors (archways let it through).
+            Click a room to lay this {fillWith} across it, up to its walls and doors (archways let it through).
+            Shift+click drains the room.
           </p>
         )}
 

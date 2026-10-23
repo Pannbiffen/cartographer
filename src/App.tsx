@@ -8,11 +8,15 @@ import type {
   FoliageType,
   FloorTexture,
   LabelStyle,
+  FillWith,
   ShapeMode,
   ViewportTransform,
   MapHistoryState,
   Selection,
   WaterStyle,
+  MapLayer,
+  PlacedDoor,
+  PlacedWall,
 } from './types/map';
 import { MenuBar, type Menu, type MenuItem } from './components/MenuBar';
 import { ContextMenu } from './components/ContextMenu';
@@ -20,7 +24,7 @@ import { Toolbar } from './components/Toolbar';
 import { Toolbox } from './components/Toolbox';
 import { DockPanel } from './components/DockPanel';
 import { MapSettingsDrawer } from './components/MapSettingsDrawer';
-import { DOOR_TYPES, FLOOR_TEXTURES, LABEL_STYLES, LIQUID_NAMES, PROP_TYPES, TOOLS, WATER_STYLES, keepsSelection, laysFloor } from './components/options';
+import { DOOR_TYPES, FLOOR_TEXTURES, LABEL_STYLES, LIQUID_NAMES, PROP_TYPES, TOOLS, WATER_STYLES, keepsSelection, laysFloor, laysLiquid } from './components/options';
 import { MapCanvas, type CanvasMenuRequest } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
@@ -90,9 +94,9 @@ import {
   withLevel,
 } from './core/levels';
 import { fitViewport, zoomAbout } from './core/viewport';
-import { fillRoom, textureAt } from './core/tools/fill';
+import { drainRoom, fillRoom, floodRoom, textureAt } from './core/tools/fill';
 import { DEFAULT_RIVER, DEFAULT_ROAD, type RiverSettings } from './core/geometry/river';
-import { setWaterStyleAt, waterStyleAt } from './core/geometry/region';
+import { hasWater, setWaterStyleAt, waterStyleAt } from './core/geometry/region';
 import { createBlankMap, mapLook } from './core/newMap';
 import { clearShareFragment, isShareFragment, readShareFragment } from './core/share';
 
@@ -312,6 +316,7 @@ export function App() {
   const [paintTexture, setPaintTexture] = useState<FloorTexture>('dirt');
   const [labelStyle, setLabelStyle] = useState<LabelStyle>('text');
   const [shapeMode, setShapeMode] = useState<ShapeMode>('add');
+  const [fillWith, setFillWith] = useState<FillWith>('floor');
   const [river, setRiver] = useState<RiverSettings>(DEFAULT_RIVER);
   const [road, setRoad] = useState<RiverSettings>(DEFAULT_ROAD);
   const [waterStyle, setWaterStyle] = useState<WaterStyle>('solid');
@@ -1133,9 +1138,10 @@ export function App() {
       : []),
     ...(activeTool === 'label' ? [choices('Label Style', LABEL_STYLES, labelStyle, setLabelStyle)] : []),
     ...(brushTool ? [choices(activeTool === 'path' ? 'Path Width' : 'Brush Size', [1, 2, 3, 4, 5], brushSize, setBrushSize)] : []),
-    ...(laysFloor(activeTool, shapeMode) ? [choices('Floor', FLOOR_TEXTURES, floorTexture, setFloorTexture)] : []),
+    ...(activeTool === 'fill' ? [choices('Fill With', ['floor', 'liquid'] as FillWith[], fillWith, setFillWith)] : []),
+    ...(laysFloor(activeTool, shapeMode, fillWith) ? [choices('Floor', FLOOR_TEXTURES, floorTexture, setFloorTexture)] : []),
     ...(activeTool === 'paint' || activeTool === 'road' ? [choices('Texture', FLOOR_TEXTURES, paintTexture, setPaintTexture)] : []),
-    ...(activeTool === 'water' || activeTool === 'river' ? [choices('New Liquid', WATER_STYLES, waterStyle, setWaterStyle, (style) => LIQUID_NAMES[style])] : []),
+    ...(laysLiquid(activeTool, fillWith) ? [choices('New Liquid', WATER_STYLES, waterStyle, setWaterStyle, (style) => LIQUID_NAMES[style])] : []),
     ...(activeTool === 'polygon' || activeTool === 'circle' || activeTool === 'path'
       ? [choices('Mode', ['add', 'cut'] as ShapeMode[], shapeMode, setShapeMode)]
       : []),
@@ -1144,10 +1150,11 @@ export function App() {
   const menuAt = contextMenu?.at;
   const spotTexture = menuAt && activeLayerEditable ? textureAt(activeLayer, menuAt.x, menuAt.y) : null;
   const spotWater = menuAt && activeLayerEditable ? waterStyleAt(activeLayer, menuAt.x, menuAt.y) : null;
-  const fillAt = (at: { x: number; y: number }, texture: FloorTexture) => {
+  // Re-textures, floods or drains the room under the right-click, bounded by doors and walls on any shown layer
+  const editRoomAt = (edit: (layer: MapLayer, doors: PlacedDoor[], walls: PlacedWall[]) => void) => {
     const shown = visibleLayers(levelMap);
     const [doors, walls] = [shown.flatMap((l) => l.doors), shown.flatMap((l) => l.walls)];
-    modifyMap((draft) => withLayer(draft, activeLayerId, (layer) => fillRoom(layer, doors, walls, at.x, at.y, texture)));
+    modifyMap((draft) => withLayer(draft, activeLayerId, (layer) => edit(layer, doors, walls)));
   };
   const mapMenu: MenuItem[] = [
     {
@@ -1159,12 +1166,24 @@ export function App() {
     ...(menuAt && spotTexture
       ? [{
           label: 'Fill Room With',
-          submenu: FLOOR_TEXTURES.map((texture) => ({
-            label: capitalize(texture),
-            checked: texture === spotTexture,
-            onSelect: () => fillAt(menuAt, texture),
-          })),
-        }, { label: 'Pick Floor Texture', onSelect: () => setFloorTexture(spotTexture) }]
+          submenu: [
+            ...FLOOR_TEXTURES.map((texture) => ({
+              label: capitalize(texture),
+              checked: texture === spotTexture,
+              onSelect: () => editRoomAt((layer, doors, walls) => fillRoom(layer, doors, walls, menuAt.x, menuAt.y, texture)),
+            })),
+            'separator' as const,
+            ...WATER_STYLES.map((style) => ({
+              label: LIQUID_NAMES[style],
+              checked: style === spotWater,
+              onSelect: () => editRoomAt((layer, doors, walls) => floodRoom(layer, doors, walls, menuAt.x, menuAt.y, style)),
+            })),
+          ],
+        },
+        ...(hasWater(activeLayer)
+          ? [{ label: 'Drain Room', onSelect: () => editRoomAt((layer, doors, walls) => drainRoom(layer, doors, walls, menuAt.x, menuAt.y)) }]
+          : []),
+        { label: 'Pick Floor Texture', onSelect: () => setFloorTexture(spotTexture) }]
       : []),
     ...(menuAt && spotWater
       ? [{
@@ -1227,6 +1246,7 @@ export function App() {
               paintTexture={paintTexture}
               labelStyle={labelStyle}
               shapeMode={shapeMode}
+              fillWith={fillWith}
               river={river}
               road={road}
               waterStyle={waterStyle}
@@ -1273,6 +1293,8 @@ export function App() {
             onLabelStyleChange={setLabelStyle}
             shapeMode={shapeMode}
             onShapeModeChange={setShapeMode}
+            fillWith={fillWith}
+            onFillWithChange={setFillWith}
             river={river}
             onRiverChange={setRiver}
             road={road}

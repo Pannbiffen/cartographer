@@ -120,3 +120,104 @@ test('Alt+click and the right-click menu pick up the floor texture', async ({ pa
   await page.getByRole('menuitem', { name: 'Pick Floor Texture' }).click();
   await expect(page.getByRole('button', { name: 'dirt' })).toHaveAttribute('aria-pressed', 'true');
 });
+
+async function layer0(page: Page) {
+  return (await saveMap(page)).levels[0].layers[0];
+}
+
+test('the fill tool floods a room with a liquid up to its door, and Shift+click drains it', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await twoRooms(page);
+  await page.keyboard.press('k');
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  await panel.getByRole('button', { name: 'liquid' }).click();
+  // Liquids replace the floor textures in the panel
+  await expect(panel.getByRole('button', { name: 'cobbles' })).toHaveCount(0);
+  await clickCell(page, -14, -6);
+
+  let layer = await layer0(page);
+  expect(layer.water['-15,-7']).toBe(true);
+  expect(layer.water['-13,-5']).toBe(true);
+  expect(layer.water['-11,-6']).toBe(true);
+  expect(layer.water['-10,-6']).toBeUndefined();
+
+  // One undo takes it all back
+  await page.keyboard.press('Control+z');
+  layer = await layer0(page);
+  expect(layer.water['-15,-7']).toBeUndefined();
+  expect(layer.water['-11,-6']).toBeUndefined();
+
+  // Lava in the room behind the door, water in the first; then drain the first
+  await panel.getByRole('button', { name: 'lava' }).click();
+  await clickCell(page, -9, -6);
+  await panel.getByRole('button', { name: 'solid' }).click();
+  await clickCell(page, -14, -6);
+  await page.keyboard.down('Shift');
+  await clickCell(page, -14, -6);
+  await page.keyboard.up('Shift');
+  layer = await layer0(page);
+  expect(layer.water['-15,-7']).toBeUndefined();
+  expect(layer.water['-11,-6']).toBeUndefined();
+  expect(layer.lava['-10,-7']).toBe(true);
+  expect(layer.lava['-8,-5']).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('right-clicking a room floods it with any liquid, or drains it', async ({ page }) => {
+  await openApp(page);
+  await twoRooms(page);
+  await page.keyboard.press('v');
+  const spot = await cellCenter(page, -9, -6);
+  const fillWith = async (name: string) => {
+    await page.mouse.click(spot.x, spot.y, { button: 'right' });
+    await page.getByRole('menu').getByRole('menuitem', { name: 'Fill Room With' }).hover();
+    await page.getByRole('menuitemcheckbox', { name }).click();
+  };
+  await fillWith('See-through Water');
+  let layer = await layer0(page);
+  expect(layer.clearWater['-10,-7']).toBe(true);
+  expect(layer.clearWater['-11,-6']).toBeUndefined();
+
+  // Lava poured in replaces the water
+  await fillWith('Lava');
+  layer = await layer0(page);
+  expect(layer.lava['-10,-7']).toBe(true);
+  expect(layer.clearWater['-10,-7']).toBeUndefined();
+
+  await page.mouse.click(spot.x, spot.y, { button: 'right' });
+  await page.getByRole('menuitem', { name: 'Drain Room' }).click();
+  layer = await layer0(page);
+  expect(layer.lava).toEqual({});
+});
+
+test('a liquid fills free-form floor right up to its curved walls', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await page.keyboard.press('c');
+  const centre = await gridPoint(page, -12, -4);
+  const edge = await gridPoint(page, -12, -2);
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.down();
+  await page.mouse.move(edge.x, edge.y, { steps: 6 });
+  await page.mouse.up();
+
+  await page.keyboard.press('k');
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  await panel.getByRole('button', { name: 'liquid' }).click();
+  await panel.getByRole('button', { name: 'lava' }).click();
+  await clickCell(page, -12, -4);
+  let layer = await layer0(page);
+  expect(layer.lava).toEqual({});
+  expect(layer.lavaAreas).toHaveLength(1);
+  const xs = layer.lavaAreas[0][0].map(([x]) => x);
+  expect(Math.min(...xs)).toBeCloseTo(-14, 1);
+  expect(Math.max(...xs)).toBeCloseTo(-10, 1);
+
+  await page.keyboard.down('Shift');
+  await clickCell(page, -12, -4);
+  await page.keyboard.up('Shift');
+  layer = await layer0(page);
+  expect(layer.lavaAreas).toHaveLength(0);
+  expect(errors).toEqual([]);
+});

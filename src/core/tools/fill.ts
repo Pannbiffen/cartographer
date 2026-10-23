@@ -1,7 +1,18 @@
-// The fill tool: re-textures the room under a point, up to its walls and doors
-import type { FloorTexture, MapLayer, PlacedDoor, PlacedWall } from '../../types/map';
+// The fill tool: re-textures the room under a point, up to its walls and
+// doors, or floods it with a liquid and drains it again
+import type { FloorTexture, MapLayer, PlacedDoor, PlacedWall, Polygon, WaterStyle } from '../../types/map';
 import { closedWalls, doorEdgeKey, wallDoorEdge } from '../geometry/walls';
-import { cellPolygons, floorPieceAt, hasShapes, layerFloor, paintArea, pointInPolygons } from '../geometry/region';
+import {
+  addWater,
+  cellPolygons,
+  drainWater,
+  floorPieceAt,
+  hasShapes,
+  layerFloor,
+  paintArea,
+  paintWaterCells,
+  pointInPolygons,
+} from '../geometry/region';
 
 // A fill never spreads further than this (an open outdoor map could be huge)
 const MAX_CELLS = 40000;
@@ -26,20 +37,19 @@ export function textureAt(layer: MapLayer, x: number, y: number): FloorTexture |
 }
 
 /**
- * Lays `texture` over the floor connected to (x, y), spreading cell by cell
- * but never through a door or a thin wall along a cell edge (archways are
- * open, so it passes those, even on a wall). Returns false if there is no
- * floor there.
+ * The room at (x, y): the floor connected to it, spreading cell by cell but
+ * never through a door or a thin wall along a cell edge (archways are open,
+ * so it passes those, even on a wall). On free-form floor `piece` is its
+ * outline. Null if there is no floor there.
  */
-export function fillRoom(
+function roomAt(
   layer: MapLayer,
   doors: PlacedDoor[],
   walls: PlacedWall[],
   x: number,
-  y: number,
-  texture: FloorTexture
-): boolean {
-  if (!isFloorAt(layer, x, y)) return false;
+  y: number
+): { cells: Map<string, [number, number]>; piece: Polygon | null } | null {
+  if (!isFloorAt(layer, x, y)) return null;
   const shaped = hasShapes(layer);
   const floor = shaped ? layerFloor(layer) : [];
   const isFloorCell = shaped
@@ -71,19 +81,66 @@ export function fillRoom(
     }
   }
 
-  if (!shaped) {
-    for (const key of cells.keys()) setCellTexture(layer, key, texture);
-    return true;
-  }
+  if (!shaped) return { cells, piece: null };
   // Free-form floor can reach past a door's cells, or bridge two rooms in a
   // cell they share, so keep only the floor joined to the point clicked
   const squares = cellPolygons(Object.fromEntries([...cells.keys()].map((key) => [key, true])));
   const piece = floorPieceAt(squares, floor, x, y);
-  if (!piece) return false;
+  return piece ? { cells, piece } : null;
+}
+
+/** Lays `texture` over the room at (x, y). Returns false if there is no floor there. */
+export function fillRoom(
+  layer: MapLayer,
+  doors: PlacedDoor[],
+  walls: PlacedWall[],
+  x: number,
+  y: number,
+  texture: FloorTexture
+): boolean {
+  const room = roomAt(layer, doors, walls, x, y);
+  if (!room) return false;
+  const { cells, piece } = room;
+  if (!piece) {
+    for (const key of cells.keys()) setCellTexture(layer, key, texture);
+    return true;
+  }
   for (const [key, [gx, gy]] of cells) {
     if (layer.rooms[key] && pointInPolygons([piece], gx + 0.5, gy + 0.5)) setCellTexture(layer, key, texture);
   }
   paintArea(layer, [piece], texture);
+  return true;
+}
+
+/**
+ * Floods the room at (x, y) with a liquid, right up to its walls, replacing
+ * any other liquid in it. Returns false if there is no floor there.
+ */
+export function floodRoom(
+  layer: MapLayer,
+  doors: PlacedDoor[],
+  walls: PlacedWall[],
+  x: number,
+  y: number,
+  style: WaterStyle
+): boolean {
+  const room = roomAt(layer, doors, walls, x, y);
+  if (!room) return false;
+  if (room.piece) addWater(layer, [room.piece], style);
+  else paintWaterCells(layer, [...room.cells.values()].map(([gx, gy]) => ({ x: gx, y: gy })), style);
+  return true;
+}
+
+/** Takes every liquid out of the room at (x, y). Returns false if there is no floor there. */
+export function drainRoom(layer: MapLayer, doors: PlacedDoor[], walls: PlacedWall[], x: number, y: number): boolean {
+  const room = roomAt(layer, doors, walls, x, y);
+  if (!room) return false;
+  if (room.piece) {
+    drainWater(layer, [room.piece]);
+  } else {
+    const keys = [...room.cells.keys()];
+    drainWater(layer, cellPolygons(Object.fromEntries(keys.map((key) => [key, true]))), keys);
+  }
   return true;
 }
 

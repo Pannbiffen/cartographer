@@ -62,6 +62,9 @@ export type GridType = 'square' | 'hex-pointy' | 'hex-flat';
 // Whether a free-form shape adds floor or carves it away
 export type ShapeMode = 'add' | 'cut';
 
+// What the fill tool floods a room with: a floor texture or a liquid
+export type FillWith = 'floor' | 'liquid';
+
 // Plain text, or a room number keyed in a circle or box
 export type LabelStyle = 'text' | 'circle' | 'box';
 

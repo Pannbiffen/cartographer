@@ -23,6 +23,7 @@ const CANVAS_SHORTCUTS: [string, string][] = [
   ['Remove last point', 'Backspace'],
   ['Cancel polygon, path or river', 'Esc'],
   ['Erase walls (wall tool)', 'Shift + drag'],
+  ['Drain a room (fill tool)', 'Shift + click'],
   ['Pick the floor texture there (room and fill tools)', 'Alt + click'],
 ];
 

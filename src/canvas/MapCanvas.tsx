@@ -13,6 +13,7 @@ import type {
   Pair,
   Polygon,
   Selection,
+  FillWith,
   ShapeMode,
   ViewportTransform,
 } from '../types/map';
@@ -33,7 +34,7 @@ import {
   stairsContainCell,
   lineCells,
 } from '../core/tools/toolGeometry';
-import { fillRoom, isFloorAt, textureAt } from '../core/tools/fill';
+import { drainRoom, fillRoom, floodRoom, isFloorAt, textureAt } from '../core/tools/fill';
 import { isTypingInField } from '../core/keyboard';
 import {
   findDoor,
@@ -101,11 +102,13 @@ interface MapCanvasProps {
   labelStyle: LabelStyle;
   // Whether the polygon, circle and path tools add floor or cut it away
   shapeMode: ShapeMode;
+  // Whether the fill tool lays floor or a liquid
+  fillWith: FillWith;
   // Width, wander and seed of the rivers the river tool draws
   river: RiverSettings;
   // The same for the roads the road tool paints, in `paintTexture`
   road: RiverSettings;
-  // Whether the water and river tools lay solid or see-through water
+  // The liquid the water, river and fill tools lay
   waterStyle: WaterStyle;
   // Layer the drawing tools edit
   activeLayerId: string;
@@ -171,6 +174,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   paintTexture,
   labelStyle,
   shapeMode,
+  fillWith,
   river,
   road,
   waterStyle,
@@ -864,7 +868,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       panStartRef.current = { x: e.clientX - viewport.x, y: e.clientY - viewport.y };
       const { worldX, worldY } = pointerToGrid(e);
       pickRef.current =
-        e.button === 0 && e.altKey && !spaceHeldRef.current && laysFloor(activeTool, shapeMode)
+        e.button === 0 && e.altKey && !spaceHeldRef.current && laysFloor(activeTool, shapeMode, fillWith)
           ? { at: [worldX / mapData.gridSize, worldY / mapData.gridSize], clientX: e.clientX, clientY: e.clientY }
           : null;
       drawMap();
@@ -990,8 +994,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       // Doors and walls on any shown layer bound the room
       const shown = visibleLayers(mapData);
       const [doors, walls] = [shown.flatMap((l) => l.doors), shown.flatMap((l) => l.walls)];
+      // Shift+click drains the room
       editLayer((draft) => {
-        fillRoom(draft, doors, walls, ...at, floorTexture);
+        if (e.shiftKey) drainRoom(draft, doors, walls, ...at);
+        else if (fillWith === 'liquid') floodRoom(draft, doors, walls, ...at, waterStyle);
+        else fillRoom(draft, doors, walls, ...at, floorTexture);
       });
     } else if (activeTool === 'circle') {
       freePlacementRef.current = e.shiftKey;

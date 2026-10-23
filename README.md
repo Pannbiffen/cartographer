@@ -25,7 +25,7 @@
 - **Hex Grid**: Show a pointy- or flat-top hex grid instead of squares. The room brush, paint and eraser then work in whole hexes, and shapes snap to hex centres and corners.
 - **Floor Textures**: Procedurally drawn flagstones, stone slabs, wooden planks, cobbles, tiles, marble, carpet, dirt, sand or grass, chosen per room as you draw it, with any room tool (cells, polygons, circles, paths and hexes). The Fill tool (or right-click > Fill Room With) re-textures a whole room in one click, up to its walls and doors; `Alt`+click (or right-click > Pick Floor Texture) picks up the texture under the pointer.
 - **Outdoor Maps**: Set Ground in Map settings (or for new maps in Preferences) to grass, dirt, sand, cobbles or any other floor texture, and the whole map becomes ground instead of blank paper. Rooms drawn on it get walls as usual, so buildings sit in a field or a town square; draw walls in the open with the Wall tool. Exports include the ground.
-- **Water and lava**: Paint lakes, moats and indoor pools with shoreline ripple lines. Water is solid, hiding the ground beneath, or see-through, so a fountain shows the floor under it; lava is a third liquid, molten rock with a crust along its edges. Pick one for new pools and rivers in the panel, or right-click a pool (Liquid Here) to switch just that one.
+- **Water and lava**: Paint lakes, moats and indoor pools with shoreline ripple lines. Water is solid, hiding the ground beneath, or see-through, so a fountain shows the floor under it; lava is a third liquid, molten rock with a crust along its edges. Pick one for new pools and rivers in the panel, or right-click a pool (Liquid Here) to switch just that one. The Fill tool set to Liquid (or right-click > Fill Room With) floods a whole room, up to its walls and doors, and `Shift`+click (or right-click > Drain Room) empties it again.
 - **Rivers**: Click points along the way and the River tool lays a river through them that winds between the points and swells and narrows as it goes; click the first point again to close it into a loop, such as a moat around a castle. Set its narrowest and widest width, how far it wanders and a seed (roll a new one for another river along the same points). It merges with painted water into one shoreline, and the eraser takes it away cell by cell.
 - **Paint Floor**: Brush a texture onto the ground (dirt, cobbles, sand, grass, flagstones...) without making a room: no walls, hatching or shadows. For a clearing, a muddy patch or a cobbled market square on an outdoor map; it hides the ground beneath and the eraser takes it away.
 - **Roads & Paths**: Click points along the way and the Road / Path tool paints a winding track through them in any texture (a dirt track, a cobbled road, a sand path), with no walls; click the first point again for a ring road. Set its narrowest and widest width, how far it wanders and a seed, as for rivers.
@@ -105,7 +105,7 @@ npm run preview
 | `N` | Polygon room |
 | `C` | Circle room |
 | `H` | Free path |
-| `K` | Fill room with the chosen floor texture |
+| `K` | Fill room with the chosen floor texture or liquid (`Shift`+click drains it) |
 | `Alt` + click (room and fill tools) | Pick the floor texture under the pointer |
 | `Enter` / `Backspace` / `Esc` (while drawing a polygon, path, river or road) | Finish / remove last point / cancel |
 | `W` | Water |
