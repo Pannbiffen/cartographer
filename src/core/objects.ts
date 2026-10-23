@@ -13,7 +13,7 @@ import type {
   PlacedWindow,
   Selection,
 } from '../types/map';
-import { nearestDoorEdge, stairsContainCell } from './tools/toolGeometry';
+import { distanceToDoor, doorLine, nearestDoorEdge, sameDoorSpot, stairsContainCell, type DoorSpot } from './tools/toolGeometry';
 import { measureLabel } from './renderers/labelRenderer';
 import { findLayer, isLayerEditable } from './layers';
 import { distanceToWall, wallKey } from './geometry/walls';
@@ -47,7 +47,7 @@ export function findLight(layer: LayerContent, id: string): PlacedLight | undefi
   return layer.lights.find((l) => l.id === id);
 }
 
-/** Doors and windows sit on cell edges, one of each kind per edge */
+/** Doors and windows sit on cell edges (doors also along walls off the grid), one of each kind per spot */
 type EdgeKind = 'door' | 'window';
 type EdgeObject = PlacedDoor | PlacedWindow;
 
@@ -59,11 +59,9 @@ function edgeObjects(layer: LayerContent, kind: EdgeKind): EdgeObject[] {
   return kind === 'door' ? layer.doors : layer.windows;
 }
 
-/** Whether a door or window other than `id` already uses the edge */
-function edgeTaken(layer: LayerContent, kind: EdgeKind, edge: Pick<EdgeObject, 'x' | 'y' | 'orientation'>, id?: string): boolean {
-  return edgeObjects(layer, kind).some(
-    (o) => o.id !== id && o.x === edge.x && o.y === edge.y && o.orientation === edge.orientation
-  );
+/** Whether a door or window other than `id` already uses the spot */
+function edgeTaken(layer: LayerContent, kind: EdgeKind, spot: DoorSpot, id?: string): boolean {
+  return edgeObjects(layer, kind).some((o) => o.id !== id && sameDoorSpot(o, spot));
 }
 
 /** Label extent in grid units */
@@ -124,6 +122,17 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
   const gx = Math.floor(worldX / gridSize);
   const gy = Math.floor(worldY / gridSize);
   const layerId = layer.id;
+  const px = worldX / gridSize;
+  const py = worldY / gridSize;
+
+  // Doors turned along walls off the grid, nearest first
+  let angled: PlacedDoor | undefined;
+  let angledDistance = DOOR_HIT_DISTANCE;
+  for (const d of layer.doors) {
+    const distance = d.angle === undefined ? Infinity : distanceToDoor(d, px, py);
+    if (distance <= angledDistance) [angled, angledDistance] = [d, distance];
+  }
+  if (angled) return { kind: 'door', id: angled.id, layerId };
 
   const edge = nearestDoorEdge(worldX, worldY, gridSize);
   const edgeDistance =
@@ -132,7 +141,7 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
       : Math.abs(worldX / gridSize - edge.x);
   if (edgeDistance <= DOOR_HIT_DISTANCE) {
     const door = layer.doors.find(
-      (d) => d.x === edge.x && d.y === edge.y && d.orientation === edge.orientation
+      (d) => d.angle === undefined && d.x === edge.x && d.y === edge.y && d.orientation === edge.orientation
     );
     if (door) return { kind: 'door', id: door.id, layerId };
     const pane = layer.windows.find(
@@ -140,8 +149,6 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
     );
     if (pane) return { kind: 'window', id: pane.id, layerId };
   }
-  const px = worldX / gridSize;
-  const py = worldY / gridSize;
   for (let i = layer.walls.length - 1; i >= 0; i--) {
     const w = layer.walls[i];
     if (distanceToWall(w, px, py) <= DOOR_HIT_DISTANCE) return { kind: 'wall', id: w.id, layerId };
@@ -200,9 +207,11 @@ export function objectBounds(
   if (isEdgeKind(sel.kind)) {
     const d = sel.kind === 'door' ? findDoor(layer, sel.id) : findWindow(layer, sel.id);
     if (!d) return null;
-    return d.orientation === 'horizontal'
-      ? { x: d.x, y: d.y - 0.2, w: 1, h: 0.4 }
-      : { x: d.x - 0.2, y: d.y, w: 0.4, h: 1 };
+    // A cell long and 0.4 across, turned with the wall
+    const { cx, cy, ux, uy } = doorLine(d);
+    const halfW = Math.abs(ux) * 0.5 + Math.abs(uy) * 0.2;
+    const halfH = Math.abs(uy) * 0.5 + Math.abs(ux) * 0.2;
+    return { x: cx - halfW, y: cy - halfH, w: halfW * 2, h: halfH * 2 };
   }
   if (sel.kind === 'wall') {
     const w = findWall(layer, sel.id);
@@ -238,10 +247,12 @@ export function rotateObject(draft: MapData | LevelMap, sel: Selection) {
   if (sel.kind === 'door') {
     const d = findDoor(layer, sel.id);
     if (!d) return;
-    replaceDoor(layer, {
-      ...d,
-      orientation: d.orientation === 'horizontal' ? 'vertical' : 'horizontal',
-    });
+    replaceDoor(
+      layer,
+      d.angle === undefined
+        ? { ...d, orientation: d.orientation === 'horizontal' ? 'vertical' : 'horizontal' }
+        : { ...d, angle: (d.angle + 90) % 180 }
+    );
   } else if (sel.kind === 'window') {
     const w = findWindow(layer, sel.id);
     if (w) replaceWindow(layer, { ...w, orientation: w.orientation === 'horizontal' ? 'vertical' : 'horizontal' });
@@ -334,7 +345,7 @@ export function moveObjects(draft: MapData | LevelMap, origins: ObjectOrigin[], 
     return (
       edge &&
       edgeObjects(layer, sel.kind as EdgeKind).some(
-        (d) => !moving.has(d.id) && d.x === x + dx && d.y === y + dy && d.orientation === edge.orientation
+        (d) => !moving.has(d.id) && sameDoorSpot(d, { ...edge, x: x + dx, y: y + dy })
       )
     );
   });
@@ -419,8 +430,7 @@ export function placeCopies(
     entries.some((e) => {
       if (e.kind !== 'door' && e.kind !== 'window') return false;
       const layer = target(e);
-      const { x, y, orientation } = e.object;
-      return !!layer && edgeTaken(layer, e.kind, { x: x + offset, y: y + dy, orientation });
+      return !!layer && edgeTaken(layer, e.kind, { ...e.object, x: e.object.x + offset, y: e.object.y + dy });
     });
   // Bounded, as every door and window stays on its own row or column
   for (let i = 0; i < 1000 && edgeTakenAt(dx); i++) dx++;
@@ -435,16 +445,19 @@ export function placeCopies(
 /**
  * The copy to paste onto a layer: a new id, one cell to the right, or under
  * `at` (a point in grid units) snapped as the placing tools do. Doors and
- * windows move along their wall instead, or to the edge nearest `at`, past
- * any of their kind already there.
+ * windows move along their wall instead, or to the edge nearest `at` (a door
+ * turned along a wall keeps its angle, centred on `at`), past any of their
+ * kind already there.
  */
 export function offsetCopy(layer: LayerContent, copied: CopiedObject, at?: { x: number; y: number }): CopiedObject {
   const id = newObjectId(copied.kind);
   if (copied.kind === 'door' || copied.kind === 'window') {
-    const d = { ...copied.object, ...(at && nearestDoorEdge(at.x, at.y, 1)) };
-    const [dx, dy] = d.orientation === 'horizontal' ? [1, 0] : [0, 1];
-    let [x, y] = at ? [d.x, d.y] : [d.x + dx, d.y + dy];
-    while (edgeTaken(layer, copied.kind, { x, y, orientation: d.orientation })) [x, y] = [x + dx, y + dy];
+    const angled = 'angle' in copied.object && copied.object.angle !== undefined;
+    const d = { ...copied.object, ...(at && (angled ? at : nearestDoorEdge(at.x, at.y, 1))) };
+    const { ux: dx, uy: dy } = doorLine(d);
+    const step = (v: number) => Math.round(v * 1e4) / 1e4;
+    let [x, y] = at ? [d.x, d.y] : [step(d.x + dx), step(d.y + dy)];
+    while (edgeTaken(layer, copied.kind, { ...d, x, y })) [x, y] = [step(x + dx), step(y + dy)];
     return { kind: copied.kind, object: { ...d, id, x, y } } as CopiedObject;
   }
   if (!at) return { ...copied, object: { ...copied.object, id, x: copied.object.x + 1 } } as CopiedObject;

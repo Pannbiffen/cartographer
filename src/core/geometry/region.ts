@@ -4,6 +4,7 @@ import * as clipping from 'polygon-clipping';
 import type { FloorTexture, GridCoord, LayerContent, MapLayer, Pair, Polygon, Ring, ShapeMode, WaterStyle } from '../../types/map';
 import { extractWallSegments, type WallSegment } from './hatching';
 import { thinWallSegments } from './walls';
+import type { DoorWall } from '../tools/toolGeometry';
 
 // The package's types list named exports, but its ES build only has a default one
 const { union, difference, intersection } = (clipping as unknown as { default: typeof clipping }).default;
@@ -409,6 +410,42 @@ export function floorPath(floor: Polygon[], gridSize: number): Path2D {
  */
 export function combinedWalls(layers: MapLayer[], gridSize: number): WallSegment[] {
   return [...floorWalls(layers, gridSize), ...thinWallSegments(layers.flatMap((l) => l.walls), layers.flatMap((l) => l.doors), gridSize)];
+}
+
+const onGridLine = (x1: number, y1: number, x2: number, y2: number) =>
+  (Math.abs(y1 - y2) < 1e-9 && Number.isInteger(y1)) || (Math.abs(x1 - x2) < 1e-9 && Number.isInteger(x1));
+
+let doorWallsCache: { layers: MapLayer[]; walls: DoorWall[] } | null = null;
+
+/**
+ * The walls of `layers` that run off the grid lines, in grid units: diagonal
+ * and curved floor outlines and hex thin walls, which doors snap and turn to.
+ * Walls along cell edges are left out, as doors there snap to the edge.
+ */
+export function doorWalls(layers: MapLayer[]): DoorWall[] {
+  const cached = doorWallsCache;
+  if (cached && cached.layers.length === layers.length && cached.layers.every((l, i) => l === layers[i])) return cached.walls;
+  const outline = layers.some(hasShapes) ? floorWalls(layers, 1) : [];
+  const walls: DoorWall[] = [
+    ...outline.filter((s) => !onGridLine(s.x1, s.y1, s.x2, s.y2)).map((s) => ({ ...s, centred: false })),
+    ...layers
+      .flatMap((l) => l.walls)
+      .map((w) => ({ x1: w.x, y1: w.y, x2: w.x + w.dx, y2: w.y + w.dy, centred: true }))
+      .filter((w) => !onGridLine(w.x1, w.y1, w.x2, w.y2)),
+  ];
+  doorWallsCache = { layers, walls };
+  return walls;
+}
+
+/** Floor with `barriers` taken out of it, or the floor as it was if they can't be clipped */
+export function floorWithout(floor: Polygon[], barriers: Polygon[]): Polygon[] {
+  if (barriers.length === 0 || floor.length === 0) return floor;
+  try {
+    return difference(floor, ...barriers);
+  } catch (err) {
+    console.warn('Could not clip to the floor', err);
+    return floor;
+  }
 }
 
 function floorWalls(layers: MapLayer[], gridSize: number): WallSegment[] {

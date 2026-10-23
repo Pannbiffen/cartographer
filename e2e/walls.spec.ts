@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, cellCenter, clickCell, dragCells, gridPoint, saveMap, trackErrors } from './helpers';
+import { openApp, cellCenter, clickCell, downloadText, dragCells, gridPoint, saveMap, trackErrors } from './helpers';
 
 // The starter map leaves the block x -15..-8, y -8..0 empty
 
@@ -145,14 +145,6 @@ test('on a hex grid, walls follow hex edges', async ({ page }) => {
   for (const w of walls) expect(Math.hypot(w.dx, w.dy)).toBeCloseTo(1 / Math.sqrt(3), 5);
   expect(errors).toEqual([]);
 });
-
-async function downloadText(page: Page, trigger: () => Promise<unknown>) {
-  const [download] = await Promise.all([page.waitForEvent('download'), trigger()]);
-  const stream = await download.createReadStream();
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) chunks.push(chunk as Buffer);
-  return Buffer.concat(chunks).toString('utf8');
-}
 
 /** One stroke through several grid points */
 async function tracePoints(page: Page, points: [number, number][]) {

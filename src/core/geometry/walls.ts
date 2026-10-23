@@ -67,13 +67,16 @@ export function doorEdgeKey(edge: Pick<PlacedDoor, 'x' | 'y' | 'orientation'>): 
   return `${edge.orientation === 'horizontal' ? 'h' : 'v'},${edge.x},${edge.y}`;
 }
 
-/** Walls not opened by a door on the same edge */
+/** Walls not opened by a door on the same edge, or one turned to sit at their middle (a hex edge) */
 export function closedWalls(walls: PlacedWall[], doors: PlacedDoor[]): PlacedWall[] {
   if (doors.length === 0) return walls;
-  const doorEdges = new Set(doors.map(doorEdgeKey));
+  const doorEdges = new Set(doors.filter((d) => d.angle === undefined).map(doorEdgeKey));
+  const angled = doors.filter((d) => d.angle !== undefined);
   return walls.filter((w) => {
     const edge = wallDoorEdge(w);
-    return !edge || !doorEdges.has(doorEdgeKey(edge));
+    if (edge && doorEdges.has(doorEdgeKey(edge))) return false;
+    const [mx, my] = [w.x + w.dx / 2, w.y + w.dy / 2];
+    return !angled.some((d) => Math.hypot(d.x - mx, d.y - my) < 0.05);
   });
 }
 

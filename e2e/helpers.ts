@@ -95,6 +95,14 @@ export async function saveMap(page: Page): Promise<MapData> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
+/** The text of the file a click (or other action) downloads */
+export async function downloadText(page: Page, trigger: () => Promise<unknown>) {
+  const [download] = await Promise.all([page.waitForEvent('download'), trigger()]);
+  const chunks: Buffer[] = [];
+  for await (const chunk of await download.createReadStream()) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 /**
  * Opens a hall x 0..9, y 0..4 split by a thin wall along x = 5: the starter
  * map's settings, darkened, with no grid, and `content` on its one layer

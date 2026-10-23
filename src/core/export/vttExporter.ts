@@ -3,6 +3,7 @@ import type { LevelMap } from '../../types/map';
 import { combinedWalls } from '../geometry/region';
 import { visibleLayers } from '../layers';
 import { mapLights } from '../lighting';
+import { doorLine } from '../tools/toolGeometry';
 
 export interface VttPoint {
   x: number;
@@ -12,6 +13,7 @@ export interface VttPoint {
 export interface VttPortal {
   position: VttPoint;
   bounds: [VttPoint, VttPoint];
+  rotation: number; // radians
   closed: boolean;
   freestanding: boolean;
 }
@@ -71,31 +73,20 @@ export function exportUniversalVtt(
     .flatMap((l) => l.doors)
     .filter((door) => door.type !== 'archway')
     .map((door) => {
-    const dx = door.x - minX;
-    const dy = door.y - minY;
-
-    if (door.orientation === 'horizontal') {
+      // From 0.1 to 0.9 along the door's cell-wide span, turned with its wall
+      const { cx, cy, ux, uy } = doorLine(door);
+      const [x, y] = [cx - minX, cy - minY];
       return {
-        position: { x: dx + 0.5, y: dy },
+        position: { x, y },
         bounds: [
-          { x: dx + 0.1, y: dy },
-          { x: dx + 0.9, y: dy },
+          { x: x - ux * 0.4, y: y - uy * 0.4 },
+          { x: x + ux * 0.4, y: y + uy * 0.4 },
         ],
+        rotation: Math.atan2(uy, ux),
         closed: true,
         freestanding: false,
       };
-    } else {
-      return {
-        position: { x: dx, y: dy + 0.5 },
-        bounds: [
-          { x: dx, y: dy + 0.1 },
-          { x: dx, y: dy + 0.9 },
-        ],
-        closed: true,
-        freestanding: false,
-      };
-    }
-  });
+    });
 
   // Placed lights and torches become VTT light sources, colour as AARRGGBB
   const lights: VttLight[] = mapLights(mapData).map((light) => ({

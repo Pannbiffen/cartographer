@@ -95,6 +95,12 @@ export interface PlacedDoor {
   y: number; // grid y
   orientation: 'horizontal' | 'vertical';
   type: DoorType;
+  /**
+   * Set on a door along a wall off the grid lines (diagonal, curved or hex):
+   * (x, y) is then its centre in grid units and `angle` the wall's direction
+   * in degrees, 0 up to 180; `orientation` is unused
+   */
+  angle?: number;
 }
 
 /**

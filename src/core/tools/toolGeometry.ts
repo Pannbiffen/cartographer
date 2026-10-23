@@ -86,8 +86,81 @@ export function nearestDoorEdge(
   return { x, y, orientation };
 }
 
-/** True when a door (or window) lies on any of the four edges of cell (gx, gy) */
-export function doorTouchesCell(door: Pick<PlacedDoor, 'x' | 'y' | 'orientation'>, gx: number, gy: number): boolean {
+/** Where a door (or window) sits: a cell edge, or a centre and angle along a wall off the grid lines */
+export type DoorSpot = Pick<PlacedDoor, 'x' | 'y' | 'orientation' | 'angle'>;
+
+/** A door's (or window's) middle and its direction along the wall, in grid units */
+export function doorLine(door: DoorSpot): { cx: number; cy: number; ux: number; uy: number } {
+  if (door.angle !== undefined) {
+    const a = (door.angle * Math.PI) / 180;
+    return { cx: door.x, cy: door.y, ux: Math.cos(a), uy: Math.sin(a) };
+  }
+  return door.orientation === 'horizontal'
+    ? { cx: door.x + 0.5, cy: door.y, ux: 1, uy: 0 }
+    : { cx: door.x, cy: door.y + 0.5, ux: 0, uy: 1 };
+}
+
+/** Whether two doors (or windows) would overlap on a wall: their middles are under half a cell apart */
+export function sameDoorSpot(a: DoorSpot, b: DoorSpot): boolean {
+  const p = doorLine(a);
+  const q = doorLine(b);
+  return Math.hypot(p.cx - q.cx, p.cy - q.cy) < 0.5;
+}
+
+/** Distance from a point to a door's full cell-wide span, in grid units */
+export function distanceToDoor(door: DoorSpot, x: number, y: number): number {
+  const { cx, cy, ux, uy } = doorLine(door);
+  const t = Math.max(-0.5, Math.min(0.5, (x - cx) * ux + (y - cy) * uy));
+  return Math.hypot(x - (cx + ux * t), y - (cy + uy * t));
+}
+
+/**
+ * A wall a door can snap to, in grid units. A `centred` door sits at its
+ * middle (a hex edge); otherwise anywhere along it (a long or curved wall).
+ */
+export interface DoorWall {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  centred: boolean;
+}
+
+// How near (in cells) a wall off the grid lines must be for a door to snap to it
+const ANGLED_DOOR_REACH = 0.35;
+
+const tidy = (v: number, places: number) => Math.round(v * 10 ** places) / 10 ** places;
+
+/**
+ * Where a door goes for a point in grid units: on the nearest of `walls`
+ * within reach, turned to run along it, or else on the nearest cell edge
+ */
+export function snapDoor(x: number, y: number, walls: DoorWall[]): DoorSpot {
+  let best: { x: number; y: number; angle: number } | null = null;
+  let bestDistance = ANGLED_DOOR_REACH;
+  for (const w of walls) {
+    const dx = w.x2 - w.x1;
+    const dy = w.y2 - w.y1;
+    const lengthSq = dx * dx + dy * dy;
+    if (lengthSq < 1e-12) continue;
+    const t = w.centred ? 0.5 : Math.max(0, Math.min(1, ((x - w.x1) * dx + (y - w.y1) * dy) / lengthSq));
+    const px = w.x1 + dx * t;
+    const py = w.y1 + dy * t;
+    const d = Math.hypot(x - px, y - py);
+    if (d < bestDistance) {
+      bestDistance = d;
+      // A door looks the same either way round, so keep 0 to 180
+      const angle = (((Math.atan2(dy, dx) * 180) / Math.PI) % 180 + 180) % 180;
+      best = { x: tidy(px, 4), y: tidy(py, 4), angle: tidy(angle, 2) % 180 };
+    }
+  }
+  if (best) return { ...best, orientation: 'horizontal' };
+  return { ...nearestDoorEdge(x, y, 1), angle: undefined };
+}
+
+/** True when a door (or window) lies on any of the four edges of cell (gx, gy), or has its middle in it */
+export function doorTouchesCell(door: DoorSpot, gx: number, gy: number): boolean {
+  if (door.angle !== undefined) return Math.floor(door.x) === gx && Math.floor(door.y) === gy;
   if (door.orientation === 'horizontal') {
     return door.x === gx && (door.y === gy || door.y === gy + 1);
   }

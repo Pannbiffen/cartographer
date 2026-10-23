@@ -1,12 +1,16 @@
 // The fill tool: re-textures the room under a point, up to its walls and
 // doors, or floods it with a liquid and drains it again
-import type { FloorTexture, MapLayer, PlacedDoor, PlacedWall, Polygon, WaterStyle } from '../../types/map';
+import type { FloorTexture, MapLayer, Pair, PlacedDoor, PlacedWall, Polygon, WaterStyle } from '../../types/map';
 import { closedWalls, doorEdgeKey, wallDoorEdge } from '../geometry/walls';
+import type { WallSegment } from '../geometry/hatching';
+import { doorLine } from './toolGeometry';
 import {
   addWater,
   cellPolygons,
   drainWater,
   floorPieceAt,
+  floorSegments,
+  floorWithout,
   hasShapes,
   layerFloor,
   paintArea,
@@ -16,6 +20,12 @@ import {
 
 // A fill never spreads further than this (an open outdoor map could be huge)
 const MAX_CELLS = 40000;
+// An angled door parts free-form floor along its line: out to the walls either
+// side when they are this near (in cells; a doorway in a curved wall can be
+// wider than the door), else half a cell, plus a little to close the seam
+const BARRIER_REACH = 1.5;
+const BARRIER_OVERLAP = 0.05;
+const BARRIER_HALF_WIDTH = 0.005;
 // Points tested to tell whether free-form floor reaches into a cell
 const SAMPLES: [number, number][] = [[0.5, 0.5], [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]];
 
@@ -38,8 +48,9 @@ export function textureAt(layer: MapLayer, x: number, y: number): FloorTexture |
 
 /**
  * The room at (x, y): the floor connected to it, spreading cell by cell but
- * never through a door or a thin wall along a cell edge (archways are open,
- * so it passes those, even on a wall). On free-form floor `piece` is its
+ * never through a door or a thin wall along a cell edge, nor across a door
+ * turned along a wall off the grid (archways are open, so it passes those,
+ * even on a wall). On free-form floor `piece` is its
  * outline. Null if there is no floor there.
  */
 function roomAt(
@@ -55,8 +66,9 @@ function roomAt(
   const isFloorCell = shaped
     ? (gx: number, gy: number) => SAMPLES.some(([sx, sy]) => pointInPolygons(floor, gx + sx, gy + sy))
     : (gx: number, gy: number) => !!layer.rooms[`${gx},${gy}`];
+  const shut = doors.filter((d) => d.type !== 'archway');
   // Door edges as "h,x,y" (the top edge of cell x,y) or "v,x,y" (its left edge)
-  const closed = new Set(doors.filter((d) => d.type !== 'archway').map(doorEdgeKey));
+  const closed = new Set(shut.filter((d) => d.angle === undefined).map(doorEdgeKey));
   for (const wall of closedWalls(walls, doors)) {
     const edge = wallDoorEdge(wall);
     if (edge) closed.add(doorEdgeKey(edge));
@@ -83,10 +95,48 @@ function roomAt(
 
   if (!shaped) return { cells, piece: null };
   // Free-form floor can reach past a door's cells, or bridge two rooms in a
-  // cell they share, so keep only the floor joined to the point clicked
+  // cell they share, so keep only the floor joined to the point clicked. A
+  // door turned along a wall off the grid parts the floor where it stands.
   const squares = cellPolygons(Object.fromEntries([...cells.keys()].map((key) => [key, true])));
-  const piece = floorPieceAt(squares, floor, x, y);
+  const angled = shut.filter((d) => d.angle !== undefined);
+  const outline = angled.length > 0 ? floorSegments(floor, 1) : [];
+  const barriers = angled.map((door) => doorBarrier(door, outline));
+  const piece = floorPieceAt(squares, floorWithout(floor, barriers), x, y);
   return piece ? { cells, piece } : null;
+}
+
+/** A thin strip along an angled door, out to the walls either side, cut from the floor so a fill stops there */
+function doorBarrier(door: PlacedDoor, walls: WallSegment[]): Polygon {
+  const { cx, cy, ux, uy } = doorLine(door);
+  const reach = (dx: number, dy: number) => {
+    let nearest = BARRIER_REACH;
+    for (const w of walls) {
+      const t = rayHit(cx, cy, dx, dy, w);
+      // Skip the wall a door stands on, where its line starts
+      if (t !== null && t > 0.05 && t < nearest) nearest = t;
+    }
+    return (nearest < BARRIER_REACH ? Math.max(0.5, nearest) : 0.5) + BARRIER_OVERLAP;
+  };
+  const [back, ahead] = [reach(-ux, -uy), reach(ux, uy)];
+  const [nx, ny] = [-uy * BARRIER_HALF_WIDTH, ux * BARRIER_HALF_WIDTH];
+  const ring: Pair[] = [
+    [cx - ux * back - nx, cy - uy * back - ny],
+    [cx + ux * ahead - nx, cy + uy * ahead - ny],
+    [cx + ux * ahead + nx, cy + uy * ahead + ny],
+    [cx - ux * back + nx, cy - uy * back + ny],
+  ];
+  return [[...ring, ring[0]]];
+}
+
+/** How far along the ray from (x, y) in direction (dx, dy) it crosses a wall, or null if it misses */
+function rayHit(x: number, y: number, dx: number, dy: number, w: WallSegment): number | null {
+  const [ex, ey] = [w.x2 - w.x1, w.y2 - w.y1];
+  const denom = dx * ey - dy * ex;
+  if (Math.abs(denom) < 1e-12) return null;
+  const [ox, oy] = [w.x1 - x, w.y1 - y];
+  const t = (ox * ey - oy * ex) / denom;
+  const s = (ox * dy - oy * dx) / denom;
+  return t >= 0 && s >= 0 && s <= 1 ? t : null;
 }
 
 /** Lays `texture` over the room at (x, y). Returns false if there is no floor there. */

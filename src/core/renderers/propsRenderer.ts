@@ -1,5 +1,6 @@
 // Renderer for doors, windows, stairs, and dungeon props
 import type { PlacedDoor, PlacedStairs, PlacedProp, PlacedWindow } from '../../types/map';
+import { doorLine } from '../tools/toolGeometry';
 
 // How much of its cell edge a window's glass spans, centred on it; light passes only there
 export const WINDOW_PANE_LENGTH = 0.7;
@@ -38,8 +39,10 @@ export function renderDoor(
   fillColor: string = '#fcf8ec'
 ) {
   ctx.save();
-  const x = door.x * gridSize;
-  const y = door.y * gridSize;
+  // Drawn along the x axis of the door's own frame: centred, one cell long
+  const { cx, cy, ux, uy } = doorLine(door);
+  ctx.transform(ux, uy, -uy, ux, cx * gridSize, cy * gridSize);
+  const half = gridSize / 2;
 
   ctx.fillStyle = fillColor;
   ctx.strokeStyle = inkColor;
@@ -50,77 +53,41 @@ export function renderDoor(
     const jamb = gridSize * 0.14;
     const depth = 10;
     ctx.fillStyle = inkColor;
-    if (door.orientation === 'horizontal') {
-      ctx.fillRect(x, y - depth / 2, jamb, depth);
-      ctx.fillRect(x + gridSize - jamb, y - depth / 2, jamb, depth);
-    } else {
-      ctx.fillRect(x - depth / 2, y, depth, jamb);
-      ctx.fillRect(x - depth / 2, y + gridSize - jamb, depth, jamb);
-    }
+    ctx.fillRect(-half, -depth / 2, jamb, depth);
+    ctx.fillRect(half - jamb, -depth / 2, jamb, depth);
     ctx.restore();
     return;
   }
 
-  if (door.orientation === 'horizontal') {
-    // Door along horizontal wall
-    const doorWidth = gridSize * 0.8;
-    const doorHeight = 6;
-    const startX = x + (gridSize - doorWidth) / 2;
-    const startY = y - doorHeight / 2;
+  const doorWidth = gridSize * 0.8;
+  const doorHeight = 6;
+  const startX = -doorWidth / 2;
+  const startY = -doorHeight / 2;
 
-    ctx.fillRect(startX, startY, doorWidth, doorHeight);
-    ctx.strokeRect(startX, startY, doorWidth, doorHeight);
+  ctx.fillRect(startX, startY, doorWidth, doorHeight);
+  ctx.strokeRect(startX, startY, doorWidth, doorHeight);
 
-    if (door.type === 'secret') {
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillStyle = inkColor;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('S', x + gridSize / 2, y);
-    } else if (door.type === 'double') {
-      ctx.beginPath();
-      ctx.moveTo(x + gridSize / 2, startY);
-      ctx.lineTo(x + gridSize / 2, startY + doorHeight);
-      ctx.stroke();
-    } else if (door.type === 'portcullis') {
-      ctx.beginPath();
-      for (let i = 1; i <= 4; i++) {
-        const px = startX + (doorWidth / 5) * i;
-        ctx.moveTo(px, startY);
-        ctx.lineTo(px, startY + doorHeight);
-      }
-      ctx.stroke();
+  if (door.type === 'secret') {
+    // The letter stays upright however the door turns
+    ctx.rotate(-Math.atan2(uy, ux));
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = inkColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('S', 0, 0);
+  } else if (door.type === 'double') {
+    ctx.beginPath();
+    ctx.moveTo(0, startY);
+    ctx.lineTo(0, startY + doorHeight);
+    ctx.stroke();
+  } else if (door.type === 'portcullis') {
+    ctx.beginPath();
+    for (let i = 1; i <= 4; i++) {
+      const px = startX + (doorWidth / 5) * i;
+      ctx.moveTo(px, startY);
+      ctx.lineTo(px, startY + doorHeight);
     }
-  } else {
-    // Door along vertical wall
-    const doorWidth = 6;
-    const doorHeight = gridSize * 0.8;
-    const startX = x - doorWidth / 2;
-    const startY = y + (gridSize - doorHeight) / 2;
-
-    ctx.fillRect(startX, startY, doorWidth, doorHeight);
-    ctx.strokeRect(startX, startY, doorWidth, doorHeight);
-
-    if (door.type === 'secret') {
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillStyle = inkColor;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('S', x, y + gridSize / 2);
-    } else if (door.type === 'double') {
-      ctx.beginPath();
-      ctx.moveTo(startX, y + gridSize / 2);
-      ctx.lineTo(startX + doorWidth, y + gridSize / 2);
-      ctx.stroke();
-    } else if (door.type === 'portcullis') {
-      ctx.beginPath();
-      for (let i = 1; i <= 4; i++) {
-        const py = startY + (doorHeight / 5) * i;
-        ctx.moveTo(startX, py);
-        ctx.lineTo(startX + doorWidth, py);
-      }
-      ctx.stroke();
-    }
+    ctx.stroke();
   }
 
   ctx.restore();

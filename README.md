@@ -32,7 +32,7 @@
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
 - **Lighting**: Place lights with their own colour, radius and intensity; the rest of the map goes dark and walls cast shadows. Torches give off light too. Windows (the Window tool) let light through a wall onto the far side, dimmed by how much light the pane lets through and tinted by its colour, so stained glass casts coloured light.
 - **Walls**: Drag along the grid with the Wall tool to put thin walls inside or between rooms, such as splitting a hall in two (on hex grids they follow hex edges). Walls that close off an area make it a room, in the floor texture picked in the panel, so a building or yard can be outlined wall by wall. They're drawn in the room wall style, block light, stop the Fill tool and export as VTT walls; a door on one opens it. `Shift`+drag erases them, and they can be selected, moved and deleted like doors.
-- **Doors, Stairs & Props**: Doors snap to the nearest wall edge (standard, double, secret, portcullis, archway), stairs, pillars, chests, tables, altars, torches, barrels and sarcophagi.
+- **Doors, Stairs & Props**: Doors snap to the nearest wall edge (standard, double, secret, portcullis, archway), or onto a diagonal, curved or hex wall nearby, turned to run along it (and exported to VTT at that angle), stairs, pillars, chests, tables, altars, torches, barrels and sarcophagi.
 - **Procedural Generators**:
   - BSP Dungeon Generator (rooms + corridors)
   - Cellular Automata Cave Generator (winding organic caverns)

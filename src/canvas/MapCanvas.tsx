@@ -30,7 +30,10 @@ import {
   rectCells,
   tunnelCells,
   nearestDoorEdge,
+  doorLine,
   doorTouchesCell,
+  sameDoorSpot,
+  snapDoor,
   stairsContainCell,
   lineCells,
 } from '../core/tools/toolGeometry';
@@ -62,6 +65,7 @@ import {
   addWater,
   applyShape,
   circlePolygon,
+  doorWalls,
   addPaint,
   erasePaint,
   eraseShapesInCells,
@@ -256,6 +260,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     },
     [mapData.gridSize, mapData.gridType]
   );
+  // Where a door would go: on a wall off the grid lines nearby, turned to match, or the nearest cell edge
+  const doorSpotAt = useCallback(
+    (hover: HoverState) =>
+      snapDoor(hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize, doorWalls(visibleLayers(mapData))),
+    [mapData]
+  );
   const spaceHeldRef = useRef<boolean>(false);
   const [isSpaceHeld, setIsSpaceHeld] = useState<boolean>(false);
   const [isPanning, setIsPanning] = useState<boolean>(false);
@@ -405,17 +415,16 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         ctx.fill();
         ctx.stroke();
       } else if (activeTool === 'door' || activeTool === 'window') {
-        // Highlight the wall edge the door or window will snap to
-        const edge = nearestDoorEdge(hover.worldX, hover.worldY, gridSize);
-        const x = edge.x * gridSize;
-        const y = edge.y * gridSize;
+        // Highlight the wall edge (or, for a door, the stretch of a wall off the grid) it will snap to
+        const spot =
+          activeTool === 'door' ? doorSpotAt(hover) : nearestDoorEdge(hover.worldX, hover.worldY, gridSize);
+        const { cx, cy, ux, uy } = doorLine(spot);
         ctx.setLineDash([]);
         ctx.lineWidth = 6;
         ctx.strokeStyle = activeTool === 'window' ? 'rgba(60, 140, 180, 0.6)' : 'rgba(139, 58, 43, 0.6)';
         ctx.beginPath();
-        ctx.moveTo(x, y);
-        if (edge.orientation === 'horizontal') ctx.lineTo(x + gridSize, y);
-        else ctx.lineTo(x, y + gridSize);
+        ctx.moveTo((cx - ux / 2) * gridSize, (cy - uy / 2) * gridSize);
+        ctx.lineTo((cx + ux / 2) * gridSize, (cy + uy / 2) * gridSize);
         ctx.stroke();
       } else if (activeTool === 'wall') {
         // The corner the wall will start from or run to; red while erasing
@@ -482,7 +491,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     ctx.restore();
 
     ctx.restore();
-  }, [mapData, levelsBelow, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, river, road, waterStyle, snapPoint, hexGrid, hexBrush]);
+  }, [mapData, levelsBelow, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, river, road, waterStyle, snapPoint, doorSpotAt, hexGrid, hexBrush]);
 
   // Keep the canvas backing store matched to its on-screen size
   const drawRef = useRef(drawMap);
@@ -754,19 +763,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
     if (drag.sel.kind === 'door') {
       const door = findDoor(layer, drag.sel.id);
-      const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
+      const spot = doorSpotAt(hover);
       if (!door) return;
       const same =
-        door.x === edge.x && door.y === edge.y && door.orientation === edge.orientation;
-      const occupied = layer.doors.some(
-        (d) =>
-          d.id !== door.id &&
-          d.x === edge.x &&
-          d.y === edge.y &&
-          d.orientation === edge.orientation
-      );
+        door.x === spot.x && door.y === spot.y && door.orientation === spot.orientation && door.angle === spot.angle;
+      const occupied = layer.doors.some((d) => d.id !== door.id && sameDoorSpot(d, spot));
       if (!same && !occupied) {
-        editDragged((draft) => replaceDoor(draft, { ...door, ...edge }));
+        editDragged((draft) => replaceDoor(draft, { ...door, ...spot }));
       }
       return;
     }
@@ -1061,13 +1064,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       };
       drawMap();
     } else if (activeTool === 'door') {
-      const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
+      const spot = doorSpotAt(hover);
       editLayer((draft) => {
-        // Placing on an occupied edge replaces the door there
-        draft.doors = draft.doors.filter(
-          (d) => d.x !== edge.x || d.y !== edge.y || d.orientation !== edge.orientation
-        );
-        draft.doors.push({ id: newObjectId('door'), ...edge, type: selectedDoorType });
+        // Placing on an occupied spot replaces the door there
+        draft.doors = draft.doors.filter((d) => !sameDoorSpot(d, spot));
+        draft.doors.push({ id: newObjectId('door'), ...spot, type: selectedDoorType });
       });
     } else if (activeTool === 'stairs') {
       editLayer((draft) => {

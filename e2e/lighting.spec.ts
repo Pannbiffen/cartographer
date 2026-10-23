@@ -1,14 +1,7 @@
-import { test, expect, type Page } from '@playwright/test';
-import { openApp, openDarkHall, clickCell, rgbAt, saveMap, trackErrors } from './helpers';
+import { test, expect } from '@playwright/test';
+import { openApp, openDarkHall, clickCell, downloadText, rgbAt, saveMap, trackErrors } from './helpers';
 
 // The starter map has a torch at (-4, 2) in the Grand Hall
-
-async function downloadText(page: Page, trigger: () => Promise<void>) {
-  const [download] = await Promise.all([page.waitForEvent('download'), trigger()]);
-  const chunks: Buffer[] = [];
-  for await (const chunk of await download.createReadStream()) chunks.push(chunk as Buffer);
-  return Buffer.concat(chunks).toString('utf8');
-}
 
 test('the light tool places a light, turns lighting on and edits it', async ({ page }) => {
   const errors = trackErrors(page);
