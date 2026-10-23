@@ -1,5 +1,31 @@
-// Renderer for doors, stairs, and dungeon props
-import type { PlacedDoor, PlacedStairs, PlacedProp } from '../../types/map';
+// Renderer for doors, windows, stairs, and dungeon props
+import type { PlacedDoor, PlacedStairs, PlacedProp, PlacedWindow } from '../../types/map';
+
+/** A pane across the wall line in its tint, with a line along the glass */
+export function renderWindow(ctx: CanvasRenderingContext2D, pane: PlacedWindow, gridSize: number, inkColor: string) {
+  const length = gridSize * 0.7;
+  const depth = 6;
+  const along = pane.orientation === 'horizontal';
+  const [cx, cy] = along ? [(pane.x + 0.5) * gridSize, pane.y * gridSize] : [pane.x * gridSize, (pane.y + 0.5) * gridSize];
+  const [w, h] = along ? [length, depth] : [depth, length];
+  ctx.save();
+  ctx.fillStyle = pane.tint;
+  ctx.strokeStyle = inkColor;
+  ctx.lineWidth = 2;
+  ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+  ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (along) {
+    ctx.moveTo(cx - w / 2, cy);
+    ctx.lineTo(cx + w / 2, cy);
+  } else {
+    ctx.moveTo(cx, cy - h / 2);
+    ctx.lineTo(cx, cy + h / 2);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
 
 export function renderDoor(
   ctx: CanvasRenderingContext2D,

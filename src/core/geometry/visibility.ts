@@ -53,6 +53,34 @@ export function mergeWallSegments(walls: WallSegment[]): Segment[] {
   return merged;
 }
 
+/**
+ * The walls with a gap from (x1, y1) to (x2, y2) cut out of any that run
+ * along it, as a window lets light through; the same array if none does
+ */
+export function wallsWithGap(walls: Segment[], gap: Segment): Segment[] {
+  const horizontal = gap.y1 === gap.y2;
+  const [from, to] = horizontal ? [Math.min(gap.x1, gap.x2), Math.max(gap.x1, gap.x2)] : [Math.min(gap.y1, gap.y2), Math.max(gap.y1, gap.y2)];
+  const eps = 1e-6;
+  let cut = false;
+  const result: Segment[] = [];
+  for (const w of walls) {
+    const along = horizontal
+      ? Math.abs(w.y1 - gap.y1) < eps && Math.abs(w.y2 - gap.y1) < eps
+      : Math.abs(w.x1 - gap.x1) < eps && Math.abs(w.x2 - gap.x1) < eps;
+    const [s, e] = horizontal ? [Math.min(w.x1, w.x2), Math.max(w.x1, w.x2)] : [Math.min(w.y1, w.y2), Math.max(w.y1, w.y2)];
+    if (!along || e <= from + eps || s >= to - eps) {
+      result.push(w);
+      continue;
+    }
+    cut = true;
+    for (const [a, b] of [[s, from], [to, e]]) {
+      if (b - a <= eps) continue;
+      result.push(horizontal ? { x1: a, y1: gap.y1, x2: b, y2: gap.y1 } : { x1: gap.x1, y1: a, x2: gap.x1, y2: b });
+    }
+  }
+  return cut ? result : walls;
+}
+
 /** Distance along the ray (ox, oy) + t * (dx, dy) to a segment, or Infinity */
 function rayHit(ox: number, oy: number, dx: number, dy: number, s: Segment): number {
   const sx = s.x2 - s.x1;

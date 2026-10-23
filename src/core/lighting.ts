@@ -1,9 +1,12 @@
-// Light sources: placed lights plus the torches that double as lights
-import type { LightSettings, LevelMap } from '../types/map';
+// Light sources: placed lights plus the torches that double as lights, and
+// the windows they shine through
+import type { LightSettings, LevelMap, PlacedWindow } from '../types/map';
 import { visibleLayers } from './layers';
 
 export const DEFAULT_LIGHT: LightSettings = { color: '#ffe2a8', radius: 5, intensity: 1 };
 export const TORCH_LIGHT: LightSettings = { color: '#ff9a3c', radius: 4, intensity: 0.9 };
+
+export const DEFAULT_WINDOW: Pick<PlacedWindow, 'tint' | 'clarity'> = { tint: '#cfe8ff', clarity: 0.8 };
 
 export const LIGHT_RADIUS_RANGE = { min: 1, max: 15 };
 
@@ -25,4 +28,9 @@ export function mapLights(map: LevelMap): MapLight[] {
     }
   }
   return lights;
+}
+
+/** Every window on the shown layers that lets any light through */
+export function mapWindows(map: LevelMap): PlacedWindow[] {
+  return visibleLayers(map).flatMap((layer) => layer.windows.filter((w) => w.clarity > 0));
 }

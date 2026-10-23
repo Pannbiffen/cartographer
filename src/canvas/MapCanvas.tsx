@@ -23,7 +23,7 @@ import { useKeyboardPan } from './useKeyboardPan';
 import { keepsSelection, laysFloor } from '../components/options';
 import { renderGhostLevel, renderMap, renderMapGround } from '../core/renderers/mapRenderer';
 import { renderLightMarkers } from '../core/renderers/lightingRenderer';
-import { DEFAULT_LIGHT } from '../core/lighting';
+import { DEFAULT_LIGHT, DEFAULT_WINDOW } from '../core/lighting';
 import { nextRoomNumber } from '../core/renderers/labelRenderer';
 import {
   brushCells,
@@ -40,6 +40,7 @@ import {
   findDoor,
   findSelected,
   findWall,
+  findWindow,
   hitTestObject,
   moveObjects,
   newObjectId,
@@ -52,6 +53,7 @@ import {
   replaceProp,
   replaceStairs,
   replaceWall,
+  replaceWindow,
   sameSelection,
   type ObjectOrigin,
 } from '../core/objects';
@@ -340,7 +342,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       !isPanningRef.current &&
       activeTool !== 'select' &&
       activeTool !== 'label' &&
-      activeTool !== 'light'
+      activeTool !== 'light' &&
+      !(activeTool === 'window' && hitTestObject(mapData, hover.worldX, hover.worldY)?.kind === 'window')
     ) {
       ctx.save();
       ctx.strokeStyle = theme.ink;
@@ -401,14 +404,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         }
         ctx.fill();
         ctx.stroke();
-      } else if (activeTool === 'door') {
-        // Highlight the wall edge the door will snap to
+      } else if (activeTool === 'door' || activeTool === 'window') {
+        // Highlight the wall edge the door or window will snap to
         const edge = nearestDoorEdge(hover.worldX, hover.worldY, gridSize);
         const x = edge.x * gridSize;
         const y = edge.y * gridSize;
         ctx.setLineDash([]);
         ctx.lineWidth = 6;
-        ctx.strokeStyle = 'rgba(139, 58, 43, 0.6)';
+        ctx.strokeStyle = activeTool === 'window' ? 'rgba(60, 140, 180, 0.6)' : 'rgba(139, 58, 43, 0.6)';
         ctx.beginPath();
         ctx.moveTo(x, y);
         if (edge.orientation === 'horizontal') ctx.lineTo(x + gridSize, y);
@@ -728,7 +731,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Moves the dragged object: doors re-snap to the nearest wall edge, stairs
+  // Moves the dragged object: doors and windows re-snap to the nearest wall edge, stairs
   // and props shift by whole cells from where the drag started
   const moveSelectedTo = (hover: HoverState) => {
     const drag = moveDragRef.current;
@@ -764,6 +767,16 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       );
       if (!same && !occupied) {
         editDragged((draft) => replaceDoor(draft, { ...door, ...edge }));
+      }
+      return;
+    }
+
+    if (drag.sel.kind === 'window') {
+      const pane = findWindow(layer, drag.sel.id);
+      const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
+      const at = (w: typeof edge) => w.x === edge.x && w.y === edge.y && w.orientation === edge.orientation;
+      if (pane && !at(pane) && !layer.windows.some((w) => w.id !== pane.id && at(w))) {
+        editDragged((draft) => replaceWindow(draft, { ...pane, ...edge }));
       }
       return;
     }
@@ -963,6 +976,31 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         draft.lighting = true;
       });
       onSelect([{ kind: 'light', id, layerId: activeLayerId }]);
+    } else if (activeTool === 'window') {
+      // Clicking a window selects it for editing or dragging; elsewhere places one on the nearest edge
+      const hit = hitTestObject(mapData, hover.worldX, hover.worldY);
+      if (hit?.kind === 'window') {
+        onSelect([hit]);
+        strokeCountRef.current++;
+        moveDragRef.current = {
+          sel: hit,
+          startCell: { x: gx, y: gy },
+          startWorld: { x: hover.worldX, y: hover.worldY },
+          origin: { x: gx, y: gy },
+        };
+        return;
+      }
+      if (!layerEditable) return;
+      const id = newObjectId('window');
+      const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
+      editLayer((draft) => {
+        // Placing on an edge that has a window replaces it
+        draft.windows = draft.windows.filter(
+          (w) => w.x !== edge.x || w.y !== edge.y || w.orientation !== edge.orientation
+        );
+        draft.windows.push({ id, ...edge, ...DEFAULT_WINDOW });
+      });
+      onSelect([{ kind: 'window', id, layerId: activeLayerId }]);
     } else if (!layerEditable) {
       return;
     } else if (activeTool === 'polygon' || activeTool === 'path' || winds(activeTool)) {
@@ -1094,6 +1132,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     } else if (activeTool === 'light') {
       const overLight = hitTestObject(mapData, hover.worldX, hover.worldY)?.kind === 'light';
       e.currentTarget.style.cursor = overLight ? 'move' : '';
+    } else if (activeTool === 'window') {
+      const overWindow = hitTestObject(mapData, hover.worldX, hover.worldY)?.kind === 'window';
+      e.currentTarget.style.cursor = overWindow ? 'move' : '';
     } else {
       e.currentTarget.style.cursor = '';
     }
@@ -1256,6 +1297,7 @@ function eraseCellContents(layer: LayerContent, gx: number, gy: number) {
   delete layer.paint[key];
   delete layer.foliage[key];
   layer.doors = layer.doors.filter((d) => !doorTouchesCell(d, gx, gy));
+  layer.windows = layer.windows.filter((w) => !doorTouchesCell(w, gx, gy));
   layer.walls = layer.walls.filter((w) => !wallTouchesCell(w, gx, gy));
   layer.stairs = layer.stairs.filter((s) => !stairsContainCell(s, gx, gy));
   layer.props = layer.props.filter((p) => p.x !== gx || p.y !== gy);

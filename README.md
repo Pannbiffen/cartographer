@@ -15,7 +15,7 @@
 - **Preferences** (Edit > Preferences): dark (default), light or system UI theme, accent colour, interface size, autosave on/off, and a reset that wipes everything stored in this browser.
 - **Pen & Parchment Aesthetic**: Five themes (Parchment, Blueprint, Slate, Monochrome, and Colour, where grass is green, planks brown and stone grey), bold, fine or rough pen walls, and pen-stroke, crosshatch, stipple or soft-shadow hatching outside them.
 - **Style Presets**: Save a map's look (style, walls, hatching, grid) under a name in the map settings drawer, apply it to any map in one click, and export or import presets as a `.json` file to share them with friends.
-- **Select & Edit**: Select doors, stairs, props, labels and lights to move (drag or arrow keys), rotate, retype, duplicate, copy and paste, or delete them. Shift+click or drag a box to select several and edit them together; copies keep their layout. Right-click (or long-press) an object or an empty spot for a menu of what you can do there.
+- **Select & Edit**: Select doors, windows, stairs, props, labels and lights to move (drag or arrow keys), rotate, retype, duplicate, copy and paste, or delete them. Shift+click or drag a box to select several and edit them together; copies keep their layout. Right-click (or long-press) an object or an empty spot for a menu of what you can do there.
 - **Text Labels**: Name rooms and add notes anywhere on the map in three sizes.
 - **Room Numbers**: Keyed-dungeon markers in a circle or box that count up (1, 2, 3...) as you place them.
 - **Layers**: Split a map into layers (dungeon, water, terrain, objects...) that can be shown or hidden, locked, reordered, renamed and faded, and given their own hatching (say, none for buildings on an outdoor map, pen strokes for a cave) in place of the map's. Tools draw on the active layer; hidden layers are left out of exports. Layer > Show Layers in Panel hides the section when you don't need it.
@@ -30,7 +30,7 @@
 - **Paint Floor**: Brush a texture onto the ground (dirt, cobbles, sand, grass, flagstones...) without making a room: no walls, hatching or shadows. For a clearing, a muddy patch or a cobbled market square on an outdoor map; it hides the ground beneath and the eraser takes it away.
 - **Roads & Paths**: Click points along the way and the Road / Path tool paints a winding track through them in any texture (a dirt track, a cobbled road, a sand path), with no walls; click the first point again for a ring road. Set its narrowest and widest width, how far it wanders and a seed, as for rivers.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
-- **Lighting**: Place lights with their own colour, radius and intensity; the rest of the map goes dark and walls cast shadows. Torches give off light too.
+- **Lighting**: Place lights with their own colour, radius and intensity; the rest of the map goes dark and walls cast shadows. Torches give off light too. Windows (the Window tool) let light through a wall onto the far side, dimmed by how much light the pane lets through and tinted by its colour, so stained glass casts coloured light.
 - **Walls**: Drag along the grid with the Wall tool to put thin walls inside or between rooms, such as splitting a hall in two (on hex grids they follow hex edges). Walls that close off an area make it a room, in the floor texture picked in the panel, so a building or yard can be outlined wall by wall. They're drawn in the room wall style, block light, stop the Fill tool and export as VTT walls; a door on one opens it. `Shift`+drag erases them, and they can be selected, moved and deleted like doors.
 - **Doors, Stairs & Props**: Doors snap to the nearest wall edge (standard, double, secret, portcullis, archway), stairs, pillars, chests, tables, altars, torches, barrels and sarcophagi.
 - **Procedural Generators**:
@@ -115,6 +115,7 @@ npm run preview
 | `F` | Foliage & terrain |
 | `A` | Wall (`Shift` + drag erases walls) |
 | `D` | Door |
+| `J` | Window |
 | `S` | Stairs |
 | `P` | Props |
 | `L` | Text label |

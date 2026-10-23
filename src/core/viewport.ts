@@ -73,6 +73,7 @@ export function mapBounds(map: LevelMap): { x: number; y: number; w: number; h: 
     const layerId = layer.id;
     const objects: Selection[] = [
       ...layer.doors.map((d) => ({ kind: 'door' as const, id: d.id, layerId })),
+      ...layer.windows.map((w) => ({ kind: 'window' as const, id: w.id, layerId })),
       ...layer.stairs.map((s) => ({ kind: 'stairs' as const, id: s.id, layerId })),
       ...layer.props.map((p) => ({ kind: 'prop' as const, id: p.id, layerId })),
       ...layer.labels.map((l) => ({ kind: 'label' as const, id: l.id, layerId })),

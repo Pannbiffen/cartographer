@@ -86,8 +86,8 @@ export function nearestDoorEdge(
   return { x, y, orientation };
 }
 
-/** True when a door lies on any of the four edges of cell (gx, gy) */
-export function doorTouchesCell(door: PlacedDoor, gx: number, gy: number): boolean {
+/** True when a door (or window) lies on any of the four edges of cell (gx, gy) */
+export function doorTouchesCell(door: Pick<PlacedDoor, 'x' | 'y' | 'orientation'>, gx: number, gy: number): boolean {
   if (door.orientation === 'horizontal') {
     return door.x === gx && (door.y === gy || door.y === gy + 1);
   }

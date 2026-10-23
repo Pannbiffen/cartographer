@@ -20,11 +20,13 @@ import {
   findProp,
   findStairs,
   findWall,
+  findWindow,
   replaceDoor,
   replaceLabel,
   replaceLight,
   replaceProp,
   replaceStairs,
+  replaceWindow,
   rotateObjects,
 } from '../core/objects';
 import { Copy, CopyPlus, RotateCw, Trash2 } from 'lucide-react';
@@ -190,7 +192,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
       <p className="text-ui-muted leading-snug">
         {hint ?? (
           <>
-            Click a door, wall, staircase, prop, label or light to select it; Shift+click or drag a box to select
+            Click a door, window, wall, staircase, prop, label or light to select it; Shift+click or drag a box to select
             several. Drag to move, <kbd>R</kbd> to rotate, <kbd>Delete</kbd> to remove.
           </>
         )}
@@ -201,6 +203,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   const layer = findLayer(mapData, selection.layerId);
   if (!layer) return null;
   const door = selection.kind === 'door' ? findDoor(layer, selection.id) : undefined;
+  const pane = selection.kind === 'window' ? findWindow(layer, selection.id) : undefined;
   const wall = selection.kind === 'wall' ? findWall(layer, selection.id) : undefined;
   const stairs = selection.kind === 'stairs' ? findStairs(layer, selection.id) : undefined;
   const prop = selection.kind === 'prop' ? findProp(layer, selection.id) : undefined;
@@ -227,7 +230,7 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="font-medium capitalize">
-        Selected: {door ? `${door.type} door` : wall ? 'wall' : stairs ? 'stairs' : label ? 'label' : light ? 'light' : prop?.type}
+        Selected: {door ? `${door.type} door` : pane ? 'window' : wall ? 'wall' : stairs ? 'stairs' : label ? 'label' : light ? 'light' : prop?.type}
       </div>
 
       {door && (
@@ -242,6 +245,37 @@ export const SelectionInspector: React.FC<SelectionInspectorProps> = ({
             </button>
           ))}
         </div>
+      )}
+
+      {pane && (
+        <>
+          <label className="flex items-center justify-between">
+            <span>Tint</span>
+            <input
+              type="color"
+              aria-label="Window tint"
+              value={pane.tint}
+              onChange={(e) =>
+                editLayer((draft) => replaceWindow(draft, { ...pane, tint: e.target.value }), {
+                  coalesce: `window-${pane.id}-tint`,
+                })
+              }
+              className="h-6 w-12 bg-ui-field border border-ui-border rounded-sm"
+            />
+          </label>
+          <Slider
+            label="Light through"
+            value={pane.clarity}
+            display={`${Math.round(pane.clarity * 100)}%`}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={(clarity) =>
+              editLayer((draft) => replaceWindow(draft, { ...pane, clarity }), { coalesce: `window-${pane.id}-clarity` })
+            }
+          />
+          <p className="text-ui-muted leading-snug">Lights shine through the window onto the far side, dimmed and tinted by the pane.</p>
+        </>
       )}
 
       {stairs && (

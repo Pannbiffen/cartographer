@@ -11,7 +11,7 @@ import {
   renderShoreRipples,
   renderFoliageCluster,
 } from '../geometry/hatching';
-import { renderDoor, renderStairs, renderProp } from './propsRenderer';
+import { renderDoor, renderStairs, renderProp, renderWindow } from './propsRenderer';
 import { renderLabel } from './labelRenderer';
 import { renderFloorTextures, renderGround, renderPaint } from './floorRenderer';
 import { renderLightGlow, renderLighting } from './lightingRenderer';
@@ -172,12 +172,15 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
     );
   }
 
-  // 6. Stairs, doors, props
+  // 6. Stairs, doors, windows, props
   for (const stairs of layer.stairs) {
     renderStairs(ctx, stairs, gridSize, theme.ink, theme.floor);
   }
   for (const door of layer.doors) {
     renderDoor(ctx, door, gridSize, theme.ink, theme.propFill);
+  }
+  for (const pane of layer.windows) {
+    renderWindow(ctx, pane, gridSize, theme.ink);
   }
   for (const prop of layer.props) {
     renderProp(ctx, prop, gridSize, theme.ink, propColor(theme, prop.type));

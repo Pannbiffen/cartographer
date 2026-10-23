@@ -7,6 +7,7 @@ import {
   Eraser,
   Footprints,
   Circle,
+  Grid2x2,
   Lightbulb,
   Milestone,
   MousePointer2,
@@ -61,6 +62,7 @@ export const TOOLS: ToolInfo[] = [
   { id: 'foliage', label: 'Foliage & Terrain', icon: Trees, shortcut: 'F' },
   { id: 'wall', label: 'Wall', icon: BrickWall, shortcut: 'A' },
   { id: 'door', label: 'Door / Portal', icon: DoorOpen, shortcut: 'D' },
+  { id: 'window', label: 'Window', icon: Grid2x2, shortcut: 'J' },
   { id: 'stairs', label: 'Stairs', icon: Footprints, shortcut: 'S' },
   { id: 'prop', label: 'Dungeon Props', icon: Sparkles, shortcut: 'P' },
   { id: 'label', label: 'Text Label', icon: Type, shortcut: 'L' },
@@ -70,7 +72,7 @@ export const TOOLS: ToolInfo[] = [
 
 /** Tools that keep, and edit, the current selection */
 export function keepsSelection(tool: ToolType): boolean {
-  return tool === 'select' || tool === 'label' || tool === 'light';
+  return tool === 'select' || tool === 'label' || tool === 'light' || tool === 'window';
 }
 
 /** Tools that lay the liquid picked in the panel */

@@ -604,7 +604,9 @@ export const DockPanel: React.FC<DockPanelProps> = ({
                   : 'Click the map to place the next room number (1, 2, 3...).'
                 : activeTool === 'light'
                   ? 'Click the map to place a light, or click a light to edit or drag it. Torch props shine too.'
-                  : undefined
+                  : activeTool === 'window'
+                    ? 'Click a wall to put a window in it, or click a window to edit or drag it. Light shines through windows on a darkened map.'
+                    : undefined
             }
             onModifyMap={onModifyMap}
             onClearSelection={onClearSelection}

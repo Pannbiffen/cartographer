@@ -33,8 +33,8 @@ export function computeMapBounds(mapData: LevelMap, margin: number = 2): Boundin
       coords.push({ x: Math.floor(shapes.minX), y: Math.floor(shapes.minY) });
       coords.push({ x: Math.ceil(shapes.maxX) - 1, y: Math.ceil(shapes.maxY) - 1 });
     }
-    for (const door of layer.doors) {
-      coords.push({ x: door.x, y: door.y });
+    for (const edge of [...layer.doors, ...layer.windows]) {
+      coords.push({ x: edge.x, y: edge.y });
     }
     for (const stairs of layer.stairs) {
       coords.push({ x: stairs.x, y: stairs.y });

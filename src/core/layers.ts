@@ -5,7 +5,7 @@ import type { HatchStyle, LayerContent, LayerHatching, LevelMap, MapData, MapLay
 type Layered = Pick<MapLevel, 'layers'>;
 
 export function emptyContent(): LayerContent {
-  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, waterAreas: [], clearWater: {}, clearWaterAreas: [], lava: {}, lavaAreas: [], paint: {}, paintAreas: {}, foliage: {}, doors: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
+  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, waterAreas: [], clearWater: {}, clearWaterAreas: [], lava: {}, lavaAreas: [], paint: {}, paintAreas: {}, foliage: {}, doors: [], windows: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
 }
 
 export function newLayer(id: string, name: string, content: Partial<LayerContent> = {}): MapLayer {
@@ -38,6 +38,7 @@ export function cloneLayer(layer: MapLayer): MapLayer {
     paint: { ...layer.paint },
     foliage: { ...layer.foliage },
     doors: [...layer.doors],
+    windows: [...layer.windows],
     walls: [...layer.walls],
     stairs: [...layer.stairs],
     props: [...layer.props],
@@ -149,6 +150,7 @@ function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string
     paintAreas: stored.paintAreas ?? {},
     foliage: stored.foliage ?? {},
     doors: stored.doors ?? [],
+    windows: stored.windows ?? [],
     walls: stored.walls ?? [],
     stairs: stored.stairs ?? [],
     props: stored.props ?? [],

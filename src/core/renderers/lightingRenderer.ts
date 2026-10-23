@@ -1,23 +1,37 @@
 // Darkness and light: every light lifts the darkness within its radius,
-// except where walls block it, and tints what it reaches with its colour
-import type { LevelMap, MapLayer } from '../../types/map';
+// except where walls block it, and tints what it reaches with its colour.
+// Through a window it reaches further, dimmed and tinted by the pane.
+import type { LevelMap, MapLayer, PlacedWindow } from '../../types/map';
 import { combinedWalls } from '../geometry/region';
-import { mergeWallSegments, visibilityPolygon, type Point, type Segment } from '../geometry/visibility';
-import { mapLights, type MapLight } from '../lighting';
+import { mergeWallSegments, visibilityPolygon, wallsWithGap, type Point, type Segment } from '../geometry/visibility';
+import { mapLights, mapWindows, type MapLight } from '../lighting';
 import { visibleLayers } from '../layers';
 
 // Walls and light shapes per level drawn (the active one and the faint ones
 // below); maps are replaced on every edit, so the layer list identifies the content
-const caches = new WeakMap<MapLayer[], { gridSize: number; walls: Segment[]; shapes: Map<string, Point[]> }>();
+interface ShapeCache {
+  gridSize: number;
+  walls: Segment[];
+  shapes: Map<string, Point[]>;
+  // Per light and window, the shape with that window open; null where it adds nothing
+  through: Map<string, Point[] | null>;
+}
+const caches = new WeakMap<MapLayer[], ShapeCache>();
 
-function lightShape(map: LevelMap, light: MapLight): Point[] {
+function shapeCache(map: LevelMap): ShapeCache {
   const g = map.gridSize;
   let cache = caches.get(map.layers);
   if (!cache || cache.gridSize !== g) {
     const walls = mergeWallSegments(combinedWalls(visibleLayers(map), g));
-    cache = { gridSize: g, walls, shapes: new Map() };
+    cache = { gridSize: g, walls, shapes: new Map(), through: new Map() };
     caches.set(map.layers, cache);
   }
+  return cache;
+}
+
+function lightShape(map: LevelMap, light: MapLight): Point[] {
+  const g = map.gridSize;
+  const cache = shapeCache(map);
   const key = `${light.x},${light.y},${light.radius}`;
   let shape = cache.shapes.get(key);
   if (!shape) {
@@ -27,16 +41,72 @@ function lightShape(map: LevelMap, light: MapLight): Point[] {
   return shape;
 }
 
-function clipTo(ctx: CanvasRenderingContext2D, shape: Point[]) {
-  ctx.beginPath();
+/** The window's edge in pixels */
+function windowEdge(w: PlacedWindow, g: number): Segment {
+  const [x, y] = [w.x * g, w.y * g];
+  return w.orientation === 'horizontal' ? { x1: x, y1: y, x2: x + g, y2: y } : { x1: x, y1: y, x2: x, y2: y + g };
+}
+
+/**
+ * Each window within a light's reach that sits in a wall, with what the light
+ * would see were that window open: the part outside `lightShape` is what
+ * shines through the pane
+ */
+function throughWindows(map: LevelMap, light: MapLight): { pane: PlacedWindow; shape: Point[] }[] {
+  const g = map.gridSize;
+  const cache = shapeCache(map);
+  const found: { pane: PlacedWindow; shape: Point[] }[] = [];
+  for (const pane of mapWindows(map)) {
+    // Only windows within the light's square
+    const edge = windowEdge(pane, g);
+    const r = light.radius * g;
+    const [cx, cy] = [light.x * g, light.y * g];
+    if (Math.max(edge.x1, edge.x2) < cx - r || Math.min(edge.x1, edge.x2) > cx + r) continue;
+    if (Math.max(edge.y1, edge.y2) < cy - r || Math.min(edge.y1, edge.y2) > cy + r) continue;
+    const key = `${light.x},${light.y},${light.radius}|${pane.orientation},${pane.x},${pane.y}`;
+    let shape = cache.through.get(key);
+    if (shape === undefined) {
+      const walls = wallsWithGap(cache.walls, edge);
+      shape = walls === cache.walls ? null : visibilityPolygon({ x: cx, y: cy }, r, walls);
+      cache.through.set(key, shape);
+    }
+    if (shape) found.push({ pane, shape });
+  }
+  return found;
+}
+
+function tracePolygon(ctx: CanvasRenderingContext2D, shape: Point[]) {
   shape.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
   ctx.closePath();
+}
+
+function clipTo(ctx: CanvasRenderingContext2D, shape: Point[]) {
+  ctx.beginPath();
+  tracePolygon(ctx, shape);
   ctx.clip();
 }
 
-function rgba(hex: string, alpha: number): string {
+/** Clips to what `outer` covers beyond `inner`, which lies within it */
+function clipBetween(ctx: CanvasRenderingContext2D, outer: Point[], inner: Point[]) {
+  ctx.beginPath();
+  tracePolygon(ctx, outer);
+  tracePolygon(ctx, inner);
+  ctx.clip('evenodd');
+}
+
+function rgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgba(hex: string, alpha: number): string {
+  return `rgba(${rgb(hex).join(', ')}, ${alpha})`;
+}
+
+/** A light's colour after passing through a pane of `tint`, as filters multiply */
+function filtered(color: string, tint: string): string {
+  const [a, b] = [rgb(color), rgb(tint)];
+  return `#${a.map((c, i) => Math.round((c * b[i]) / 255).toString(16).padStart(2, '0')).join('')}`;
 }
 
 // Scratch canvas holding the darkness while lights are cut out of it
@@ -61,22 +131,34 @@ export function renderLighting(ctx: CanvasRenderingContext2D, map: LevelMap) {
   dark.fillStyle = `rgba(6, 8, 14, ${map.darkness})`;
   dark.fillRect(0, 0, width, height);
 
-  // Each light erases darkness, fully near its centre and fading to its edge
+  // Each light erases darkness, fully near its centre and fading to its
+  // edge, and less through a window
   dark.setTransform(ctx.getTransform());
   dark.globalCompositeOperation = 'destination-out';
   for (const light of lights) {
     const cx = light.x * g;
     const cy = light.y * g;
     const r = light.radius * g;
-    const fade = dark.createRadialGradient(cx, cy, 0, cx, cy, r);
-    fade.addColorStop(0, `rgba(0, 0, 0, ${light.intensity})`);
-    fade.addColorStop(0.5, `rgba(0, 0, 0, ${light.intensity * 0.75})`);
-    fade.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    const fade = (strength: number) => {
+      const gradient = dark.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gradient.addColorStop(0, `rgba(0, 0, 0, ${strength})`);
+      gradient.addColorStop(0.5, `rgba(0, 0, 0, ${strength * 0.75})`);
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      return gradient;
+    };
+    const shape = lightShape(map, light);
     dark.save();
-    clipTo(dark, lightShape(map, light));
-    dark.fillStyle = fade;
+    clipTo(dark, shape);
+    dark.fillStyle = fade(light.intensity);
     dark.fillRect(cx - r, cy - r, r * 2, r * 2);
     dark.restore();
+    for (const { pane, shape: through } of throughWindows(map, light)) {
+      dark.save();
+      clipBetween(dark, through, shape);
+      dark.fillStyle = fade(light.intensity * pane.clarity);
+      dark.fillRect(cx - r, cy - r, r * 2, r * 2);
+      dark.restore();
+    }
   }
 
   // Coloured glow first, so the darkness on top dims it near the edges too
@@ -88,21 +170,35 @@ export function renderLighting(ctx: CanvasRenderingContext2D, map: LevelMap) {
   ctx.restore();
 }
 
-/** Each light's coloured glow, stopped by walls, without lifting any darkness */
+/**
+ * Each light's coloured glow, stopped by walls, without lifting any darkness;
+ * through a window it is dimmer and takes on the pane's tint
+ */
 export function renderLightGlow(ctx: CanvasRenderingContext2D, map: LevelMap) {
   const g = map.gridSize;
   for (const light of mapLights(map)) {
     const cx = light.x * g;
     const cy = light.y * g;
     const r = light.radius * g;
-    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    glow.addColorStop(0, rgba(light.color, 0.4 * light.intensity));
-    glow.addColorStop(1, rgba(light.color, 0));
+    const glow = (color: string, strength: number) => {
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gradient.addColorStop(0, rgba(color, 0.4 * strength));
+      gradient.addColorStop(1, rgba(color, 0));
+      return gradient;
+    };
+    const shape = lightShape(map, light);
     ctx.save();
-    clipTo(ctx, lightShape(map, light));
-    ctx.fillStyle = glow;
+    clipTo(ctx, shape);
+    ctx.fillStyle = glow(light.color, light.intensity);
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     ctx.restore();
+    for (const { pane, shape: through } of throughWindows(map, light)) {
+      ctx.save();
+      clipBetween(ctx, through, shape);
+      ctx.fillStyle = glow(filtered(light.color, pane.tint), light.intensity * pane.clarity);
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      ctx.restore();
+    }
   }
 }
 

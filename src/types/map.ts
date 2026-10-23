@@ -14,6 +14,7 @@ export type ToolType =
   | 'foliage' 
   | 'wall'
   | 'door' 
+  | 'window'
   | 'stairs' 
   | 'prop' 
   | 'label'
@@ -68,7 +69,7 @@ export type FillWith = 'floor' | 'liquid';
 // Plain text, or a room number keyed in a circle or box
 export type LabelStyle = 'text' | 'circle' | 'box';
 
-export type SelectableKind = 'door' | 'wall' | 'stairs' | 'prop' | 'label' | 'light';
+export type SelectableKind = 'door' | 'window' | 'wall' | 'stairs' | 'prop' | 'label' | 'light';
 
 export interface Selection {
   kind: SelectableKind;
@@ -94,6 +95,19 @@ export interface PlacedDoor {
   y: number; // grid y
   orientation: 'horizontal' | 'vertical';
   type: DoorType;
+}
+
+/**
+ * A pane on a cell edge, placed like a door. Light shines through it,
+ * dimmed by `clarity` (0 lets none through, like a wall) and tinted by `tint`.
+ */
+export interface PlacedWindow {
+  id: string;
+  x: number; // grid x
+  y: number; // grid y
+  orientation: 'horizontal' | 'vertical';
+  tint: string; // #rrggbb
+  clarity: number; // 0 to 1: how much of a light's strength passes
 }
 
 /**
@@ -180,6 +194,7 @@ export interface LayerContent {
   paintAreas: Partial<Record<FloorTexture, Polygon[]>>;
   foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
   doors: PlacedDoor[];
+  windows: PlacedWindow[];
   walls: PlacedWall[];
   stairs: PlacedStairs[];
   props: PlacedProp[];
