@@ -62,7 +62,7 @@ export function mapBounds(map: LevelMap): { x: number; y: number; w: number; h: 
   };
 
   for (const layer of visibleLayers(map)) {
-    for (const cells of [layer.rooms, layer.water, layer.clearWater, layer.paint, layer.foliage]) {
+    for (const cells of [layer.rooms, layer.water, layer.clearWater, layer.lava, layer.paint, layer.foliage]) {
       for (const key of Object.keys(cells)) {
         const [x, y] = key.split(',').map(Number);
         include(x, y, 1, 1);

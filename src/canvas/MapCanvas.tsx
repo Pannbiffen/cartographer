@@ -156,6 +156,7 @@ const PREVIEW_FILLS: Partial<Record<ToolType, string>> = {
   road: 'rgba(150, 120, 80, 0.35)',
   foliage: 'rgba(80, 150, 80, 0.25)',
 };
+const LAVA_PREVIEW_FILL = 'rgba(220, 90, 40, 0.3)';
 const DEFAULT_PREVIEW_FILL = 'rgba(210, 180, 140, 0.25)';
 
 export const MapCanvas: React.FC<MapCanvasProps> = ({
@@ -341,7 +342,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       ctx.strokeStyle = theme.ink;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([3, 3]);
-      ctx.fillStyle = PREVIEW_FILLS[activeTool] ?? DEFAULT_PREVIEW_FILL;
+      ctx.fillStyle =
+        (activeTool === 'water' || activeTool === 'river') && waterStyle === 'lava'
+          ? LAVA_PREVIEW_FILL
+          : (PREVIEW_FILLS[activeTool] ?? DEFAULT_PREVIEW_FILL);
 
       const here = { x: hover.gx, y: hover.gy };
       const dragStart = dragStartRef.current;
@@ -471,7 +475,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     ctx.restore();
 
     ctx.restore();
-  }, [mapData, levelsBelow, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, river, road, snapPoint, hexGrid, hexBrush]);
+  }, [mapData, levelsBelow, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, river, road, waterStyle, snapPoint, hexGrid, hexBrush]);
 
   // Keep the canvas backing store matched to its on-screen size
   const drawRef = useRef(drawMap);
@@ -1241,6 +1245,7 @@ function eraseCellContents(layer: LayerContent, gx: number, gy: number) {
   const key = `${gx},${gy}`;
   delete layer.water[key];
   delete layer.clearWater[key];
+  delete layer.lava[key];
   delete layer.paint[key];
   delete layer.foliage[key];
   layer.doors = layer.doors.filter((d) => !doorTouchesCell(d, gx, gy));

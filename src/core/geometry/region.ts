@@ -91,12 +91,19 @@ export function layerFloor(layer: MapLayer): Polygon[] {
   return floor;
 }
 
-// Each kind of water: solid, or see-through
-type WaterKind = { cells: 'water' | 'clearWater'; areas: 'waterAreas' | 'clearWaterAreas' };
-const SOLID: WaterKind = { cells: 'water', areas: 'waterAreas' };
-const CLEAR: WaterKind = { cells: 'clearWater', areas: 'clearWaterAreas' };
-const kindOf = (style: WaterStyle) => (style === 'solid' ? SOLID : CLEAR);
-const otherStyle = (style: WaterStyle): WaterStyle => (style === 'solid' ? 'see-through' : 'solid');
+// Each liquid: solid or see-through water, or lava
+type WaterKind = { cells: 'water' | 'clearWater' | 'lava'; areas: 'waterAreas' | 'clearWaterAreas' | 'lavaAreas' };
+const KINDS: Record<WaterStyle, WaterKind> = {
+  solid: { cells: 'water', areas: 'waterAreas' },
+  'see-through': { cells: 'clearWater', areas: 'clearWaterAreas' },
+  lava: { cells: 'lava', areas: 'lavaAreas' },
+};
+export const LIQUIDS = Object.keys(KINDS) as WaterStyle[];
+const kindOf = (style: WaterStyle) => KINDS[style];
+const otherStyles = (style: WaterStyle) => LIQUIDS.filter((other) => other !== style);
+// Everything a liquid edit may replace, to put back if it fails
+const liquids = (layer: LayerContent) =>
+  Object.fromEntries(Object.values(KINDS).flatMap((kind) => [[kind.cells, layer[kind.cells]], [kind.areas, layer[kind.areas]]]));
 
 const waterById = new Map<string, { cells: string; areas: Polygon[]; water: Polygon[] }>();
 
@@ -119,8 +126,9 @@ export function layerWater(layer: MapLayer, style: WaterStyle = 'solid'): Polygo
   return water;
 }
 
-/** True when a layer has water of a style */
-export function hasWater(layer: LayerContent, style: WaterStyle): boolean {
+/** True when a layer has water of a style, or any liquid at all with no style given */
+export function hasWater(layer: LayerContent, style?: WaterStyle): boolean {
+  if (!style) return LIQUIDS.some((each) => hasWater(layer, each));
   const kind = kindOf(style);
   return layer[kind.areas].length > 0 || Object.keys(layer[kind.cells]).length > 0;
 }
@@ -147,41 +155,43 @@ function clearStyle(layer: LayerContent, area: Polygon[], style: WaterStyle) {
   if (areas.length > 0) layer[kind.areas] = difference(union(areas[0], ...areas.slice(1)), area);
 }
 
-/** Adds free-form water of a style to a layer, replacing water of the other style there */
+/** Adds free-form water of a style to a layer, replacing other liquids there */
 export function addWater(layer: LayerContent, area: Polygon[], style: WaterStyle = 'solid') {
   if (area.length === 0) return;
   const kind = kindOf(style);
-  const { water, waterAreas, clearWater, clearWaterAreas } = layer;
+  const before = liquids(layer);
   try {
-    clearStyle(layer, area, otherStyle(style));
+    for (const other of otherStyles(style)) clearStyle(layer, area, other);
     layer[kind.areas] = union(area, ...layer[kind.areas]);
   } catch (err) {
     console.warn('Could not add water', err);
-    Object.assign(layer, { water, waterAreas, clearWater, clearWaterAreas });
+    Object.assign(layer, before);
   }
 }
 
-/** Paints water cells of a style, replacing water of the other style in them */
+/** Paints water cells of a style, replacing other liquids in them */
 export function paintWaterCells(layer: LayerContent, cells: GridCoord[], style: WaterStyle) {
   if (cells.length === 0) return;
   const kind = kindOf(style);
-  const other = kindOf(otherStyle(style));
+  const others = otherStyles(style).map(kindOf);
   for (const { x, y } of cells) {
     layer[kind.cells][`${x},${y}`] = true;
-    delete layer[other.cells][`${x},${y}`];
+    for (const other of others) delete layer[other.cells][`${x},${y}`];
   }
-  if (layer[other.areas].length === 0) return;
-  try {
-    layer[other.areas] = difference(layer[other.areas], cellPolygons(cellSet(cells)));
-  } catch (err) {
-    console.warn('Could not paint water', err);
+  for (const other of others) {
+    if (layer[other.areas].length === 0) continue;
+    try {
+      layer[other.areas] = difference(layer[other.areas], cellPolygons(cellSet(cells)));
+    } catch (err) {
+      console.warn('Could not paint water', err);
+    }
   }
 }
 
-/** Takes an area out of a layer's free-form water of both styles */
+/** Takes an area out of a layer's free-form liquids of every style */
 export function eraseWater(layer: LayerContent, area: Polygon[]) {
   if (area.length === 0) return;
-  for (const kind of [SOLID, CLEAR]) {
+  for (const kind of Object.values(KINDS)) {
     if (layer[kind.areas].length === 0) continue;
     try {
       layer[kind.areas] = difference(layer[kind.areas], area);
@@ -193,19 +203,20 @@ export function eraseWater(layer: LayerContent, area: Polygon[]) {
 
 /** The style of the water at (x, y) in grid units, or null if there is none */
 export function waterStyleAt(layer: MapLayer, x: number, y: number): WaterStyle | null {
-  for (const style of ['solid', 'see-through'] as WaterStyle[]) {
+  for (const style of LIQUIDS) {
     if (hasWater(layer, style) && pointInPolygons(layerWater(layer, style), x, y)) return style;
   }
   return null;
 }
 
-/** Turns the body of water at (x, y), as far as it reaches unbroken, solid or see-through */
+/** Turns the body of water at (x, y), as far as it reaches unbroken, into another liquid */
 export function setWaterStyleAt(layer: MapLayer, x: number, y: number, style: WaterStyle) {
-  const from = otherStyle(style);
+  const from = waterStyleAt(layer, x, y);
+  if (!from || from === style) return;
   const piece = layerWater(layer, from).find((polygon) => pointInPolygon(polygon, x, y));
   if (!piece) return;
   const [source, target] = [kindOf(from), kindOf(style)];
-  const { water, waterAreas, clearWater, clearWaterAreas } = layer;
+  const before = liquids(layer);
   try {
     // Its cells stay cells, its free-form part moves over as it is
     const sourceCells = { ...layer[source.cells] };
@@ -225,7 +236,7 @@ export function setWaterStyleAt(layer: MapLayer, x: number, y: number, style: Wa
     }
   } catch (err) {
     console.warn('Could not change the water', err);
-    Object.assign(layer, { water, waterAreas, clearWater, clearWaterAreas });
+    Object.assign(layer, before);
   }
 }
 
@@ -383,9 +394,9 @@ function floorWalls(layers: MapLayer[], gridSize: number): WallSegment[] {
   return floorSegments(union(floors[0], ...floors.slice(1)), gridSize);
 }
 
-/** Extent of a layer's shapes, free-form water and painted areas in grid units, or null if it has none */
+/** Extent of a layer's shapes, free-form liquids and painted areas in grid units, or null if it has none */
 export function shapeBounds(layer: LayerContent): { minX: number; minY: number; maxX: number; maxY: number } | null {
-  const polygons = [...layer.shapes, ...layer.waterAreas, ...layer.clearWaterAreas, ...Object.values(layer.paintAreas).flat()];
+  const polygons = [...layer.shapes, ...layer.waterAreas, ...layer.clearWaterAreas, ...layer.lavaAreas, ...Object.values(layer.paintAreas).flat()];
   return polygons.length === 0 ? null : polygonBounds(polygons);
 }
 
@@ -489,7 +500,7 @@ export function uncutCells(layer: LayerContent, cells: GridCoord[]) {
 /** Erased cells take shapes, cuts, textured areas, free-form water and painted areas with them */
 export function eraseShapesInCells(layer: LayerContent, cells: GridCoord[]) {
   if (cells.length === 0) return;
-  if (layer.waterAreas.length > 0 || layer.clearWaterAreas.length > 0) eraseWater(layer, cellPolygons(cellSet(cells)));
+  eraseWater(layer, cellPolygons(cellSet(cells)));
   erasePaint(layer, cellPolygons(cellSet(cells)));
   if (!hasShapes(layer) && !hasFloorAreas(layer)) return;
   const squares = cellPolygons(cellSet(cells));

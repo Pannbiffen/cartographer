@@ -20,7 +20,7 @@ import { Toolbar } from './components/Toolbar';
 import { Toolbox } from './components/Toolbox';
 import { DockPanel } from './components/DockPanel';
 import { MapSettingsDrawer } from './components/MapSettingsDrawer';
-import { DOOR_TYPES, FLOOR_TEXTURES, LABEL_STYLES, PROP_TYPES, TOOLS, WATER_STYLES, keepsSelection, laysFloor } from './components/options';
+import { DOOR_TYPES, FLOOR_TEXTURES, LABEL_STYLES, LIQUID_NAMES, PROP_TYPES, TOOLS, WATER_STYLES, keepsSelection, laysFloor } from './components/options';
 import { MapCanvas, type CanvasMenuRequest } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
@@ -1135,7 +1135,7 @@ export function App() {
     ...(brushTool ? [choices(activeTool === 'path' ? 'Path Width' : 'Brush Size', [1, 2, 3, 4, 5], brushSize, setBrushSize)] : []),
     ...(laysFloor(activeTool, shapeMode) ? [choices('Floor', FLOOR_TEXTURES, floorTexture, setFloorTexture)] : []),
     ...(activeTool === 'paint' || activeTool === 'road' ? [choices('Texture', FLOOR_TEXTURES, paintTexture, setPaintTexture)] : []),
-    ...(activeTool === 'water' || activeTool === 'river' ? [choices('New Water', WATER_STYLES, waterStyle, setWaterStyle)] : []),
+    ...(activeTool === 'water' || activeTool === 'river' ? [choices('New Liquid', WATER_STYLES, waterStyle, setWaterStyle, (style) => LIQUID_NAMES[style])] : []),
     ...(activeTool === 'polygon' || activeTool === 'circle' || activeTool === 'path'
       ? [choices('Mode', ['add', 'cut'] as ShapeMode[], shapeMode, setShapeMode)]
       : []),
@@ -1168,9 +1168,9 @@ export function App() {
       : []),
     ...(menuAt && spotWater
       ? [{
-          label: 'Water Here',
+          label: 'Liquid Here',
           submenu: WATER_STYLES.map((style) => ({
-            label: capitalize(style),
+            label: LIQUID_NAMES[style],
             checked: style === spotWater,
             onSelect: () =>
               modifyMap((draft) => withLayer(draft, activeLayerId, (layer) => setWaterStyleAt(layer, menuAt.x, menuAt.y, style))),

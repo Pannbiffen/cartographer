@@ -79,7 +79,9 @@ export function laysFloor(tool: ToolType, shapeMode: ShapeMode): boolean {
   return tool === 'room-brush' || tool === 'room-rect' || tool === 'tunnel' || tool === 'fill' || tool === 'wall';
 }
 
-export const WATER_STYLES: WaterStyle[] = ['solid', 'see-through'];
+export const WATER_STYLES: WaterStyle[] = ['solid', 'see-through', 'lava'];
+// Liquids as menus name them
+export const LIQUID_NAMES: Record<WaterStyle, string> = { solid: 'Solid Water', 'see-through': 'See-through Water', lava: 'Lava' };
 
 export const THEME_NAMES: [ThemeType, string][] = [
   ['parchment', 'Parchment'],

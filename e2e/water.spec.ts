@@ -22,15 +22,29 @@ async function colours(page: Page, from: [number, number], to: [number, number])
   );
 }
 
+/** The colour of the canvas at a point in grid units */
+async function colourAt(page: Page, gx: number, gy: number) {
+  const p = await gridPoint(page, gx, gy);
+  const box = (await page.locator('canvas').boundingBox())!;
+  return page.locator('canvas').evaluate(
+    (canvas: HTMLCanvasElement, [x, y]) => {
+      const dpr = window.devicePixelRatio || 1;
+      const [r, g, b] = canvas.getContext('2d')!.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data;
+      return { r, g, b };
+    },
+    [p.x - box.x, p.y - box.y]
+  );
+}
+
 async function topLayer(page: Page) {
   const map = await saveMap(page);
   return map.levels[0].layers[map.levels[0].layers.length - 1];
 }
 
-async function setWaterHere(page: Page, gx: number, gy: number, style: 'Solid' | 'See-through') {
+async function setWaterHere(page: Page, gx: number, gy: number, style: 'Solid' | 'See-through' | 'Lava') {
   const spot = await gridPoint(page, gx, gy);
   await page.mouse.click(spot.x, spot.y, { button: 'right' });
-  await page.getByRole('menu').getByRole('menuitem', { name: 'Water Here' }).hover();
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Liquid Here' }).hover();
   await page.getByRole('menuitemcheckbox', { name: style }).click();
 }
 
@@ -84,7 +98,7 @@ test('each body of water keeps its own style, and new water takes the panel styl
   // The menu shows the style of the water under the pointer
   const pool = await gridPoint(page, -9.5, -6.5);
   await page.mouse.click(pool.x, pool.y, { button: 'right' });
-  await page.getByRole('menu').getByRole('menuitem', { name: 'Water Here' }).hover();
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Liquid Here' }).hover();
   await expect(page.getByRole('menuitemcheckbox', { name: 'Solid' })).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Escape');
 
@@ -105,5 +119,60 @@ test('each body of water keeps its own style, and new water takes the panel styl
   layer = await topLayer(page);
   expect(layer.clearWaterAreas).toHaveLength(1);
   expect(layer.waterAreas).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
+test('lava is a third liquid: painted, laid as a river, swapped with water and erased', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  await page.keyboard.press('w');
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  await panel.getByRole('button', { name: 'lava' }).click();
+  for (const y of [-7, -6, -5]) await dragCells(page, [-14, y], [-12, y]);
+
+  let layer = await topLayer(page);
+  expect(Object.keys(layer.lava)).toHaveLength(9);
+  expect(layer.water['-13,-6']).toBeUndefined();
+  // Glowing red, not blue
+  await expect.poll(async () => {
+    const { r, g, b } = await colourAt(page, -12.5, -5.5);
+    return r - Math.max(g, b);
+  }).toBeGreaterThan(60);
+
+  // Water painted over lava replaces it
+  await panel.getByRole('button', { name: 'solid' }).click();
+  await dragCells(page, [-14, -7], [-14, -7]);
+  layer = await topLayer(page);
+  expect(layer.water['-14,-7']).toBe(true);
+  expect(layer.lava['-14,-7']).toBeUndefined();
+  expect(Object.keys(layer.lava)).toHaveLength(8);
+
+  // The menu shows lava under the pointer, and turns the pool to water
+  const pool = await gridPoint(page, -12.5, -5.5);
+  await page.mouse.click(pool.x, pool.y, { button: 'right' });
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Liquid Here' }).hover();
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Lava' })).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await setWaterHere(page, -12.5, -5.5, 'Solid');
+  layer = await topLayer(page);
+  expect(layer.lava).toEqual({});
+  expect(layer.water['-13,-6']).toBe(true);
+  await page.keyboard.press('Control+z');
+  expect(Object.keys((await topLayer(page)).lava)).toHaveLength(8);
+
+  // A lava river, which the eraser cuts back
+  await page.keyboard.press('y');
+  await panel.getByRole('button', { name: 'lava' }).click();
+  for (const [x, y] of [[-14.5, -1.5], [-9.5, -1.5]]) {
+    const p = await gridPoint(page, x, y);
+    await page.mouse.click(p.x, p.y);
+  }
+  await page.keyboard.press('Enter');
+  layer = await topLayer(page);
+  expect(layer.lavaAreas).toHaveLength(1);
+  expect(layer.waterAreas).toHaveLength(0);
+  await page.keyboard.press('e');
+  await dragCells(page, [-12, -3], [-12, 0]);
+  expect((await topLayer(page)).lavaAreas).toHaveLength(2);
   expect(errors).toEqual([]);
 });

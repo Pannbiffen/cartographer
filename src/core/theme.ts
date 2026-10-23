@@ -18,6 +18,8 @@ export interface ThemeColors {
   hatch: string;
   waterTint: string;
   waterRipples: string;
+  lava: string; // solid, like solid water
+  lavaCrust: string; // its edge lines
   foliageFill: string;
   foliageInk: string;
   propFill: string; // doors
@@ -35,6 +37,8 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
     hatch: '#2a1f18',
     waterTint: 'rgba(88, 148, 162, 0.38)',
     waterRipples: '#225360',
+    lava: '#d9572b',
+    lavaCrust: '#7a1f0c',
     foliageFill: 'rgba(92, 128, 80, 0.32)',
     foliageInk: '#1e1611',
     propFill: '#fcf8ec',
@@ -47,6 +51,8 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
     hatch: '#d8e8fc',
     waterTint: 'rgba(10, 60, 110, 0.55)',
     waterRipples: '#99cbff',
+    lava: '#c4502e',
+    lavaCrust: '#ffd08a',
     foliageFill: 'rgba(30, 95, 80, 0.45)',
     foliageInk: '#f0f6ff',
     propFill: '#1b4a7d',
@@ -59,6 +65,8 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
     hatch: '#8f96a3',
     waterTint: 'rgba(40, 85, 105, 0.42)',
     waterRipples: '#6db8d6',
+    lava: '#c2421c',
+    lavaCrust: '#ffb347',
     foliageFill: 'rgba(52, 85, 62, 0.4)',
     foliageInk: '#e2e5eb',
     propFill: '#262930',
@@ -71,6 +79,8 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
     hatch: '#000000',
     waterTint: 'rgba(0, 0, 0, 0.08)',
     waterRipples: '#000000',
+    lava: '#4a4a4a',
+    lavaCrust: '#ffffff',
     foliageFill: 'rgba(0, 0, 0, 0.05)',
     foliageInk: '#000000',
     propFill: '#ffffff',
@@ -83,6 +93,8 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
     hatch: '#3d342a',
     waterTint: 'rgba(52, 120, 168, 0.6)',
     waterRipples: '#d6eef8',
+    lava: '#e0521f',
+    lavaCrust: '#ffcc4d',
     foliageFill: 'rgba(76, 128, 62, 0.85)',
     foliageInk: '#24301c',
     propFill: '#9c6b3e',

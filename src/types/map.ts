@@ -26,8 +26,9 @@ export type PropType = 'pillar' | 'chest' | 'table' | 'altar' | 'torch' | 'barre
 
 export type FoliageType = 'tree' | 'bush' | 'rock';
 
-// Solid water hides the ground and floor beneath; see-through water tints them
-export type WaterStyle = 'solid' | 'see-through';
+// The liquids the water tools lay: solid water hides the ground and floor
+// beneath, see-through water tints them, and lava hides them like solid water
+export type WaterStyle = 'solid' | 'see-through' | 'lava';
 
 export type ThemeType = 'parchment' | 'blueprint' | 'slate' | 'monochrome' | 'colour';
 
@@ -165,6 +166,9 @@ export interface LayerContent {
   // solid water above and never overlapping it
   clearWater: { [key: string]: boolean };
   clearWaterAreas: Polygon[];
+  // Lava, a third liquid kept the same way and never overlapping either water
+  lava: { [key: string]: boolean };
+  lavaAreas: Polygon[];
   // Texture laid on the ground without making floor: no walls, hatching or
   // effect on light. Cells by texture, and free-form areas by texture that
   // never overlap one another and win over the cells beneath them (the

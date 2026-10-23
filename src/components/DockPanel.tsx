@@ -626,10 +626,10 @@ export const DockPanel: React.FC<DockPanelProps> = ({
 
         {(activeTool === 'water' || activeTool === 'river') && (
           <>
-            <Choices label="Water" options={WATER_STYLES} value={waterStyle} columns={2} onChange={onWaterStyleChange} />
+            <Choices label="Liquid" options={WATER_STYLES} value={waterStyle} columns={3} onChange={onWaterStyleChange} />
             <p className="text-ui-muted leading-snug">
-              Solid water hides the ground beneath; see-through water shows the floor through it. Right-click
-              water to change it.
+              Solid water hides the ground beneath; see-through water shows the floor through it; lava covers it
+              in molten rock. Right-click a pool to change what it holds.
             </p>
           </>
         )}
