@@ -553,9 +553,14 @@ export const DockPanel: React.FC<DockPanelProps> = ({
     activeTool === 'foliage' ||
     activeTool === 'eraser';
 
-  // On a hex grid the room brush, paint and eraser work in whole hexes
-  const hexBrush =
-    isHexGrid(mapData.gridType) && (activeTool === 'room-brush' || activeTool === 'paint' || activeTool === 'eraser');
+  // On a hex grid the brushes and the tunnel work in whole hexes
+  const hexBrush = isHexGrid(mapData.gridType) && usesBrushSize && activeTool !== 'path';
+  const hexHint: Partial<Record<ToolType, string>> = {
+    eraser: 'Erases whole hexes',
+    paint: 'Paints whole hexes',
+    water: 'Floods whole hexes',
+    foliage: 'Plants one in the middle of each hex',
+  };
   const brushWidth = 2 * brushSize - 1;
   const shapeHint: Partial<Record<ToolType, string>> = {
     polygon:
@@ -699,7 +704,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
 
         {hexBrush && (
           <p className="text-ui-muted leading-snug">
-            {activeTool === 'eraser' ? 'Erases' : activeTool === 'paint' ? 'Paints' : 'Paints floor in'} whole hexes on the hex grid.
+            {hexHint[activeTool] ?? 'Paints floor in whole hexes'} on the hex grid.
           </p>
         )}
         {laysFloor(activeTool, shapeMode, fillWith) && (

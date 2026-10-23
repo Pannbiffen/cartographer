@@ -1,7 +1,8 @@
 // The fill tool: re-textures the room under a point, up to its walls and
 // doors, or floods it with a liquid and drains it again
-import type { FloorTexture, MapLayer, Pair, PlacedDoor, PlacedWall, Polygon, WaterStyle } from '../../types/map';
+import type { FloorTexture, GridType, MapLayer, Pair, PlacedDoor, PlacedWall, Polygon, WaterStyle } from '../../types/map';
 import { closedWalls, doorEdgeKey, wallDoorEdge } from '../geometry/walls';
+import { hexAt, hexCenter, hexKey, hexNeighbours, hexPolygon, isHexGrid, type Hex } from '../geometry/hex';
 import type { WallSegment } from '../geometry/hatching';
 import { doorLine } from './toolGeometry';
 import {
@@ -50,18 +51,23 @@ export function textureAt(layer: MapLayer, x: number, y: number): FloorTexture |
  * The room at (x, y): the floor connected to it, spreading cell by cell but
  * never through a door or a thin wall along a cell edge, nor across a door
  * turned along a wall off the grid (archways are open, so it passes those,
- * even on a wall). On free-form floor `piece` is its
- * outline. Null if there is no floor there.
+ * even on a wall). On free-form floor `piece` is its outline. On a hex
+ * `grid` it spreads hex by hex instead. Null if there is no floor there.
  */
 function roomAt(
   layer: MapLayer,
   doors: PlacedDoor[],
   walls: PlacedWall[],
   x: number,
-  y: number
+  y: number,
+  grid?: GridType
 ): { cells: Map<string, [number, number]>; piece: Polygon | null } | null {
   if (!isFloorAt(layer, x, y)) return null;
   const shaped = hasShapes(layer);
+  if (shaped && isHexGrid(grid)) {
+    const piece = hexRoomAt(grid, layer, doors, walls, x, y);
+    return piece ? { cells: new Map(), piece } : null;
+  }
   const floor = shaped ? layerFloor(layer) : [];
   const isFloorCell = shaped
     ? (gx: number, gy: number) => SAMPLES.some(([sx, sy]) => pointInPolygons(floor, gx + sx, gy + sy))
@@ -105,9 +111,58 @@ function roomAt(
   return piece ? { cells, piece } : null;
 }
 
+/**
+ * The room at (x, y) on a hex grid, as `roomAt`: the floor joined to it hex
+ * by hex, never across a hex side with a wall or a shut door at its middle
+ */
+function hexRoomAt(
+  grid: 'hex-pointy' | 'hex-flat',
+  layer: MapLayer,
+  doors: PlacedDoor[],
+  walls: PlacedWall[],
+  x: number,
+  y: number
+): Polygon | null {
+  const floor = layerFloor(layer);
+  // Middles of the hex sides that stop it, bucketed by half cell
+  const stops = new Map<string, Pair[]>();
+  const bucket = (px: number, py: number) => `${Math.floor(px * 2)},${Math.floor(py * 2)}`;
+  const middles: Pair[] = [
+    ...closedWalls(walls, doors).map((w): Pair => [w.x + w.dx / 2, w.y + w.dy / 2]),
+    ...doors.filter((d) => d.type !== 'archway' && d.angle !== undefined).map((d): Pair => [d.x, d.y]),
+  ];
+  for (const m of middles) stops.set(bucket(...m), [...(stops.get(bucket(...m)) ?? []), m]);
+  const stopped = (px: number, py: number) => {
+    for (let bx = -1; bx <= 1; bx++) {
+      for (let by = -1; by <= 1; by++) {
+        const near = stops.get(bucket(px + bx / 2, py + by / 2));
+        if (near?.some(([mx, my]) => Math.hypot(mx - px, my - py) < 0.05)) return true;
+      }
+    }
+    return false;
+  };
+
+  const start = hexAt(grid, x, y);
+  const hexes = new Map<string, Hex>([[hexKey(start), start]]);
+  const queue = [start];
+  while (queue.length > 0 && hexes.size < MAX_CELLS) {
+    const h = queue.pop()!;
+    const [ax, ay] = hexCenter(grid, h);
+    for (const n of hexNeighbours(h)) {
+      const key = hexKey(n);
+      if (hexes.has(key)) continue;
+      const [bx, by] = hexCenter(grid, n);
+      if (stopped((ax + bx) / 2, (ay + by) / 2) || !pointInPolygons(floor, bx, by)) continue;
+      hexes.set(key, n);
+      queue.push(n);
+    }
+  }
+  return floorPieceAt([...hexes.values()].map((h) => hexPolygon(grid, h)), floor, x, y);
+}
+
 /** A thin strip along an angled door, out to the walls either side, cut from the floor so a fill stops there */
 function doorBarrier(door: PlacedDoor, walls: WallSegment[]): Polygon {
-  const { cx, cy, ux, uy } = doorLine(door);
+  const { cx, cy, ux, uy, length } = doorLine(door);
   const reach = (dx: number, dy: number) => {
     let nearest = BARRIER_REACH;
     for (const w of walls) {
@@ -115,7 +170,7 @@ function doorBarrier(door: PlacedDoor, walls: WallSegment[]): Polygon {
       // Skip the wall a door stands on, where its line starts
       if (t !== null && t > 0.05 && t < nearest) nearest = t;
     }
-    return (nearest < BARRIER_REACH ? Math.max(0.5, nearest) : 0.5) + BARRIER_OVERLAP;
+    return (nearest < BARRIER_REACH ? Math.max(length / 2, nearest) : length / 2) + BARRIER_OVERLAP;
   };
   const [back, ahead] = [reach(-ux, -uy), reach(ux, uy)];
   const [nx, ny] = [-uy * BARRIER_HALF_WIDTH, ux * BARRIER_HALF_WIDTH];
@@ -139,16 +194,17 @@ function rayHit(x: number, y: number, dx: number, dy: number, w: WallSegment): n
   return t >= 0 && s >= 0 && s <= 1 ? t : null;
 }
 
-/** Lays `texture` over the room at (x, y). Returns false if there is no floor there. */
+/** Lays `texture` over the room at (x, y) (spreading in hexes on a hex `grid`). Returns false if there is no floor there. */
 export function fillRoom(
   layer: MapLayer,
   doors: PlacedDoor[],
   walls: PlacedWall[],
   x: number,
   y: number,
-  texture: FloorTexture
+  texture: FloorTexture,
+  grid?: GridType
 ): boolean {
-  const room = roomAt(layer, doors, walls, x, y);
+  const room = roomAt(layer, doors, walls, x, y, grid);
   if (!room) return false;
   const { cells, piece } = room;
   if (!piece) {
@@ -172,9 +228,10 @@ export function floodRoom(
   walls: PlacedWall[],
   x: number,
   y: number,
-  style: WaterStyle
+  style: WaterStyle,
+  grid?: GridType
 ): boolean {
-  const room = roomAt(layer, doors, walls, x, y);
+  const room = roomAt(layer, doors, walls, x, y, grid);
   if (!room) return false;
   if (room.piece) addWater(layer, [room.piece], style);
   else paintWaterCells(layer, [...room.cells.values()].map(([gx, gy]) => ({ x: gx, y: gy })), style);
@@ -182,8 +239,15 @@ export function floodRoom(
 }
 
 /** Takes every liquid out of the room at (x, y). Returns false if there is no floor there. */
-export function drainRoom(layer: MapLayer, doors: PlacedDoor[], walls: PlacedWall[], x: number, y: number): boolean {
-  const room = roomAt(layer, doors, walls, x, y);
+export function drainRoom(
+  layer: MapLayer,
+  doors: PlacedDoor[],
+  walls: PlacedWall[],
+  x: number,
+  y: number,
+  grid?: GridType
+): boolean {
+  const room = roomAt(layer, doors, walls, x, y, grid);
   if (!room) return false;
   if (room.piece) {
     drainWater(layer, [room.piece]);

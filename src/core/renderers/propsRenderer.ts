@@ -39,10 +39,10 @@ export function renderDoor(
   fillColor: string = '#fcf8ec'
 ) {
   ctx.save();
-  // Drawn along the x axis of the door's own frame: centred, one cell long
-  const { cx, cy, ux, uy } = doorLine(door);
+  // Drawn along the x axis of the door's own frame: centred, one cell (or a hex side) long
+  const { cx, cy, ux, uy, length } = doorLine(door);
   ctx.transform(ux, uy, -uy, ux, cx * gridSize, cy * gridSize);
-  const half = gridSize / 2;
+  const half = (gridSize * length) / 2;
 
   ctx.fillStyle = fillColor;
   ctx.strokeStyle = inkColor;
@@ -50,7 +50,7 @@ export function renderDoor(
 
   if (door.type === 'archway') {
     // Open passage: solid stone jambs at both ends, no door leaf
-    const jamb = gridSize * 0.14;
+    const jamb = gridSize * length * 0.14;
     const depth = 10;
     ctx.fillStyle = inkColor;
     ctx.fillRect(-half, -depth / 2, jamb, depth);
@@ -59,7 +59,7 @@ export function renderDoor(
     return;
   }
 
-  const doorWidth = gridSize * 0.8;
+  const doorWidth = gridSize * length * 0.8;
   const doorHeight = 6;
   const startX = -doorWidth / 2;
   const startY = -doorHeight / 2;

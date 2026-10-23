@@ -1170,18 +1170,18 @@ export function App() {
             ...FLOOR_TEXTURES.map((texture) => ({
               label: capitalize(texture),
               checked: texture === spotTexture,
-              onSelect: () => editRoomAt((layer, doors, walls) => fillRoom(layer, doors, walls, menuAt.x, menuAt.y, texture)),
+              onSelect: () => editRoomAt((layer, doors, walls) => fillRoom(layer, doors, walls, menuAt.x, menuAt.y, texture, levelMap.gridType)),
             })),
             'separator' as const,
             ...WATER_STYLES.map((style) => ({
               label: LIQUID_NAMES[style],
               checked: style === spotWater,
-              onSelect: () => editRoomAt((layer, doors, walls) => floodRoom(layer, doors, walls, menuAt.x, menuAt.y, style)),
+              onSelect: () => editRoomAt((layer, doors, walls) => floodRoom(layer, doors, walls, menuAt.x, menuAt.y, style, levelMap.gridType)),
             })),
           ],
         },
         ...(hasWater(activeLayer)
-          ? [{ label: 'Drain Room', onSelect: () => editRoomAt((layer, doors, walls) => drainRoom(layer, doors, walls, menuAt.x, menuAt.y)) }]
+          ? [{ label: 'Drain Room', onSelect: () => editRoomAt((layer, doors, walls) => drainRoom(layer, doors, walls, menuAt.x, menuAt.y, levelMap.gridType)) }]
           : []),
         { label: 'Pick Floor Texture', onSelect: () => setFloorTexture(spotTexture) }]
       : []),

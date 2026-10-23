@@ -82,7 +82,11 @@ import {
   hexCenter,
   hexKey,
   hexLine,
+  hexOffset,
   hexPolygon,
+  hexRect,
+  hexSlot,
+  hexTunnel,
   hexesWithin,
   isHexGrid,
   snapToHex,
@@ -215,6 +219,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const freePlacementRef = useRef<boolean>(false);
   // Hex under the pointer during a hex-grid brush stroke
   const lastHexRef = useRef<Hex | null>(null);
+  // Hex a rectangle or tunnel drag started on, on a hex grid
+  const hexDragStartRef = useRef<Hex | null>(null);
   // Corner the wall stroke has reached, whether it erases (Shift held), and
   // the edges it has run along
   const wallStrokeRef = useRef<{ corner: Pair; erase: boolean; edges: [Pair, Pair][] } | null>(null);
@@ -247,7 +253,18 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     [onModifyMap, activeLayerId]
   );
   const hexGrid = isHexGrid(mapData.gridType) ? mapData.gridType : null;
-  const hexBrush = hexGrid !== null && (activeTool === 'room-brush' || activeTool === 'paint' || activeTool === 'eraser');
+  const hexBrush = hexGrid !== null && usesBrush(activeTool);
+  // The hexes the active tool would cover with the pointer over `h`
+  const hexFootprint = useCallback(
+    (h: Hex): Hex[] => {
+      if (!hexGrid) return [];
+      const start = hexDragStartRef.current;
+      if (activeTool === 'room-rect') return start ? hexRect(hexGrid, start, h) : [h];
+      if (activeTool === 'tunnel') return start ? hexTunnel(start, h, brushSize) : hexesWithin(h, brushSize);
+      return usesBrush(activeTool) ? hexesWithin(h, brushSize) : [h];
+    },
+    [hexGrid, activeTool, brushSize]
+  );
 
   // Where a shape point would go: on the nearest half cell, or hex centre or corner
   const snapPoint = useCallback(
@@ -260,10 +277,17 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     },
     [mapData.gridSize, mapData.gridType]
   );
+  // Where a prop, light or stairs would go: the cell under the pointer, or the middle of the hex
+  const slotAt = (hover: HoverState): Pair =>
+    hexGrid ? hexSlot(hexGrid, hexAt(hexGrid, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize)) : [hover.gx, hover.gy];
   // Where a door would go: on a wall off the grid lines nearby, turned to match, or the nearest cell edge
   const doorSpotAt = useCallback(
     (hover: HoverState) =>
-      snapDoor(hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize, doorWalls(visibleLayers(mapData))),
+      snapDoor(
+        hover.worldX / mapData.gridSize,
+        hover.worldY / mapData.gridSize,
+        doorWalls(visibleLayers(mapData), isHexGrid(mapData.gridType))
+      ),
     [mapData]
   );
   const spaceHeldRef = useRef<boolean>(false);
@@ -403,10 +427,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           ctx.arc(x * gridSize, y * gridSize, 3, 0, Math.PI * 2);
         }
         ctx.fill();
-      } else if (hexGrid && hexBrush) {
+      } else if (hexGrid && activeTool !== 'door' && activeTool !== 'window' && activeTool !== 'wall') {
+        // On a hex grid every other tool works in whole hexes
         ctx.beginPath();
-        const centre = hexAt(hexGrid, hover.worldX / gridSize, hover.worldY / gridSize);
-        for (const h of hexesWithin(centre, brushSize)) {
+        for (const h of hexFootprint(hexAt(hexGrid, hover.worldX / gridSize, hover.worldY / gridSize))) {
           hexPolygon(hexGrid, h)[0].forEach(([x, y], i) =>
             i === 0 ? ctx.moveTo(x * gridSize, y * gridSize) : ctx.lineTo(x * gridSize, y * gridSize)
           );
@@ -418,13 +442,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         // Highlight the wall edge (or, for a door, the stretch of a wall off the grid) it will snap to
         const spot =
           activeTool === 'door' ? doorSpotAt(hover) : nearestDoorEdge(hover.worldX, hover.worldY, gridSize);
-        const { cx, cy, ux, uy } = doorLine(spot);
+        const { cx, cy, ux, uy, length } = doorLine(spot);
+        const [hx, hy] = [(ux * length) / 2, (uy * length) / 2];
         ctx.setLineDash([]);
         ctx.lineWidth = 6;
         ctx.strokeStyle = activeTool === 'window' ? 'rgba(60, 140, 180, 0.6)' : 'rgba(139, 58, 43, 0.6)';
         ctx.beginPath();
-        ctx.moveTo((cx - ux / 2) * gridSize, (cy - uy / 2) * gridSize);
-        ctx.lineTo((cx + ux / 2) * gridSize, (cy + uy / 2) * gridSize);
+        ctx.moveTo((cx - hx) * gridSize, (cy - hy) * gridSize);
+        ctx.lineTo((cx + hx) * gridSize, (cy + hy) * gridSize);
         ctx.stroke();
       } else if (activeTool === 'wall') {
         // The corner the wall will start from or run to; red while erasing
@@ -491,7 +516,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     ctx.restore();
 
     ctx.restore();
-  }, [mapData, levelsBelow, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, river, road, waterStyle, snapPoint, doorSpotAt, hexGrid, hexBrush]);
+  }, [mapData, levelsBelow, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, river, road, waterStyle, snapPoint, doorSpotAt, hexGrid, hexFootprint]);
 
   // Keep the canvas backing store matched to its on-screen size
   const drawRef = useRef(drawMap);
@@ -609,7 +634,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     [activeTool, brushSize, selectedFoliageType, floorTexture, paintTexture, waterStyle, editLayer]
   );
 
-  // On a hex grid the room brush, paint and eraser lay or cut whole hexes
+  // On a hex grid the brushes lay, plant or cut whole hexes
   const applyHexBrush = useCallback(
     (centers: Hex[]) => {
       if (!hexGrid) return;
@@ -624,17 +649,41 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             addPaint(draft, shape, paintTexture);
             return;
           }
+          if (activeTool === 'water') {
+            addWater(draft, shape, waterStyle);
+            return;
+          }
+          if (activeTool === 'foliage') {
+            // A plant in the middle of each hex, kept if already there so
+            // dragging over it doesn't reshuffle its shape
+            for (const h of hexes.values()) {
+              const key = hexSlot(hexGrid, h).join(',');
+              if (draft.foliage[key]?.type !== selectedFoliageType) {
+                draft.foliage[key] = { type: selectedFoliageType, seed: Math.floor(Math.random() * 10000) };
+              }
+            }
+            return;
+          }
           applyShape(draft, shape, activeTool === 'eraser' ? 'cut' : 'add', floorTexture);
           if (activeTool !== 'eraser') return;
           eraseWater(draft, shape);
           erasePaint(draft, shape);
-          // Water, plants and objects go with the cells centred in the hexes,
-          // and walls with the hex edges
+          // Plants and objects centred in the hexes go, as do walls on their
+          // edges and water or plants in the cells centred in them
+          const inHexes = (x: number, y: number) => hexes.has(hexKey(hexAt(hexGrid, x, y)));
+          for (const key of Object.keys(draft.foliage)) {
+            const [x, y] = key.split(',').map(Number);
+            if (inHexes(x + 0.5, y + 0.5)) delete draft.foliage[key];
+          }
+          draft.props = draft.props.filter((p) => !inHexes(p.x + 0.5, p.y + 0.5));
+          draft.lights = draft.lights.filter((l) => !inHexes(l.x + 0.5, l.y + 0.5));
+          draft.stairs = draft.stairs.filter((s) => !inHexes(s.x + 0.5, s.y + 0.5));
           for (const h of hexes.values()) {
             const [cx, cy] = hexCenter(hexGrid, h);
             draft.walls = draft.walls.filter(
               (w) => Math.hypot(w.x + w.dx / 2 - cx, w.y + w.dy / 2 - cy) > 0.5 + 1e-6
             );
+            draft.doors = draft.doors.filter((d) => d.angle === undefined || Math.hypot(d.x - cx, d.y - cy) > 0.5 + 1e-3);
             for (let gy = Math.floor(cy) - 1; gy <= Math.floor(cy) + 1; gy++) {
               for (let gx = Math.floor(cx) - 1; gx <= Math.floor(cx) + 1; gx++) {
                 if (hexKey(hexAt(hexGrid, gx + 0.5, gy + 0.5)) === hexKey(h)) eraseCellContents(draft, gx, gy);
@@ -645,7 +694,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         { coalesce: `stroke-${strokeCountRef.current}` }
       );
     },
-    [hexGrid, activeTool, brushSize, floorTexture, paintTexture, editLayer]
+    [hexGrid, activeTool, brushSize, floorTexture, paintTexture, waterStyle, selectedFoliageType, editLayer]
   );
 
   // Adds walls along grid edges, or erases those there
@@ -746,9 +795,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const drag = moveDragRef.current;
     if (!drag) return;
     const coalesce = { coalesce: `move-${strokeCountRef.current}` };
+    // Things move by whole cells, or from hex to hex on a hex grid
+    const [stepX, stepY] = hexGrid
+      ? hexOffset(hexGrid, [drag.startWorld.x / mapData.gridSize, drag.startWorld.y / mapData.gridSize], [hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize])
+      : [hover.gx - drag.startCell.x, hover.gy - drag.startCell.y];
     if (drag.group) {
-      // A group moves by whole cells, keeping its layout
-      const offset = { x: hover.gx - drag.startCell.x, y: hover.gy - drag.startCell.y };
+      // A group keeps its layout
+      const offset = { x: stepX, y: stepY };
       if (drag.offset && offset.x === drag.offset.x && offset.y === drag.offset.y) return;
       drag.offset = offset;
       drag.moved = true;
@@ -766,7 +819,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const spot = doorSpotAt(hover);
       if (!door) return;
       const same =
-        door.x === spot.x && door.y === spot.y && door.orientation === spot.orientation && door.angle === spot.angle;
+        door.x === spot.x && door.y === spot.y && door.orientation === spot.orientation && door.angle === spot.angle && door.length === spot.length;
       const occupied = layer.doors.some((d) => d.id !== door.id && sameDoorSpot(d, spot));
       if (!same && !occupied) {
         editDragged((draft) => replaceDoor(draft, { ...door, ...spot }));
@@ -785,14 +838,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
 
     if (drag.sel.kind === 'wall') {
-      // Walls move by whole cells, but not onto an edge another wall uses
+      // Walls move by whole steps, but not onto an edge another wall uses
       const wall = findWall(layer, drag.sel.id);
       if (!wall) return;
-      const moved = {
-        ...wall,
-        x: drag.origin.x + hover.gx - drag.startCell.x,
-        y: drag.origin.y + hover.gy - drag.startCell.y,
-      };
+      const moved = { ...wall, x: drag.origin.x + stepX, y: drag.origin.y + stepY };
       const key = wallKey(moved);
       if ((moved.x !== wall.x || moved.y !== wall.y) && !layer.walls.some((w) => w.id !== wall.id && wallKey(w) === key)) {
         editDragged((draft) => replaceWall(draft, moved));
@@ -812,8 +861,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       return;
     }
 
-    const x = drag.origin.x + hover.gx - drag.startCell.x;
-    const y = drag.origin.y + hover.gy - drag.startCell.y;
+    const x = drag.origin.x + stepX;
+    const y = drag.origin.y + stepY;
     const obj = findSelected(mapData, drag.sel);
     if (!obj || (obj.x === x && obj.y === y)) return;
     editDragged((draft) => {
@@ -866,6 +915,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         longPressOpenedRef.current = Date.now();
         isDrawingRef.current = false;
         dragStartRef.current = null;
+        hexDragStartRef.current = null;
         circleCentreRef.current = null;
         wallStrokeRef.current = null;
         moveDragRef.current = null;
@@ -960,21 +1010,23 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     } else if (activeTool === 'light') {
       // Clicking a light selects it for editing or dragging; elsewhere places one
       const hit = hitTestObject(mapData, hover.worldX, hover.worldY);
-      if (hit?.kind === 'light') {
+      const light = hit?.kind === 'light' ? findSelected(mapData, hit) : undefined;
+      if (hit && light) {
         onSelect([hit]);
         strokeCountRef.current++;
         moveDragRef.current = {
           sel: hit,
           startCell: { x: gx, y: gy },
           startWorld: { x: hover.worldX, y: hover.worldY },
-          origin: { x: gx, y: gy },
+          origin: { x: light.x, y: light.y },
         };
         return;
       }
       if (!layerEditable) return;
       const id = newObjectId('light');
+      const [x, y] = slotAt(hover);
       onModifyMap((draft) => {
-        withLayer(draft, activeLayerId, (layer) => layer.lights.push({ id, x: gx, y: gy, ...DEFAULT_LIGHT }));
+        withLayer(draft, activeLayerId, (layer) => layer.lights.push({ id, x, y, ...DEFAULT_LIGHT }));
         // A light only shows on a darkened map
         draft.lighting = true;
       });
@@ -1037,9 +1089,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const [doors, walls] = [shown.flatMap((l) => l.doors), shown.flatMap((l) => l.walls)];
       // Shift+click drains the room
       editLayer((draft) => {
-        if (e.shiftKey) drainRoom(draft, doors, walls, ...at);
-        else if (fillWith === 'liquid') floodRoom(draft, doors, walls, ...at, waterStyle);
-        else fillRoom(draft, doors, walls, ...at, floorTexture);
+        if (e.shiftKey) drainRoom(draft, doors, walls, ...at, mapData.gridType);
+        else if (fillWith === 'liquid') floodRoom(draft, doors, walls, ...at, waterStyle, mapData.gridType);
+        else fillRoom(draft, doors, walls, ...at, floorTexture, mapData.gridType);
       });
     } else if (activeTool === 'circle') {
       freePlacementRef.current = e.shiftKey;
@@ -1053,6 +1105,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       applyHexBrush([h]);
     } else if (activeTool === 'room-rect' || activeTool === 'tunnel') {
       dragStartRef.current = { x: gx, y: gy };
+      hexDragStartRef.current = hexGrid && hexAt(hexGrid, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize);
       drawMap();
     } else if (activeTool === 'wall') {
       strokeCountRef.current++;
@@ -1071,11 +1124,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         draft.doors.push({ id: newObjectId('door'), ...spot, type: selectedDoorType });
       });
     } else if (activeTool === 'stairs') {
+      const [x, y] = slotAt(hover);
       editLayer((draft) => {
         draft.stairs.push({
           id: newObjectId('stairs'),
-          x: gx,
-          y: gy,
+          x,
+          y,
           width: 1,
           height: 2,
           direction: 'down',
@@ -1083,11 +1137,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         });
       });
     } else if (activeTool === 'prop') {
+      const [x, y] = slotAt(hover);
       editLayer((draft) => {
         draft.props.push({
           id: newObjectId('prop'),
-          x: gx,
-          y: gy,
+          x,
+          y,
           type: selectedPropType,
           rotation: 0,
         });
@@ -1190,7 +1245,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
     const start = dragStartRef.current;
     const end = currentHoverRef.current;
-    if (start && end) {
+    const hexStart = hexDragStartRef.current;
+    if (hexGrid && hexStart && end) {
+      const hexes = hexFootprint(hexAt(hexGrid, end.worldX / mapData.gridSize, end.worldY / mapData.gridSize));
+      editLayer((draft) => applyShape(draft, hexes.map((h) => hexPolygon(hexGrid, h)), 'add', floorTexture));
+    } else if (start && end) {
       const here = { x: end.gx, y: end.gy };
       const cells =
         activeTool === 'tunnel' ? tunnelCells(start, here, brushSize) : rectCells(start, here);
@@ -1225,6 +1284,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     circleCentreRef.current = null;
     wallStrokeRef.current = null;
     dragStartRef.current = null;
+    hexDragStartRef.current = null;
     moveDragRef.current = null;
     isDrawingRef.current = false;
     drawMap();

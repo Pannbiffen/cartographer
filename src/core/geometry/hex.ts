@@ -174,3 +174,74 @@ export function hexCornerNeighbours(type: GridType, corner: Pair): Pair[] {
   }
   return [...found.values()];
 }
+
+const AXIAL_STEPS: Hex[] = [{ q: 1, r: 0 }, { q: -1, r: 0 }, { q: 0, r: 1 }, { q: 0, r: -1 }, { q: 1, r: -1 }, { q: -1, r: 1 }];
+
+/** The six hexes sharing an edge with `h` */
+export function hexNeighbours(h: Hex): Hex[] {
+  return AXIAL_STEPS.map((d) => ({ q: h.q + d.q, r: h.r + d.r }));
+}
+
+/** Hexes with their centres in the box spanned by the centres of `a` and `b`: a rectangle in whole hexes */
+export function hexRect(type: GridType, a: Hex, b: Hex): Hex[] {
+  const [ax, ay] = hexCenter(type, a);
+  const [bx, by] = hexCenter(type, b);
+  const [minX, maxX, minY, maxY] = [Math.min(ax, bx), Math.max(ax, bx), Math.min(ay, by), Math.max(ay, by)];
+  const hexes = new Map<string, Hex>();
+  for (let y = Math.floor(minY); y <= Math.ceil(maxY); y++) {
+    for (let x = Math.floor(minX); x <= Math.ceil(maxX); x++) {
+      for (const h of hexesWithin(hexAt(type, x, y), 2)) {
+        const [cx, cy] = hexCenter(type, h);
+        if (cx >= minX - 1e-6 && cx <= maxX + 1e-6 && cy >= minY - 1e-6 && cy <= maxY + 1e-6) hexes.set(hexKey(h), h);
+      }
+    }
+  }
+  return [...hexes.values()];
+}
+
+/** A straight corridor of hexes from `a` to `b`, widened to `size` like the brush */
+export function hexTunnel(a: Hex, b: Hex, size: number): Hex[] {
+  const hexes = new Map<string, Hex>();
+  for (const centre of hexLine(a, b)) {
+    for (const h of hexesWithin(centre, size)) hexes.set(hexKey(h), h);
+  }
+  return [...hexes.values()];
+}
+
+/** Where a one-cell object (prop, light, plant) goes to sit in the middle of a hex: its top-left corner */
+export function hexSlot(type: GridType, h: Hex): Pair {
+  const [cx, cy] = hexCenter(type, h);
+  return [round6(cx - 0.5), round6(cy - 0.5)];
+}
+
+const round6 = (v: number) => Math.round(v * 1e6) / 1e6;
+
+/** How far a drag from one point to another moves things on a hex grid: from hex centre to hex centre */
+export function hexOffset(type: GridType, from: Pair, to: Pair): Pair {
+  const [ax, ay] = hexCenter(type, hexAt(type, ...from));
+  const [bx, by] = hexCenter(type, hexAt(type, ...to));
+  return [bx - ax, by - ay];
+}
+
+/**
+ * One arrow-key step from a point to a neighbouring hex centre. Across the
+ * rows of hexes (up and down on pointy hexes, left and right on flat ones)
+ * the step zigzags by the row, so repeated steps run straight.
+ */
+export function hexNudge(type: GridType, at: Pair, dx: number, dy: number): Pair {
+  const h = hexAt(type, ...at);
+  const flat = type === 'hex-flat';
+  const [along, across] = flat ? [dy, dx] : [dx, dy];
+  let step: Hex;
+  if (across === 0) {
+    // Along a row of hexes
+    step = flat ? { q: 0, r: Math.sign(along) } : { q: Math.sign(along), r: 0 };
+  } else {
+    // Into the next row, leaning one way on even rows and the other on odd ones
+    const row = flat ? h.q : h.r;
+    const lean = row % 2 === 0 ? 0 : -1;
+    step = across > 0 ? { q: lean, r: 1 } : { q: lean + 1, r: -1 };
+    if (flat) step = { q: step.r, r: step.q };
+  }
+  return hexOffset(type, hexCenter(type, h), hexCenter(type, { q: h.q + step.q, r: h.r + step.r }));
+}

@@ -157,6 +157,8 @@ test('on a hex grid, a door on a thin wall sits at its middle and opens it', asy
   expect(door.x).toBeCloseTo(mx, 3);
   expect(door.y).toBeCloseTo(my, 3);
   expect(door.angle).toBeCloseTo(((((Math.atan2(wall.dy, wall.dx) * 180) / Math.PI) % 180) + 180) % 180, 1);
+  // As long as the hex side, not a whole cell
+  expect(door.length).toBeCloseTo(Math.hypot(wall.dx, wall.dy), 3);
 
   // The wall under the door no longer blocks: one wall fewer in the VTT export
   await page.keyboard.press('Control+e');

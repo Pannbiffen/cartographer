@@ -73,14 +73,15 @@ export function exportUniversalVtt(
     .flatMap((l) => l.doors)
     .filter((door) => door.type !== 'archway')
     .map((door) => {
-      // From 0.1 to 0.9 along the door's cell-wide span, turned with its wall
-      const { cx, cy, ux, uy } = doorLine(door);
+      // From 0.1 to 0.9 along the door's span, turned with its wall
+      const { cx, cy, ux, uy, length } = doorLine(door);
       const [x, y] = [cx - minX, cy - minY];
+      const half = length * 0.4;
       return {
         position: { x, y },
         bounds: [
-          { x: x - ux * 0.4, y: y - uy * 0.4 },
-          { x: x + ux * 0.4, y: y + uy * 0.4 },
+          { x: x - ux * half, y: y - uy * half },
+          { x: x + ux * half, y: y + uy * half },
         ],
         rotation: Math.atan2(uy, ux),
         closed: true,

@@ -13,10 +13,11 @@ import type {
   PlacedWindow,
   Selection,
 } from '../types/map';
-import { distanceToDoor, doorLine, nearestDoorEdge, sameDoorSpot, stairsContainCell, type DoorSpot } from './tools/toolGeometry';
+import { distanceToDoor, doorLine, nearestDoorEdge, sameDoorSpot, type DoorSpot } from './tools/toolGeometry';
 import { measureLabel } from './renderers/labelRenderer';
 import { findLayer, isLayerEditable } from './layers';
 import { distanceToWall, wallKey } from './geometry/walls';
+import { hexNudge, isHexGrid } from './geometry/hex';
 
 // How close (in cells) the pointer must be to a door's wall edge to pick it
 const DOOR_HIT_DISTANCE = 0.3;
@@ -119,8 +120,6 @@ function hitTestLabel(layer: MapLayer, worldX: number, worldY: number, gridSize:
 }
 
 function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize: number): Selection | null {
-  const gx = Math.floor(worldX / gridSize);
-  const gy = Math.floor(worldY / gridSize);
   const layerId = layer.id;
   const px = worldX / gridSize;
   const py = worldY / gridSize;
@@ -154,17 +153,19 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
     if (distanceToWall(w, px, py) <= DOOR_HIT_DISTANCE) return { kind: 'wall', id: w.id, layerId };
   }
 
+  // Lights, props and stairs fill whole cells, which on a hex grid sit off the square grid
+  const covers = (x: number, y: number, w: number, h: number) => px >= x && px < x + w && py >= y && py < y + h;
   for (let i = layer.lights.length - 1; i >= 0; i--) {
     const l = layer.lights[i];
-    if (l.x === gx && l.y === gy) return { kind: 'light', id: l.id, layerId };
+    if (covers(l.x, l.y, 1, 1)) return { kind: 'light', id: l.id, layerId };
   }
   for (let i = layer.props.length - 1; i >= 0; i--) {
     const p = layer.props[i];
-    if (p.x === gx && p.y === gy) return { kind: 'prop', id: p.id, layerId };
+    if (covers(p.x, p.y, 1, 1)) return { kind: 'prop', id: p.id, layerId };
   }
   for (let i = layer.stairs.length - 1; i >= 0; i--) {
     const s = layer.stairs[i];
-    if (stairsContainCell(s, gx, gy)) return { kind: 'stairs', id: s.id, layerId };
+    if (covers(s.x, s.y, s.width, s.height)) return { kind: 'stairs', id: s.id, layerId };
   }
   return null;
 }
@@ -207,10 +208,10 @@ export function objectBounds(
   if (isEdgeKind(sel.kind)) {
     const d = sel.kind === 'door' ? findDoor(layer, sel.id) : findWindow(layer, sel.id);
     if (!d) return null;
-    // A cell long and 0.4 across, turned with the wall
-    const { cx, cy, ux, uy } = doorLine(d);
-    const halfW = Math.abs(ux) * 0.5 + Math.abs(uy) * 0.2;
-    const halfH = Math.abs(uy) * 0.5 + Math.abs(ux) * 0.2;
+    // Its length (a cell, or a hex side) and 0.4 across, turned with the wall
+    const { cx, cy, ux, uy, length } = doorLine(d);
+    const halfW = (Math.abs(ux) * length) / 2 + Math.abs(uy) * 0.2;
+    const halfH = (Math.abs(uy) * length) / 2 + Math.abs(ux) * 0.2;
     return { x: cx - halfW, y: cy - halfH, w: halfW * 2, h: halfH * 2 };
   }
   if (sel.kind === 'wall') {
@@ -357,8 +358,19 @@ export function moveObjects(draft: MapData | LevelMap, origins: ObjectOrigin[], 
   }
 }
 
-/** Nudges one object as `nudgeObject` does, or a group by whole cells */
+/**
+ * Nudges one object as `nudgeObject` does, or a group by whole cells. On a
+ * hex grid each step goes to a neighbouring hex (a label on its own still
+ * moves freely).
+ */
 export function nudgeObjects(draft: MapData | LevelMap, sels: Selection[], dx: number, dy: number, labelStep: number) {
+  if (isHexGrid(draft.gridType) && !(sels.length === 1 && sels[0].kind === 'label')) {
+    const b = sels.length > 0 ? objectBounds(draft, sels[sels.length - 1]) : null;
+    if (!b) return;
+    // Just off the middle, which for a wall or door is on a hex edge, so it
+    // is always clear which hex the object is in
+    [dx, dy] = hexNudge(draft.gridType, [b.x + b.w / 2 + 0.013, b.y + b.h / 2 + 0.017], dx, dy);
+  }
   if (sels.length === 1) nudgeObject(draft, sels[0], dx, dy, labelStep);
   else moveObjects(draft, objectOrigins(draft, sels), dx, dy);
 }

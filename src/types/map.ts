@@ -101,6 +101,8 @@ export interface PlacedDoor {
    * in degrees, 0 up to 180; `orientation` is unused
    */
   angle?: number;
+  /** Its span along the wall in cells, when shorter than one (a hex edge) */
+  length?: number;
 }
 
 /**
