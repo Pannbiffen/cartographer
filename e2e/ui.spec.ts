@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openApp, cellCenter, dragCells, gridPoint, saveMap, view } from './helpers';
+import { openApp, newEmptyMap, cellCenter, dragCells, gridPoint, saveMap, view } from './helpers';
 
 test('menus run commands and show their state', async ({ page }) => {
   await openApp(page);
@@ -58,7 +58,7 @@ test('dialogs take keyboard focus, keep Tab inside and give focus back', async (
 
   // A control with autoFocus keeps it
   await dragCells(page, [7, 6], [10, 6]);
-  await page.keyboard.press('Control+Alt+n');
+  await newEmptyMap(page, 'key');
   await expect(page.getByRole('dialog', { name: /\?$/ }).getByRole('button', { name: 'Save first' })).toBeFocused();
 });
 

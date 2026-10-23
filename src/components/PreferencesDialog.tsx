@@ -200,6 +200,12 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
           checked={preferences.autosave}
           onChange={(autosave) => onChange({ autosave })}
         />
+        <Check
+          label="Show the welcome dialog on start"
+          hint="Offers an empty map or an example when no map is reopened. File > New always shows it."
+          checked={preferences.showWelcome}
+          onChange={(showWelcome) => onChange({ showWelcome })}
+        />
         <div className="flex flex-col gap-1">
           <Select
             label="Unsaved map"

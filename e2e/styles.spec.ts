@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, clickCell, dragCells, gridPoint, saveMap, trackErrors, view } from './helpers';
+import { openApp, newEmptyMap, clickCell, dragCells, gridPoint, saveMap, trackErrors, view } from './helpers';
 
 // The starter map leaves rows y >= 8 empty
 
@@ -74,7 +74,7 @@ test('grass, sand, carpet, slabs and marble can be laid and are drawn', async ({
   const errors = trackErrors(page);
   await openApp(page);
   // A blank map, framed around the origin
-  await page.keyboard.press('Control+Alt+n');
+  await newEmptyMap(page, 'key');
   await expect(page.getByTestId('map-stats')).toContainText('Rooms: 0');
   await page.keyboard.press('r');
   // A plain room for comparison, then one room per texture, a cell apart
@@ -226,7 +226,7 @@ test('stipple hatching on a large map draws from a tile, zoomed out and back in'
 test('the colour style colours floors by texture and is saved with the map', async ({ page }) => {
   const errors = trackErrors(page);
   await openApp(page, { mapSettings: true });
-  await page.keyboard.press('Control+Alt+n');
+  await newEmptyMap(page, 'key');
   await expect(page.getByTestId('map-stats')).toContainText('Rooms: 0');
   await page.getByLabel('Map style').selectOption('parchment');
   await page.keyboard.press('r');

@@ -35,6 +35,8 @@ export interface Preferences {
   showLevelsFurtherBelow: boolean;
   levelBelowFade: number;
   zoomSpeed: ZoomSpeed;
+  // Open the welcome dialog (empty map or an example) when no map is resumed on start
+  showWelcome: boolean;
   // The look File > New starts a map with
   newMap: NewMapDefaults;
 }
@@ -60,6 +62,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showLevelsFurtherBelow: false,
   levelBelowFade: 0.1,
   zoomSpeed: 'normal',
+  showWelcome: true,
   newMap: DEFAULT_NEW_MAP,
 };
 

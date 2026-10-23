@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, dragCells, saveMap, stats, trackErrors } from './helpers';
+import { openApp, newEmptyMap, dragCells, saveMap, stats, trackErrors } from './helpers';
 
 async function fileMenu(page: Page, item: string | RegExp) {
   await page.getByRole('menuitem', { name: 'File' }).click();
@@ -34,7 +34,7 @@ test('New keeps the previous map, which Open Recent brings back', async ({ page 
   await page.keyboard.press('Escape');
 
   await drawMap(page, 'First Map');
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await expect(unsavedDialog(page)).toContainText('stays in File > My Maps');
   await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
   await expect(page.getByLabel('Map title')).toHaveValue('Untitled map');
@@ -55,7 +55,7 @@ test('edits made just before switching maps are kept', async ({ page }) => {
   await drawMap(page, 'Quick');
   await page.getByLabel('Map title').fill('Quick Edit');
   // No waiting for the autosave: opening another map stores this one first
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
   await openRecent(page, 'Quick Edit');
   await expect(page.getByLabel('Map title')).toHaveValue('Quick Edit');
@@ -75,7 +75,7 @@ test('My Maps opens, renames, duplicates and deletes maps', async ({ page }) => 
   const errors = trackErrors(page);
   await openApp(page, { mapSettings: true });
   await drawMap(page, 'Alpha');
-  await page.keyboard.press('Control+Alt+n');
+  await newEmptyMap(page, 'key');
   await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
   await drawMap(page, 'Beta', 2);
 
@@ -141,7 +141,7 @@ test('a map saved to a file still counts as saved after a reload', async ({ page
   await page.reload();
   await openApp(page, { mapSettings: true });
   await expect(page).toHaveTitle(/^Filed/);
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await expect(unsavedDialog(page)).toHaveCount(0);
   await expect(page.getByLabel('Map title')).toHaveValue('Untitled map');
 

@@ -32,6 +32,7 @@ import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
 import { ShareDialog } from './components/ShareDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { MyMapsDialog } from './components/MyMapsDialog';
+import { WelcomeDialog } from './components/WelcomeDialog';
 import {
   generateBspDungeon,
   generateCaveSystem,
@@ -459,9 +460,17 @@ export function App() {
     return () => window.removeEventListener('hashchange', openSharedMap);
   }, []);
 
-  const handleNewMap = useCallback(() => {
+  const handleEmptyMap = useCallback(() => {
     confirmReplace('Start a new map', () => replaceMap(createBlankMap(preferences.newMap), { pristine: true }));
   }, [confirmReplace, replaceMap, preferences.newMap]);
+
+  // The welcome dialog offers an empty map or an example. It opens on a
+  // first visit (no map to resume, no share link to offer) unless switched
+  // off in Preferences, and always for File > New.
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(
+    () => preferences.showWelcome && !initial.resumed && !isShareFragment(window.location.hash)
+  );
+  const handleNewMap = useCallback(() => setIsWelcomeOpen(true), []);
 
   const handleOpenExample = useCallback(
     (example: ExampleMap) => {
@@ -835,7 +844,7 @@ export function App() {
     {
       label: 'File',
       items: [
-        { label: 'New', shortcut: 'Ctrl+Alt+N', onSelect: handleNewMap },
+        { label: 'New…', shortcut: 'Ctrl+Alt+N', onSelect: handleNewMap },
         { label: 'Open…', shortcut: 'Ctrl+O', onSelect: () => fileInputRef.current?.click() },
         {
           label: 'Open Recent',
@@ -1286,6 +1295,22 @@ export function App() {
       />
 
       {isShareOpen && <ShareDialog mapData={mapData} onClose={() => setIsShareOpen(false)} />}
+
+      {isWelcomeOpen && (
+        <WelcomeDialog
+          showOnStart={preferences.showWelcome}
+          onShowOnStartChange={(showWelcome) => changePreferences({ showWelcome })}
+          onEmpty={() => {
+            setIsWelcomeOpen(false);
+            handleEmptyMap();
+          }}
+          onExample={(example) => {
+            setIsWelcomeOpen(false);
+            handleOpenExample(example);
+          }}
+          onClose={() => setIsWelcomeOpen(false)}
+        />
+      )}
 
       {isMyMapsOpen && (
         <MyMapsDialog

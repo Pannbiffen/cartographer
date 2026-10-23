@@ -6,7 +6,15 @@ import type { MapData, MapLayer } from '../src/types/map';
  * `mapSettings` starts with the map settings drawer open, as if left open last time,
  * so the map is framed in the canvas above it.
  */
-export async function openApp(page: Page, { mapSettings = false } = {}) {
+export async function openApp(page: Page, { mapSettings = false, welcome = false } = {}) {
+  // The welcome dialog would cover the starter map, so it's off unless asked for
+  if (!welcome) {
+    await page.addInitScript(() => {
+      const key = 'cartographer.preferences.v1';
+      const prefs = JSON.parse(localStorage.getItem(key) ?? '{}');
+      if (prefs.showWelcome === undefined) localStorage.setItem(key, JSON.stringify({ ...prefs, showWelcome: false }));
+    });
+  }
   if (mapSettings) {
     await page.addInitScript(() => {
       const key = 'cartographer.preferences.v1';
@@ -22,6 +30,27 @@ export async function openApp(page: Page, { mapSettings = false } = {}) {
   await expect(page.getByTestId('map-stats')).toBeVisible();
   // ...and the view has been placed for the canvas size
   await expect(page.locator('canvas')).not.toHaveAttribute('data-view', '0,0,1');
+}
+
+/**
+ * File > New (from the menu, toolbar button or Ctrl+Alt+N) and Empty map in
+ * the dialog it opens; the key picks the focused Empty map card with Enter
+ */
+export async function newEmptyMap(page: Page, via: 'menu' | 'toolbar' | 'key' = 'menu') {
+  if (via === 'key') {
+    await page.keyboard.press('Control+Alt+n');
+    const card = page.getByRole('dialog', { name: 'New map' }).getByRole('button', { name: /^Empty map/ });
+    await expect(card).toBeFocused();
+    await page.keyboard.press('Enter');
+    return;
+  }
+  if (via === 'toolbar') {
+    await page.getByRole('button', { name: 'New', exact: true }).click();
+  } else {
+    await page.getByRole('menuitem', { name: 'File' }).click();
+    await page.getByRole('menuitem', { name: 'New' }).click();
+  }
+  await page.getByRole('dialog', { name: 'New map' }).getByRole('button', { name: /^Empty map/ }).click();
 }
 
 /** Opens the map settings drawer (title, style, walls, lighting, grid) if it is closed */

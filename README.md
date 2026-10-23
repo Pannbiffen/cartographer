@@ -44,7 +44,7 @@
   - 🔗 **Share Links**: File > Share Link puts a compressed copy of the map in a link. Friends who open it get their own copy to view, edit or save; nothing is uploaded anywhere.
 - **Navigation**: Maps open framed in the window and `Ctrl + 0` brings the whole map back into view. Pan with the arrow keys or by dragging, and zoom with the wheel or a trackpad at the speed you set in Preferences.
 - **New Maps**: File > New starts a blank map (Colour style on grass with rough pen walls, unless you choose otherwise) with the style, hatching and grid you pick in Preferences (or copied from the open map), and asks before discarding changes you haven't saved to a file (tick "Remember my choice", or set it in Preferences, to always rely on the in-browser copy or always download a file first).
-- **Example maps**: File > Examples opens a ready-made map to explore or build on: The Sunken Crypt (the starter dungeon), Riverside Farm (outdoors, with a brook, a road and woods) and Ember Cavern (a torchlit cave with lava, lighting on).
+- **Welcome and example maps**: File > New offers an empty map in your look from Preferences or one of the example maps, and the same dialog greets a first visit (switch that off in the dialog or in Preferences; File > New always shows it). File > Examples also opens a ready-made map to explore or build on: The Sunken Crypt (the starter dungeon), Riverside Farm (outdoors, with a brook, a road and woods) and Ember Cavern (a torchlit cave with lava, lighting on).
 - **Autosave and My Maps**: Your maps are kept in this browser, and the one you had open comes back when you reopen the page. Starting a new map or opening a file or share link keeps the previous one: get it back from File > Open Recent, or rename, duplicate and delete maps in File > My Maps. Save a `.dndmap` file to back a map up or move it to another device. With autosave off, the browser asks before you close a tab with unsaved work.
 - **Undo/Redo**: Up to 100 steps; each brush stroke or slider drag is a single step.
 - **100% Client-Side & Static**: Hosted on GitHub Pages with no tracking and no accounts.
@@ -131,7 +131,7 @@ npm run preview
 | `Ctrl + V` / `Cmd + V` | Paste it under the pointer (or one cell along), on the active layer |
 | `Ctrl + D` / `Cmd + D` | Duplicate the selected objects |
 | Right-click / long-press / `Shift + F10` | Menu for the object or spot under the pointer (or the selection) |
-| `Ctrl + Alt + N` / `Cmd + Option + N` | New map |
+| `Ctrl + Alt + N` / `Cmd + Option + N` | New map (empty or an example; Enter picks Empty map) |
 | `Ctrl + O` / `Cmd + O` | Open project |
 | `Ctrl + S` / `Cmd + S` | Save project (`.dndmap`) |
 | `Ctrl + E` / `Cmd + E` | Export |

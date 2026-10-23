@@ -1,10 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, dragCells, saveMap, stats } from './helpers';
-
-async function fileMenu(page: Page, item: string | RegExp) {
-  await page.getByRole('menuitem', { name: 'File' }).click();
-  await page.getByRole('menuitem', { name: item }).click();
-}
+import { openApp, newEmptyMap, dragCells, saveMap, stats } from './helpers';
 
 async function openPreferences(page: Page) {
   await page.getByRole('menuitem', { name: 'Edit' }).click();
@@ -18,7 +13,7 @@ test('File > New starts a blank map without asking when nothing is unsaved', asy
   await openApp(page, { mapSettings: true });
   expect((await stats(page)).rooms).toBeGreaterThan(0);
 
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await expect(unsavedDialog(page)).toHaveCount(0);
   await expect(page.getByTestId('map-stats')).toContainText('Rooms: 0 · Water: 0');
   await expect(page.getByLabel('Map title')).toHaveValue('Untitled map');
@@ -34,19 +29,19 @@ test('unsaved changes are kept, discarded or saved first before a new map', asyn
   expect(rooms).toBeGreaterThan(before);
 
   // Cancel keeps the map
-  await page.keyboard.press('Control+Alt+n');
+  await newEmptyMap(page, 'key');
   await expect(unsavedDialog(page)).toContainText('not saved to a file');
   await unsavedDialog(page).getByRole('button', { name: 'Cancel' }).click();
   expect((await stats(page)).rooms).toBe(rooms);
 
   // Escape does too
-  await page.keyboard.press('Control+Alt+n');
+  await newEmptyMap(page, 'key');
   await page.keyboard.press('Escape');
   await expect(unsavedDialog(page)).toHaveCount(0);
   expect((await stats(page)).rooms).toBe(rooms);
 
   // Save first downloads the map, then starts the new one
-  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await newEmptyMap(page, 'toolbar');
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     unsavedDialog(page).getByRole('button', { name: 'Save first' }).click(),
@@ -56,7 +51,7 @@ test('unsaved changes are kept, discarded or saved first before a new map', asyn
 
   // Don't save just replaces it
   await dragCells(page, [0, 0], [2, 0]);
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
   await expect(page.getByTestId('map-stats')).toContainText('Rooms: 0');
 
@@ -65,7 +60,7 @@ test('unsaved changes are kept, discarded or saved first before a new map', asyn
   await saveMap(page);
   await dragCells(page, [0, 2], [2, 2]);
   await page.keyboard.press('Control+z');
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await expect(unsavedDialog(page)).toHaveCount(0);
 });
 
@@ -108,7 +103,7 @@ test('new maps start with the look chosen in Preferences', async ({ page }) => {
   // map isn't kept in the browser, so New doesn't ask.
   await page.reload();
   await openApp(page);
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await expect(page.getByLabel('Map style')).toHaveValue('blueprint');
   let map = await saveMap(page);
   expect(map).toMatchObject({ theme: 'blueprint', gridType: 'hex-flat', showGrid: false, hatchLength: 12 });
@@ -118,7 +113,7 @@ test('new maps start with the look chosen in Preferences', async ({ page }) => {
   await page.getByLabel('Map title').fill('Scratch');
   await (await openPreferences(page)).getByRole('button', { name: /current map/ }).click();
   await page.keyboard.press('Escape');
-  await page.keyboard.press('Control+Alt+n');
+  await newEmptyMap(page, 'key');
   await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
   await expect(page.getByLabel('Map title')).toHaveValue('Untitled map');
   map = await saveMap(page);
@@ -126,7 +121,7 @@ test('new maps start with the look chosen in Preferences', async ({ page }) => {
 
   await (await openPreferences(page)).getByRole('button', { name: 'Restore defaults' }).click();
   await page.keyboard.press('Escape');
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await expect(page.getByLabel('Map style')).toHaveValue('colour');
   map = await saveMap(page);
   expect(map).toMatchObject({
@@ -145,7 +140,7 @@ test('a remembered answer replaces unsaved maps without asking', async ({ page }
 
   // Remembering Don't save sets the preference and skips the dialog next time
   await dragCells(page, [7, 6], [10, 6]);
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await unsavedDialog(page).getByLabel('Remember my choice').check();
   await expect(unsavedDialog(page)).toContainText('Edit > Preferences');
   await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
@@ -155,7 +150,7 @@ test('a remembered answer replaces unsaved maps without asking', async ({ page }
   await page.keyboard.press('Escape');
 
   await dragCells(page, [0, 0], [2, 0]);
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await expect(unsavedDialog(page)).toHaveCount(0);
   await expect(page.getByLabel('Map title')).toHaveValue('Untitled map');
 
@@ -170,7 +165,7 @@ test('a remembered answer replaces unsaved maps without asking', async ({ page }
     };
   });
   await dragCells(page, [0, 0], [2, 0]);
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await expect(unsavedDialog(page)).toBeVisible();
   await unsavedDialog(page).getByRole('button', { name: 'Cancel' }).click();
   await page.evaluate(() => (window as unknown as { restoreStorage: () => void }).restoreStorage());
@@ -180,7 +175,7 @@ test('a remembered answer replaces unsaved maps without asking', async ({ page }
   await dialog.getByLabel('Autosave the map in this browser').uncheck();
   await page.keyboard.press('Escape');
   await dragCells(page, [0, 0], [2, 0]);
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await expect(unsavedDialog(page)).toBeVisible();
   await unsavedDialog(page).getByRole('button', { name: 'Cancel' }).click();
 
@@ -189,7 +184,7 @@ test('a remembered answer replaces unsaved maps without asking', async ({ page }
   await dialog.getByLabel('Unsaved map').selectOption('download');
   await page.keyboard.press('Escape');
   await page.getByLabel('Map title').fill('Downloaded');
-  const [download] = await Promise.all([page.waitForEvent('download'), fileMenu(page, 'New')]);
+  const [download] = await Promise.all([page.waitForEvent('download'), newEmptyMap(page)]);
   expect(download.suggestedFilename()).toBe('downloaded.dndmap');
   await expect(unsavedDialog(page)).toHaveCount(0);
   await expect(page.getByLabel('Map title')).toHaveValue('Untitled map');
@@ -199,7 +194,7 @@ test('a remembered answer replaces unsaved maps without asking', async ({ page }
   await dialog.getByLabel('Unsaved map').selectOption('ask');
   await page.keyboard.press('Escape');
   await dragCells(page, [0, 0], [2, 0]);
-  await fileMenu(page, 'New');
+  await newEmptyMap(page);
   await unsavedDialog(page).getByLabel('Remember my choice').check();
   await Promise.all([
     page.waitForEvent('download'),

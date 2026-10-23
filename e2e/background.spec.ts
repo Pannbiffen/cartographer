@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, dragCells, gridPoint, saveMap, trackErrors } from './helpers';
+import { openApp, newEmptyMap, dragCells, gridPoint, saveMap, trackErrors } from './helpers';
 
 // The starter map leaves the block x -15..-8, y -8..0 empty
 
@@ -113,8 +113,7 @@ test('the background is part of the new-map look', async ({ page }) => {
   await prefs.getByLabel('Background').selectOption('packed-earth');
   await page.keyboard.press('Escape');
 
-  await page.getByRole('menuitem', { name: 'File' }).click();
-  await page.getByRole('menuitem', { name: 'New' }).click();
+  await newEmptyMap(page);
   await expect(page.getByTestId('map-stats')).toContainText('Rooms: 0');
   expect((await saveMap(page)).background).toBe('packed-earth');
 });
