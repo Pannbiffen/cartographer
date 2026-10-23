@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { openApp, dragCells, gridPoint, saveMap, trackErrors } from './helpers';
+import type { Pair, Polygon } from '../src/types/map';
 
 // The starter map leaves the block x -15..-8, y -8..0 empty
 
@@ -101,5 +102,69 @@ test('on a hex grid paint covers whole hexes, which the eraser takes away', asyn
   await dragCells(page, [-12, -5], [-12, -5]);
   layer = await topLayer(page);
   expect(layer.paintAreas).toEqual({});
+  expect(errors).toEqual([]);
+});
+
+function inside(polygons: Polygon[], [x, y]: Pair): boolean {
+  let hit = false;
+  for (const ring of polygons.flat()) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i];
+      const [xj, yj] = ring[j];
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) hit = !hit;
+    }
+  }
+  return hit;
+}
+
+async function clickAt(page: Page, gx: number, gy: number) {
+  const p = await gridPoint(page, gx, gy);
+  await page.mouse.click(p.x, p.y);
+}
+
+test('the road tool paints a winding dirt track through the clicked points, undone in one step', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page, { mapSettings: true });
+  await page.getByLabel('Ground').selectOption('grass');
+  const before = await topLayer(page);
+
+  await page.keyboard.press('o');
+  const panel = page.getByRole('complementary', { name: 'Properties' });
+  await expect(panel.getByRole('heading', { name: 'Road / Path' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'dirt' })).toHaveAttribute('aria-pressed', 'true');
+
+  // Escape mid-road draws nothing
+  await clickAt(page, -14.5, -7.5);
+  await clickAt(page, -11.5, -3);
+  await page.keyboard.press('Escape');
+  expect((await topLayer(page)).paintAreas).toEqual({});
+
+  const points: Pair[] = [[-14.5, -7.5], [-11.5, -3], [-9, -0.5]];
+  for (const [x, y] of points) await clickAt(page, x, y);
+  await page.keyboard.press('Enter');
+
+  let layer = await topLayer(page);
+  const dirt = layer.paintAreas.dirt!;
+  expect(dirt).toHaveLength(1);
+  for (const point of points) expect(inside(dirt, point)).toBe(true);
+  expect(inside(dirt, [-9, -7])).toBe(false);
+  // Only paint: no floor, walls or water
+  expect(layer.rooms).toEqual(before.rooms);
+  expect(layer.shapes).toEqual(before.shapes);
+  expect(layer.walls).toEqual(before.walls);
+  expect(layer.waterAreas).toEqual(before.waterAreas);
+
+  // A cobbled ring road closes on its first point
+  await panel.getByRole('button', { name: 'cobbles' }).click();
+  for (const [x, y] of [[-14, -2], [-10, -2], [-12, 1], [-14, -2]] as Pair[]) await clickAt(page, x, y);
+  layer = await topLayer(page);
+  expect(layer.paintAreas.cobbles).toHaveLength(1);
+  // A ring: an outline with the hole in the middle
+  expect(layer.paintAreas.cobbles![0]).toHaveLength(2);
+
+  // One undo step each
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+  expect((await topLayer(page)).paintAreas).toEqual({});
   expect(errors).toEqual([]);
 });

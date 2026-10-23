@@ -28,6 +28,7 @@
 - **Water**: Paint lakes, moats and indoor pools with shoreline ripple lines. Water is solid, hiding the ground beneath, or see-through, so a fountain shows the floor under it: pick one for new water in the panel, or right-click a body of water (Water Here) to switch just that one.
 - **Rivers**: Click points along the way and the River tool lays a river through them that winds between the points and swells and narrows as it goes; click the first point again to close it into a loop, such as a moat around a castle. Set its narrowest and widest width, how far it wanders and a seed (roll a new one for another river along the same points). It merges with painted water into one shoreline, and the eraser takes it away cell by cell.
 - **Paint Floor**: Brush a texture onto the ground (dirt, cobbles, sand, grass, flagstones...) without making a room: no walls, hatching or shadows. For a clearing, a muddy patch or a cobbled market square on an outdoor map; it hides the ground beneath and the eraser takes it away.
+- **Roads & Paths**: Click points along the way and the Road / Path tool paints a winding track through them in any texture (a dirt track, a cobbled road, a sand path), with no walls; click the first point again for a ring road. Set its narrowest and widest width, how far it wanders and a seed, as for rivers.
 - **Foliage & Terrain**: Paint trees, bushes and boulders.
 - **Lighting**: Place lights with their own colour, radius and intensity; the rest of the map goes dark and walls cast shadows. Torches give off light too.
 - **Walls**: Drag along the grid with the Wall tool to put thin walls inside or between rooms, such as splitting a hall in two (on hex grids they follow hex edges). Walls that close off an area make it a room, in the floor texture picked in the panel, so a building or yard can be outlined wall by wall. They're drawn in the room wall style, block light, stop the Fill tool and export as VTT walls; a door on one opens it. `Shift`+drag erases them, and they can be selected, moved and deleted like doors.
@@ -106,10 +107,11 @@ npm run preview
 | `H` | Free path |
 | `K` | Fill room with the chosen floor texture |
 | `Alt` + click (room and fill tools) | Pick the floor texture under the pointer |
-| `Enter` / `Backspace` / `Esc` (while drawing a polygon, path or river) | Finish / remove last point / cancel |
+| `Enter` / `Backspace` / `Esc` (while drawing a polygon, path, river or road) | Finish / remove last point / cancel |
 | `W` | Water |
 | `Y` | River |
 | `U` | Paint floor |
+| `O` | Road / path |
 | `F` | Foliage & terrain |
 | `A` | Wall (`Shift` + drag erases walls) |
 | `D` | Door |

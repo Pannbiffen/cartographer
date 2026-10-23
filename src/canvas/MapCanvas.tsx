@@ -103,6 +103,8 @@ interface MapCanvasProps {
   shapeMode: ShapeMode;
   // Width, wander and seed of the rivers the river tool draws
   river: RiverSettings;
+  // The same for the roads the road tool paints, in `paintTexture`
+  road: RiverSettings;
   // Whether the water and river tools lay solid or see-through water
   waterStyle: WaterStyle;
   // Layer the drawing tools edit
@@ -151,6 +153,7 @@ const PREVIEW_FILLS: Partial<Record<ToolType, string>> = {
   water: 'rgba(60, 140, 180, 0.25)',
   river: 'rgba(60, 140, 180, 0.35)',
   paint: 'rgba(150, 120, 80, 0.25)',
+  road: 'rgba(150, 120, 80, 0.35)',
   foliage: 'rgba(80, 150, 80, 0.25)',
 };
 const DEFAULT_PREVIEW_FILL = 'rgba(210, 180, 140, 0.25)';
@@ -168,6 +171,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   labelStyle,
   shapeMode,
   river,
+  road,
   waterStyle,
   activeLayerId,
   viewport,
@@ -343,7 +347,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const dragStart = dragStartRef.current;
 
       if (isShapeTool(activeTool)) {
-        if (shapeMode === 'cut' && activeTool !== 'river') ctx.fillStyle = PREVIEW_FILLS.eraser!;
+        if (shapeMode === 'cut' && !winds(activeTool)) ctx.fillStyle = PREVIEW_FILLS.eraser!;
         const point = snapPoint(hover);
         const points = shapePointsRef.current;
         const centre = circleCentreRef.current;
@@ -354,10 +358,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           preview = [[[...points, point]]];
         } else if (activeTool === 'path' && points) {
           preview = pathPolygon([...points, point], brushSize);
-        } else if (activeTool === 'river' && points) {
+        } else if (winds(activeTool) && points) {
           // Over the first point, show the loop it would close
           const closing = points.length >= 3 && Math.hypot(point[0] - points[0][0], point[1] - points[0][1]) < 0.15;
-          preview = [riverOutline([...points, closing ? points[0] : point], river)];
+          preview = [riverOutline([...points, closing ? points[0] : point], activeTool === 'road' ? road : river)];
         }
         ctx.beginPath();
         for (const polygon of preview) {
@@ -367,7 +371,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           }
         }
         // A river's outline can cross itself in a tight bend
-        ctx.fill(activeTool === 'river' ? 'nonzero' : 'evenodd');
+        ctx.fill(winds(activeTool) ? 'nonzero' : 'evenodd');
         ctx.stroke();
         // Corners placed so far, and where the next one would go
         ctx.setLineDash([]);
@@ -467,7 +471,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     ctx.restore();
 
     ctx.restore();
-  }, [mapData, levelsBelow, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, river, snapPoint, hexGrid, hexBrush]);
+  }, [mapData, levelsBelow, activeTool, brushSize, viewport, selection, layerEditable, shapeMode, river, road, snapPoint, hexGrid, hexBrush]);
 
   // Keep the canvas backing store matched to its on-screen size
   const drawRef = useRef(drawMap);
@@ -665,7 +669,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   };
 
   // Adds the finished polygon or path to the active layer, or cuts it out;
-  // a river adds water
+  // a river adds water, and a road paints the ground
   const finishShape = useCallback(() => {
     const points = shapePointsRef.current;
     shapePointsRef.current = null;
@@ -673,13 +677,16 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (activeTool === 'river') {
       const water = riverPolygon(points, river);
       if (water.length > 0) editLayer((draft) => addWater(draft, water, waterStyle));
+    } else if (activeTool === 'road') {
+      const strip = riverPolygon(points, road);
+      if (strip.length > 0) editLayer((draft) => addPaint(draft, strip, paintTexture));
     } else {
       const shape =
         activeTool === 'path' ? pathPolygon(points, brushSize) : polygonFromPoints(points);
       if (shape.length > 0) editLayer((draft) => applyShape(draft, shape, shapeMode, floorTexture));
     }
     drawRef.current();
-  }, [activeTool, brushSize, shapeMode, floorTexture, river, waterStyle, editLayer]);
+  }, [activeTool, brushSize, shapeMode, floorTexture, paintTexture, river, road, waterStyle, editLayer]);
   const finishShapeRef = useRef(finishShape);
   useEffect(() => {
     finishShapeRef.current = finishShape;
@@ -950,15 +957,15 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       onSelect([{ kind: 'light', id, layerId: activeLayerId }]);
     } else if (!layerEditable) {
       return;
-    } else if (activeTool === 'polygon' || activeTool === 'path' || activeTool === 'river') {
+    } else if (activeTool === 'polygon' || activeTool === 'path' || winds(activeTool)) {
       freePlacementRef.current = e.shiftKey;
       const point = snapPoint(hover);
       const points = shapePointsRef.current;
       const near = (p: Pair | undefined) => !!p && Math.hypot(p[0] - point[0], p[1] - point[1]) < 0.15;
       if (!points) {
         shapePointsRef.current = [point];
-      } else if (activeTool === 'river' && points.length >= 3 && near(points[0])) {
-        // Back on its first point, a river closes into a loop
+      } else if (winds(activeTool) && points.length >= 3 && near(points[0])) {
+        // Back on its first point, a river or road closes into a loop
         shapePointsRef.current = [...points, points[0]];
         finishShape();
       } else if (
@@ -1245,7 +1252,12 @@ function eraseCellContents(layer: LayerContent, gx: number, gy: number) {
 }
 
 function isShapeTool(tool: ToolType): boolean {
-  return tool === 'polygon' || tool === 'circle' || tool === 'path' || tool === 'river';
+  return tool === 'polygon' || tool === 'circle' || tool === 'path' || winds(tool);
+}
+
+/** Tools that lay a winding strip through clicked points */
+function winds(tool: ToolType): boolean {
+  return tool === 'river' || tool === 'road';
 }
 
 /** A circle's radius out to `edge`, in half cells unless placed freely */

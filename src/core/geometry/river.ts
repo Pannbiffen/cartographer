@@ -14,6 +14,8 @@ export interface RiverSettings {
 }
 
 export const DEFAULT_RIVER: RiverSettings = { minWidth: 1.5, maxWidth: 3, wander: 1, seed: 1 };
+// Roads and paths wind the same way, but keep closer to one width
+export const DEFAULT_ROAD: RiverSettings = { minWidth: 1.5, maxWidth: 2, wander: 0.5, seed: 1 };
 
 const STEP = 0.25; // spacing of the outline's points along the river
 const WANDER_SPAN = 5; // cells between the bends of the wander

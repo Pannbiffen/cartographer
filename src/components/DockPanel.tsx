@@ -58,6 +58,8 @@ interface DockPanelProps {
   onShapeModeChange: (mode: ShapeMode) => void;
   river: RiverSettings;
   onRiverChange: (river: RiverSettings) => void;
+  road: RiverSettings;
+  onRoadChange: (road: RiverSettings) => void;
   waterStyle: WaterStyle;
   onWaterStyleChange: (style: WaterStyle) => void;
   selection: Selection[];
@@ -510,6 +512,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onShapeModeChange,
   river,
   onRiverChange,
+  road,
+  onRoadChange,
   waterStyle,
   onWaterStyleChange,
   selection,
@@ -554,15 +558,20 @@ export const DockPanel: React.FC<DockPanelProps> = ({
     path: 'Click points along the way; double-click or press Enter to finish. Backspace takes back a point, Esc cancels.',
     river:
       'Click points along the way; the river winds between them. Double-click or press Enter to finish, or click the first point to close a loop (a moat). Backspace takes back a point, Esc cancels.',
+    road:
+      'Click points along the way; the road winds between them, painted on the ground without walls. Double-click or press Enter to finish, or click the first point to close a ring road. Backspace takes back a point, Esc cancels.',
   };
   const cells = (n: number) => `${n} ${n === 1 ? 'cell' : 'cells'}`;
+  // Rivers and roads wind through their points alike
+  const [winding, onWindingChange] =
+    activeTool === 'river' ? [river, onRiverChange] : activeTool === 'road' ? [road, onRoadChange] : [null, null];
 
   return (
     <aside aria-label="Properties" className="w-64 shrink-0 bg-ui border-l border-ui-border overflow-y-auto text-ui-text">
       <Section title={toolLabel}>
         {shapeHint[activeTool] && (
           <>
-            {activeTool !== 'river' && (
+            {!winding && (
               <Choices label="Mode" options={['add', 'cut'] as ShapeMode[]} value={shapeMode} columns={2} onChange={onShapeModeChange} />
             )}
             <p className="text-ui-muted leading-snug">
@@ -624,51 +633,51 @@ export const DockPanel: React.FC<DockPanelProps> = ({
             </p>
           </>
         )}
-        {activeTool === 'river' && (
+        {winding && onWindingChange && (
           <>
             <Slider
               label="Narrowest"
-              value={river.minWidth}
-              display={cells(river.minWidth)}
+              value={winding.minWidth}
+              display={cells(winding.minWidth)}
               min={0.5}
               max={6}
               step={0.5}
-              onChange={(minWidth) => onRiverChange({ ...river, minWidth, maxWidth: Math.max(minWidth, river.maxWidth) })}
+              onChange={(minWidth) => onWindingChange({ ...winding, minWidth, maxWidth: Math.max(minWidth, winding.maxWidth) })}
             />
             <Slider
               label="Widest"
-              value={river.maxWidth}
-              display={cells(river.maxWidth)}
+              value={winding.maxWidth}
+              display={cells(winding.maxWidth)}
               min={0.5}
               max={6}
               step={0.5}
-              onChange={(maxWidth) => onRiverChange({ ...river, maxWidth, minWidth: Math.min(maxWidth, river.minWidth) })}
+              onChange={(maxWidth) => onWindingChange({ ...winding, maxWidth, minWidth: Math.min(maxWidth, winding.minWidth) })}
             />
             <Slider
               label="Wander"
-              value={river.wander}
-              display={river.wander === 0 ? 'none' : cells(river.wander)}
+              value={winding.wander}
+              display={winding.wander === 0 ? 'none' : cells(winding.wander)}
               min={0}
               max={4}
               step={0.5}
-              onChange={(wander) => onRiverChange({ ...river, wander })}
+              onChange={(wander) => onWindingChange({ ...winding, wander })}
             />
             <label className="flex items-center gap-2">
               <span>Seed</span>
               <input
                 type="number"
                 min={1}
-                value={river.seed}
+                value={winding.seed}
                 onChange={(e) => {
                   const seed = Math.round(Number(e.target.value));
-                  if (Number.isFinite(seed)) onRiverChange({ ...river, seed });
+                  if (Number.isFinite(seed)) onWindingChange({ ...winding, seed });
                 }}
                 className={`${FIELD_CLASS} min-w-0 flex-1`}
               />
               <button
                 aria-label="New seed"
-                title="New seed: another river along the same points"
-                onClick={() => onRiverChange({ ...river, seed: 1 + Math.floor(Math.random() * 9999) })}
+                title={`New seed: another ${activeTool === 'road' ? 'road' : 'river'} along the same points`}
+                onClick={() => onWindingChange({ ...winding, seed: 1 + Math.floor(Math.random() * 9999) })}
                 className={ICON_BUTTON_CLASS}
               >
                 <Dices className="w-3.5 h-3.5" />
@@ -685,14 +694,14 @@ export const DockPanel: React.FC<DockPanelProps> = ({
         {laysFloor(activeTool, shapeMode) && (
           <Choices label="Floor" options={FLOOR_TEXTURES} value={floorTexture} columns={2} onChange={onFloorTextureChange} />
         )}
+        {(activeTool === 'paint' || activeTool === 'road') && (
+          <Choices label="Texture" options={FLOOR_TEXTURES} value={paintTexture} columns={2} onChange={onPaintTextureChange} />
+        )}
         {activeTool === 'paint' && (
-          <>
-            <Choices label="Texture" options={FLOOR_TEXTURES} value={paintTexture} columns={2} onChange={onPaintTextureChange} />
-            <p className="text-ui-muted leading-snug">
-              Paints the ground without making a room: no walls, hatching or shadows. For a clearing, a muddy patch
-              or a cobbled square. The eraser takes it away.
-            </p>
-          </>
+          <p className="text-ui-muted leading-snug">
+            Paints the ground without making a room: no walls, hatching or shadows. For a clearing, a muddy patch or
+            a cobbled square. The eraser takes it away.
+          </p>
         )}
         {activeTool === 'fill' && (
           <p className="text-ui-muted leading-snug">

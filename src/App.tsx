@@ -91,7 +91,7 @@ import {
 } from './core/levels';
 import { fitViewport, zoomAbout } from './core/viewport';
 import { fillRoom, textureAt } from './core/tools/fill';
-import { DEFAULT_RIVER, type RiverSettings } from './core/geometry/river';
+import { DEFAULT_RIVER, DEFAULT_ROAD, type RiverSettings } from './core/geometry/river';
 import { setWaterStyleAt, waterStyleAt } from './core/geometry/region';
 import { createBlankMap, mapLook } from './core/newMap';
 import { clearShareFragment, isShareFragment, readShareFragment } from './core/share';
@@ -313,6 +313,7 @@ export function App() {
   const [labelStyle, setLabelStyle] = useState<LabelStyle>('text');
   const [shapeMode, setShapeMode] = useState<ShapeMode>('add');
   const [river, setRiver] = useState<RiverSettings>(DEFAULT_RIVER);
+  const [road, setRoad] = useState<RiverSettings>(DEFAULT_ROAD);
   const [waterStyle, setWaterStyle] = useState<WaterStyle>('solid');
 
   const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, zoom: 1 });
@@ -1133,7 +1134,7 @@ export function App() {
     ...(activeTool === 'label' ? [choices('Label Style', LABEL_STYLES, labelStyle, setLabelStyle)] : []),
     ...(brushTool ? [choices(activeTool === 'path' ? 'Path Width' : 'Brush Size', [1, 2, 3, 4, 5], brushSize, setBrushSize)] : []),
     ...(laysFloor(activeTool, shapeMode) ? [choices('Floor', FLOOR_TEXTURES, floorTexture, setFloorTexture)] : []),
-    ...(activeTool === 'paint' ? [choices('Texture', FLOOR_TEXTURES, paintTexture, setPaintTexture)] : []),
+    ...(activeTool === 'paint' || activeTool === 'road' ? [choices('Texture', FLOOR_TEXTURES, paintTexture, setPaintTexture)] : []),
     ...(activeTool === 'water' || activeTool === 'river' ? [choices('New Water', WATER_STYLES, waterStyle, setWaterStyle)] : []),
     ...(activeTool === 'polygon' || activeTool === 'circle' || activeTool === 'path'
       ? [choices('Mode', ['add', 'cut'] as ShapeMode[], shapeMode, setShapeMode)]
@@ -1227,6 +1228,7 @@ export function App() {
               labelStyle={labelStyle}
               shapeMode={shapeMode}
               river={river}
+              road={road}
               waterStyle={waterStyle}
               activeLayerId={activeLayerId}
               viewport={viewport}
@@ -1273,6 +1275,8 @@ export function App() {
             onShapeModeChange={setShapeMode}
             river={river}
             onRiverChange={setRiver}
+            road={road}
+            onRoadChange={setRoad}
             waterStyle={waterStyle}
             onWaterStyleChange={setWaterStyle}
             selection={activeSelection}
