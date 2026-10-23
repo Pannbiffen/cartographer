@@ -7,6 +7,8 @@ async function openGenerator(page: Page, name: 'Generate Dungeon' | 'Generate Ca
   return page.getByRole('region', { name });
 }
 
+const confirmDialog = (page: Page, name: string) => page.getByRole('dialog', { name });
+
 async function topLayer(page: Page) {
   // Out of the seed field, so the shortcut saves
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -23,19 +25,23 @@ test('the dungeon generator gives the same layout for a seed, with doors, props 
   await expect(panel).toBeVisible();
   await panel.getByRole('spinbutton', { name: 'Seed' }).fill('42');
 
-  // The starter map has content, so the first Generate asks
-  const asked: string[] = [];
+  // The starter map has content, so the first Generate asks in the app's own dialog
+  const native: string[] = [];
   page.on('dialog', (d) => {
-    asked.push(d.message());
-    void d.accept();
+    native.push(d.message());
+    void d.dismiss();
   });
   await panel.getByRole('button', { name: 'Generate', exact: true }).click();
-  expect(asked).toHaveLength(1);
+  const ask = confirmDialog(page, 'Generate Dungeon');
+  await expect(ask).toContainText('Replace everything on the layer');
+  await expect(ask.getByRole('button', { name: 'Replace layer' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(ask).toBeHidden();
   const first = await topLayer(page);
 
   // Generating again in the same session doesn't ask, and gives the same layout
   await panel.getByRole('button', { name: 'Generate', exact: true }).click();
-  expect(asked).toHaveLength(1);
+  await expect(ask).toBeHidden();
   const second = await topLayer(page);
   expect(second).toEqual(first);
 
@@ -81,6 +87,7 @@ test('the dungeon generator gives the same layout for a seed, with doors, props 
   await openGenerator(page, 'Generate Dungeon');
   await page.keyboard.press('v');
   await expect(panel).toBeHidden();
+  expect(native).toEqual([]);
   expect(errors).toEqual([]);
 });
 
@@ -88,26 +95,40 @@ test('declining to replace the layer keeps it', async ({ page }) => {
   await openApp(page);
   const before = await topLayer(page);
   const panel = await openGenerator(page, 'Generate Dungeon');
-  page.on('dialog', (d) => void d.dismiss());
   await panel.getByRole('button', { name: 'Generate', exact: true }).click();
+  await confirmDialog(page, 'Generate Dungeon').getByRole('button', { name: 'Cancel' }).click();
   expect(await topLayer(page)).toEqual(before);
+  // Escape cancels too
+  await panel.getByRole('button', { name: 'Generate', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(confirmDialog(page, 'Generate Dungeon')).toBeHidden();
+  expect(await topLayer(page)).toEqual(before);
+});
+
+test('Clear Map asks in the app first', async ({ page }) => {
+  await openApp(page);
+  const before = await topLayer(page);
+  await page.getByRole('menuitem', { name: 'Edit' }).click();
+  await page.getByRole('menuitem', { name: /^Clear Map/ }).click();
+  const ask = confirmDialog(page, 'Clear Map');
+  await ask.getByRole('button', { name: 'Cancel' }).click();
+  expect(await topLayer(page)).toEqual(before);
+
+  await page.getByRole('menuitem', { name: 'Edit' }).click();
+  await page.getByRole('menuitem', { name: /^Clear Map/ }).click();
+  await ask.getByRole('button', { name: 'Clear map' }).click();
+  expect(Object.keys((await topLayer(page)).rooms)).toEqual([]);
 });
 
 test('the cave generator lays caves with pools and rocks, dropping small pockets', async ({ page }) => {
   const errors = trackErrors(page);
   await openApp(page);
   await newEmptyMap(page);
-  const asked: string[] = [];
-  page.on('dialog', (d) => {
-    asked.push(d.message());
-    void d.accept();
-  });
-
   const panel = await openGenerator(page, 'Generate Cave');
   await panel.getByRole('spinbutton', { name: 'Seed' }).fill('7');
   await panel.getByRole('button', { name: 'Generate', exact: true }).click();
   // An empty layer is replaced without asking
-  expect(asked).toEqual([]);
+  await expect(confirmDialog(page, 'Generate Cave')).toBeHidden();
   const cave = await topLayer(page);
   const floor = Object.keys(cave.rooms);
   expect(floor.length).toBeGreaterThan(100);

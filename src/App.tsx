@@ -29,6 +29,7 @@ import { MapCanvas, type CanvasMenuRequest } from './canvas/MapCanvas';
 import { ExportModal } from './components/ExportModal';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
+import { ConfirmDialog, type ConfirmDialogProps } from './components/ConfirmDialog';
 import { ShareDialog } from './components/ShareDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { MyMapsDialog } from './components/MyMapsDialog';
@@ -414,6 +415,8 @@ export function App() {
   // in-browser copy needs it stored, so with autosave off or failing (storage
   // full) the dialog still asks.
   const [pendingReplace, setPendingReplace] = useState<{ action: string; run: () => void } | null>(null);
+  // An edit waiting for a yes in ConfirmDialog (generating over a layer, Clear Map)
+  const [pendingConfirm, setPendingConfirm] = useState<Omit<ConfirmDialogProps, 'onCancel'> | null>(null);
   const confirmReplace = useCallback(
     (action: string, run: () => void) => {
       const choice = preferences.unsavedChanges;
@@ -769,39 +772,49 @@ export function App() {
   const generate = (settings?: { seed: number }) => {
     if (!generator || !activeLayerEditable) return;
     const coalesce = `generate-${generatorSessionRef.current}-${activeLayerId}`;
+    const layerId = activeLayerId;
+    const run = () => {
+      let content;
+      if (generator === 'dungeon') {
+        const next = { ...dungeonSettings, ...settings };
+        setDungeonSettings(next);
+        content = generateBspDungeon(next);
+      } else {
+        const next = { ...caveSettings, ...settings };
+        setCaveSettings(next);
+        content = generateCaveSystem(next);
+      }
+      requestFit();
+      setSelection([]);
+      modifyMap((draft) => withLayer(draft, layerId, (layer) => Object.assign(layer, emptyContent(), content)), {
+        coalesce,
+      });
+    };
     // Ask before wiping drawn content, but not a layout from this session
-    if (
-      lastCoalesceRef.current !== coalesce &&
-      hasContent(activeLayer) &&
-      !window.confirm(`Replace everything on the layer "${activeLayer.name}" with a generated ${generator}?`)
-    ) {
+    if (lastCoalesceRef.current === coalesce || !hasContent(activeLayer)) {
+      run();
       return;
     }
-    let content;
-    if (generator === 'dungeon') {
-      const next = { ...dungeonSettings, ...settings };
-      setDungeonSettings(next);
-      content = generateBspDungeon(next);
-    } else {
-      const next = { ...caveSettings, ...settings };
-      setCaveSettings(next);
-      content = generateCaveSystem(next);
-    }
-    requestFit();
-    setSelection([]);
-    modifyMap((draft) => withLayer(draft, activeLayerId, (layer) => Object.assign(layer, emptyContent(), content)), {
-      coalesce,
+    setPendingConfirm({
+      title: `Generate ${generator === 'dungeon' ? 'Dungeon' : 'Cave'}`,
+      message: `Replace everything on the layer “${activeLayer.name}” with a generated ${generator}? Undo brings it back.`,
+      confirmLabel: 'Replace layer',
+      onConfirm: run,
     });
   };
 
   const handleClearMap = () => {
-    if (window.confirm('Are you sure you want to clear the entire map?')) {
-      modifyMap((draft) => {
-        for (const level of draft.levels) {
-          level.layers = level.layers.map((layer) => ({ ...layer, ...emptyContent() }));
-        }
-      });
-    }
+    setPendingConfirm({
+      title: 'Clear Map',
+      message: 'Clear every layer on every level of this map? Undo brings it back.',
+      confirmLabel: 'Clear map',
+      onConfirm: () =>
+        modifyMap((draft) => {
+          for (const level of draft.levels) {
+            level.layers = level.layers.map((layer) => ({ ...layer, ...emptyContent() }));
+          }
+        }),
+    });
   };
 
   // Layers, on the active level
@@ -1376,6 +1389,17 @@ export function App() {
       )}
 
       {isShortcutsOpen && <ShortcutsDialog menus={menus} onClose={() => setIsShortcutsOpen(false)} />}
+
+      {pendingConfirm && (
+        <ConfirmDialog
+          {...pendingConfirm}
+          onConfirm={() => {
+            pendingConfirm.onConfirm();
+            setPendingConfirm(null);
+          }}
+          onCancel={() => setPendingConfirm(null)}
+        />
+      )}
 
       {pendingReplace && (
         <UnsavedChangesDialog
