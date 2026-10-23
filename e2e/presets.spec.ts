@@ -90,7 +90,7 @@ test('presets export to a file and import from one', async ({ page }) => {
   });
   await expect(page.getByRole('status')).toHaveText('Imported 1 preset');
   await page.getByRole('button', { name: 'Friend', exact: true }).click();
-  expect(await saveMap(page)).toMatchObject({ theme: 'slate', hatchLength: 24, wallStyle: 'bold' });
+  expect(await saveMap(page)).toMatchObject({ theme: 'slate', hatchLength: 24, wallStyle: 'rough' });
 
   // Anything else is refused
   await page.getByLabel('Import style presets').setInputFiles({

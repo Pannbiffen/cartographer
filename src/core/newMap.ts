@@ -4,7 +4,7 @@ import { newLevel, newLevelId } from './levels';
 
 export type NewMapDefaults = Pick<
   MapData,
-    | 'theme'
+  | 'theme'
   | 'wallStyle'
   | 'hatchStyle'
   | 'hatchLength'
@@ -30,15 +30,15 @@ export const NEW_MAP_KEYS: (keyof NewMapDefaults)[] = [
 ];
 
 export const DEFAULT_NEW_MAP: NewMapDefaults = {
-  theme: 'parchment',
-  wallStyle: 'bold',
+  theme: 'colour',
+  wallStyle: 'rough',
   hatchStyle: 'dyson',
-  hatchLength: 14,
+  hatchLength: 12,
   hatchDensity: 3,
   gridType: 'square',
   showGrid: true,
   gridOpacity: 0.22,
-  outdoor: false,
+  outdoor: true,
   ground: 'grass',
 };
 

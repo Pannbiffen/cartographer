@@ -186,7 +186,9 @@ test('textured areas out of view cost nothing to draw', async ({ page }) => {
       return curve.apply(this, args);
     };
   });
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
+  // Rough walls are drawn with curves too; count only the cobbles'
+  await page.getByLabel('Wall style').selectOption('bold');
   const curvesPerFrame = async () => {
     await page.evaluate(() => ((window as unknown as { curves: number }).curves = 0));
     // Hiding and showing the grid redraws the map twice (hovering only redraws the cursor)

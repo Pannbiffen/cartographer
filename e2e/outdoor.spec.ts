@@ -39,7 +39,9 @@ async function brightnessAt(page: Page, gx: number, gy: number) {
 test('an outdoor map has ground everywhere, rooms on it get walls, and it is saved', async ({ page }) => {
   const errors = trackErrors(page);
   await openApp(page, { mapSettings: true });
-  // Away from the rooms the paper is one flat colour, give or take the grid
+  // The starter map is outdoors; indoors the paper is one flat colour, give or take the grid
+  await expect(page.getByLabel('Ground')).toHaveValue('grass');
+  await page.getByLabel('Ground').selectOption('indoor');
   await page.getByLabel('Show battle grid').uncheck();
   const blank = await colours(page, [-15, -7], [-12, -4]);
   expect(blank).toBeLessThanOrEqual(2);
@@ -62,18 +64,18 @@ test('an outdoor map has ground everywhere, rooms on it get walls, and it is sav
   expect(errors).toEqual([]);
 });
 
-test('older files load as indoor maps', async ({ page }) => {
+test('files without ground settings get the default ground', async ({ page }) => {
   await openApp(page, { mapSettings: true });
-  await page.getByLabel('Ground').selectOption('dirt');
+  await page.getByLabel('Ground').selectOption('indoor');
   const map = await saveMap(page);
   const { outdoor, ground, ...old } = map;
-  expect([outdoor, ground]).toEqual([true, 'dirt']);
+  expect([outdoor, ground]).toEqual([false, 'grass']);
   await page.getByLabel('Open map file').setInputFiles({
     name: 'old.dndmap',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(old)),
   });
-  await expect(page.getByLabel('Ground')).toHaveValue('indoor');
+  await expect(page.getByLabel('Ground')).toHaveValue('grass');
 });
 
 test('the ground is part of the new-map look', async ({ page }) => {

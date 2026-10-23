@@ -84,6 +84,18 @@ test('opening a file over unsaved changes asks first', async ({ page }) => {
   await expect(page.getByLabel('Map title')).toHaveValue('Other Map');
 });
 
+test('the starter dungeon opens in the default look', async ({ page }) => {
+  await openApp(page);
+  expect(await saveMap(page)).toMatchObject({
+    title: 'The Sunken Crypt',
+    theme: 'colour',
+    outdoor: true,
+    ground: 'grass',
+    wallStyle: 'rough',
+    hatchLength: 12,
+  });
+});
+
 test('new maps start with the look chosen in Preferences', async ({ page }) => {
   await openApp(page, { mapSettings: true });
   const dialog = await openPreferences(page);
@@ -100,7 +112,7 @@ test('new maps start with the look chosen in Preferences', async ({ page }) => {
   await fileMenu(page, 'New');
   await expect(page.getByLabel('Map style')).toHaveValue('blueprint');
   let map = await saveMap(page);
-  expect(map).toMatchObject({ theme: 'blueprint', gridType: 'hex-flat', showGrid: false, hatchLength: 14 });
+  expect(map).toMatchObject({ theme: 'blueprint', gridType: 'hex-flat', showGrid: false, hatchLength: 12 });
 
   // Copy the open map's look, then restore the defaults
   await page.getByLabel('Map style').selectOption('slate');
@@ -116,9 +128,18 @@ test('new maps start with the look chosen in Preferences', async ({ page }) => {
   await (await openPreferences(page)).getByRole('button', { name: 'Restore defaults' }).click();
   await page.keyboard.press('Escape');
   await fileMenu(page, 'New');
-  await expect(page.getByLabel('Map style')).toHaveValue('parchment');
+  await expect(page.getByLabel('Map style')).toHaveValue('colour');
   map = await saveMap(page);
-  expect(map).toMatchObject({ theme: 'parchment', gridType: 'square', showGrid: true, gridOpacity: 0.22 });
+  expect(map).toMatchObject({
+    theme: 'colour',
+    outdoor: true,
+    ground: 'grass',
+    wallStyle: 'rough',
+    hatchLength: 12,
+    gridType: 'square',
+    showGrid: true,
+    gridOpacity: 0.22,
+  });
 });
 
 test('a remembered answer replaces unsaved maps without asking', async ({ page }) => {

@@ -112,7 +112,9 @@ test('wall and hatching styles are saved with the map', async ({ page }) => {
 
 test('a layer can override the map hatching, and keeps it after a reload', async ({ page }) => {
   const errors = trackErrors(page);
-  await openApp(page);
+  await openApp(page, { mapSettings: true });
+  // Ink outside the rooms is only measurable on blank paper
+  await page.getByLabel('Ground').selectOption('indoor');
   // A room on the starter layer, then one on a new layer three cells along
   await page.keyboard.press('r');
   await dragCells(page, [-15, 8], [-13, 10]);
@@ -137,7 +139,7 @@ test('a layer can override the map hatching, and keeps it after a reload', async
 
   let layers = (await saveMap(page)).levels[0].layers;
   expect(layers[0].hatching).toBeUndefined();
-  expect(layers[1].hatching).toEqual({ style: 'none', length: 14, density: 3 });
+  expect(layers[1].hatching).toEqual({ style: 'none', length: 12, density: 3 });
 
   // Kept in the browser's copy of the map
   await page.reload();
@@ -181,7 +183,7 @@ test('stipple hatching on a large map draws from a tile, zoomed out and back in'
     }
   }
   map.levels[0].layers = [{ ...map.levels[0].layers[0], rooms, floors: {}, doors: [], stairs: [], props: [], labels: [] }];
-  Object.assign(map, { hatchStyle: 'stipple', hatchDensity: 5, hatchLength: 24 });
+  Object.assign(map, { theme: 'parchment', outdoor: false, hatchStyle: 'stipple', hatchDensity: 5, hatchLength: 24 });
   await page.getByLabel('Open map file').setInputFiles({
     name: 'large.dndmap',
     mimeType: 'application/json',
@@ -226,6 +228,7 @@ test('the colour style colours floors by texture and is saved with the map', asy
   await openApp(page, { mapSettings: true });
   await page.keyboard.press('Control+Alt+n');
   await expect(page.getByTestId('map-stats')).toContainText('Rooms: 0');
+  await page.getByLabel('Map style').selectOption('parchment');
   await page.keyboard.press('r');
   for (const [i, texture] of ['grass', 'planks', 'plain'].entries()) {
     await page.getByRole('button', { name: texture, exact: true }).click();

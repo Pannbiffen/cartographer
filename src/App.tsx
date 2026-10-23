@@ -97,7 +97,7 @@ import { fitViewport, zoomAbout } from './core/viewport';
 import { drainRoom, fillRoom, floodRoom, textureAt } from './core/tools/fill';
 import { DEFAULT_RIVER, DEFAULT_ROAD, type RiverSettings } from './core/geometry/river';
 import { hasWater, setWaterStyleAt, waterStyleAt } from './core/geometry/region';
-import { createBlankMap, mapLook } from './core/newMap';
+import { createBlankMap, DEFAULT_NEW_MAP, mapLook } from './core/newMap';
 import { clearShareFragment, isShareFragment, readShareFragment } from './core/share';
 
 const AUTOSAVE_DELAY_MS = 800;
@@ -160,16 +160,7 @@ function createDefaultStarterMap(): MapData {
     version: 4,
     title: 'The Sunken Crypt',
     gridSize: 40,
-    theme: 'parchment',
-    showGrid: true,
-    gridType: 'square',
-    gridOpacity: 0.22,
-    hatchDensity: 3,
-    hatchLength: 14,
-    hatchStyle: 'dyson',
-    wallStyle: 'bold',
-    outdoor: false,
-    ground: 'grass',
+    ...DEFAULT_NEW_MAP,
     lighting: false,
     darkness: 0.75,
     levels: [
