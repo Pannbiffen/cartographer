@@ -97,107 +97,11 @@ import { fitViewport, zoomAbout } from './core/viewport';
 import { drainRoom, fillRoom, floodRoom, textureAt } from './core/tools/fill';
 import { DEFAULT_RIVER, DEFAULT_ROAD, type RiverSettings } from './core/geometry/river';
 import { hasWater, setWaterStyleAt, waterStyleAt } from './core/geometry/region';
-import { createBlankMap, DEFAULT_NEW_MAP, mapLook } from './core/newMap';
+import { createBlankMap, mapLook } from './core/newMap';
 import { clearShareFragment, isShareFragment, readShareFragment } from './core/share';
+import { EXAMPLES, starterMap, type ExampleMap } from './core/examples';
 
 const AUTOSAVE_DELAY_MS = 800;
-
-// Initial cozy starter dungeon to greet the cartographer
-function createDefaultStarterMap(): MapData {
-  const rooms: { [key: string]: boolean } = {};
-  const water: { [key: string]: boolean } = {};
-  const foliage: { [key: string]: { type: 'tree' | 'bush' | 'rock'; seed: number } } = {};
-
-  // Entrance courtyard (-3 to 3, -10 to -7)
-  for (let x = -3; x <= 3; x++) {
-    for (let y = -10; y <= -7; y++) {
-      rooms[`${x},${y}`] = true;
-    }
-  }
-
-  // Hallway (0, -6 to -3)
-  for (let y = -6; y <= -3; y++) {
-    rooms[`0,${y}`] = true;
-  }
-
-  // Grand Hall (-5 to 5, -2 to 6)
-  for (let x = -5; x <= 5; x++) {
-    for (let y = -2; y <= 6; y++) {
-      rooms[`${x},${y}`] = true;
-    }
-  }
-
-  // Subterranean Spring / Water Basin (1 to 4, 1 to 4)
-  for (let x = 1; x <= 4; x++) {
-    for (let y = 1; y <= 4; y++) {
-      water[`${x},${y}`] = true;
-    }
-  }
-
-  // East Chamber (7 to 11, -1 to 3), reached through a short passage
-  rooms['6,1'] = true;
-  for (let x = 7; x <= 11; x++) {
-    for (let y = -1; y <= 3; y++) {
-      rooms[`${x},${y}`] = true;
-    }
-  }
-
-  // West Cave (-12 to -7, 2 to 7), behind a secret passage
-  rooms['-6,4'] = true;
-  for (let x = -12; x <= -7; x++) {
-    for (let y = 2; y <= 7; y++) {
-      rooms[`${x},${y}`] = true;
-    }
-  }
-
-  // Foliage outside entrance
-  foliage['-4,-9'] = { type: 'tree', seed: 101 };
-  foliage['4,-9'] = { type: 'tree', seed: 202 };
-  foliage['-5,-8'] = { type: 'bush', seed: 303 };
-  foliage['5,-8'] = { type: 'rock', seed: 404 };
-
-  return {
-    version: 4,
-    title: 'The Sunken Crypt',
-    gridSize: 40,
-    ...DEFAULT_NEW_MAP,
-    background: 'paving',
-    lighting: false,
-    darkness: 0.75,
-    levels: [
-      {
-        id: 'level1',
-        name: 'Level 1',
-        layers: [
-          newLayer('layer1', 'Dungeon', {
-            rooms,
-            water,
-            foliage,
-            doors: [
-              { id: 'd1', x: 0, y: -6, orientation: 'horizontal', type: 'standard' },
-              { id: 'd2', x: 6, y: 1, orientation: 'vertical', type: 'standard' },
-              { id: 'd3', x: -5, y: 4, orientation: 'vertical', type: 'secret' },
-            ],
-            stairs: [
-              { id: 's1', x: 0, y: -10, width: 2, height: 1, direction: 'down', steps: 4 },
-            ],
-            props: [
-              { id: 'p1', x: -3, y: 0, type: 'pillar', rotation: 0 },
-              { id: 'p2', x: -3, y: 4, type: 'pillar', rotation: 0 },
-              { id: 'p3', x: 9, y: 1, type: 'altar', rotation: 0 },
-              { id: 'p4', x: -10, y: 3, type: 'chest', rotation: 0 },
-              { id: 'p5', x: -4, y: 2, type: 'torch', rotation: 0 },
-            ],
-            labels: [
-              { id: 'l1', x: 0.5, y: 5.5, text: 'Grand Hall', size: 20 },
-              { id: 'l2', x: -9, y: 6.5, text: 'Hidden Vault', size: 16 },
-            ],
-          }),
-        ],
-      },
-    ],
-  };
-}
 
 const MAX_HISTORY = 100;
 
@@ -214,9 +118,9 @@ function initialMap(): { map: MapData; id: string; resumed: boolean; saved: bool
   migrateLegacyAutosave();
   const id = currentMapId();
   const stored = id && loadMap(id);
-  if (!id || !stored) return { map: createDefaultStarterMap(), id: newMapId(), resumed: false, saved: true };
+  if (!id || !stored) return { map: starterMap(), id: newMapId(), resumed: false, saved: true };
   const saved = !!listMaps().find((e) => e.id === id)?.saved;
-  return { map: normalizeLoadedMap(stored, createDefaultStarterMap()), id, resumed: true, saved };
+  return { map: normalizeLoadedMap(stored, starterMap()), id, resumed: true, saved };
 }
 
 // File > Open Recent lists this many maps
@@ -545,7 +449,7 @@ export function App() {
       try {
         const parsed = await readShareFragment(hash);
         if (!isMapLike(parsed)) throw new Error('Not a map');
-        offerSharedMap.current(normalizeLoadedMap(parsed, createDefaultStarterMap()));
+        offerSharedMap.current(normalizeLoadedMap(parsed, starterMap()));
       } catch {
         alert('This share link is damaged or incomplete. Ask for the link again, or for a .dndmap file.');
       }
@@ -558,6 +462,13 @@ export function App() {
   const handleNewMap = useCallback(() => {
     confirmReplace('Start a new map', () => replaceMap(createBlankMap(preferences.newMap), { pristine: true }));
   }, [confirmReplace, replaceMap, preferences.newMap]);
+
+  const handleOpenExample = useCallback(
+    (example: ExampleMap) => {
+      confirmReplace(`Open “${example.title}”`, () => replaceMap(example.load(), { pristine: true }));
+    },
+    [confirmReplace, replaceMap]
+  );
 
   // My Maps and File > Open Recent. The recent list is reread when the open
   // map changes or the dialog closes, not on every render.
@@ -576,7 +487,7 @@ export function App() {
       alert('This map could not be read from browser storage.');
       return;
     }
-    const map = normalizeLoadedMap(stored, createDefaultStarterMap());
+    const map = normalizeLoadedMap(stored, starterMap());
     confirmReplace(`Open “${entry.title || 'Untitled map'}”`, () =>
       replaceMap(map, { id: entry.id, saved: entry.saved })
     );
@@ -591,7 +502,7 @@ export function App() {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (isMapLike(parsed)) {
-          const map = normalizeLoadedMap(parsed, createDefaultStarterMap());
+          const map = normalizeLoadedMap(parsed, starterMap());
           confirmReplace(`Open “${file.name}”`, () => replaceMap(map));
         } else {
           alert('Invalid project file format.');
@@ -935,6 +846,10 @@ export function App() {
           })),
         },
         { label: 'My Maps…', onSelect: openMyMaps },
+        {
+          label: 'Examples',
+          submenu: EXAMPLES.map((example) => ({ label: example.title, onSelect: () => handleOpenExample(example) })),
+        },
         { label: 'Save', shortcut: 'Ctrl+S', onSelect: handleSaveJson },
         { label: 'Share Link…', onSelect: () => setIsShareOpen(true) },
         'separator',
