@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AccentColor, Preferences, UiSize, UiTheme, UnsavedChoice } from '../core/preferences';
+import type { AccentColor, Preferences, ToolboxPosition, UiSize, UiTheme, UnsavedChoice } from '../core/preferences';
 import type { ZoomSpeed } from '../core/viewport';
 import { DEFAULT_NEW_MAP, type NewMapDefaults } from '../core/newMap';
 import { Dialog, DialogGroup } from './Dialog';
@@ -35,6 +35,10 @@ const SIZES: [UiSize, string][] = [
   ['small', 'Small'],
   ['normal', 'Normal'],
   ['large', 'Large'],
+];
+const TOOLBOX_POSITIONS: [ToolboxPosition, string][] = [
+  ['left', 'Left'],
+  ['top', 'Top'],
 ];
 const ZOOM_SPEEDS: [ZoomSpeed, string][] = [
   ['slow', 'Slow'],
@@ -165,6 +169,12 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
           </div>
         </div>
         <Choice label="Interface size" options={SIZES} value={preferences.uiSize} onChange={(uiSize) => onChange({ uiSize })} />
+        <Choice
+          label="Toolbar"
+          options={TOOLBOX_POSITIONS}
+          value={preferences.toolboxPosition}
+          onChange={(toolboxPosition) => onChange({ toolboxPosition })}
+        />
         <p className="text-ui-muted">Map styles are set per map in the Map panel.</p>
       </DialogGroup>
 

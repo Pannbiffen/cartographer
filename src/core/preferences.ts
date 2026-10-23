@@ -6,6 +6,8 @@ import { DEFAULT_NEW_MAP, type NewMapDefaults } from './newMap';
 export type UiTheme = 'dark' | 'light' | 'system';
 export type AccentColor = 'blue' | 'green' | 'orange' | 'purple';
 export type UiSize = 'small' | 'normal' | 'large';
+// Where the tool palette sits: down the left of the canvas or in a row above it
+export type ToolboxPosition = 'left' | 'top';
 // What replacing a map with changes not saved to a file does: ask, rely on
 // the copy in My Maps, or download the file first
 export type UnsavedChoice = 'ask' | 'browser' | 'download';
@@ -14,6 +16,7 @@ export interface Preferences {
   uiTheme: UiTheme;
   accent: AccentColor;
   uiSize: UiSize;
+  toolboxPosition: ToolboxPosition;
   autosave: boolean;
   unsavedChanges: UnsavedChoice;
   showPanel: boolean;
@@ -43,6 +46,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   uiTheme: 'dark',
   accent: 'blue',
   uiSize: 'normal',
+  toolboxPosition: 'left',
   autosave: true,
   unsavedChanges: 'ask',
   showPanel: true,

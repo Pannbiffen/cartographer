@@ -11,8 +11,8 @@
 
 ## ✨ Features
 
-- **Plain Desktop Interface**: Menu bar, toolbar, docked toolbox, a properties panel for the current tool, selection and layers, a map settings drawer under the map (title, style, presets, walls, lighting, grid; open it with `M`), and a status bar, with your system font.
-- **Preferences** (Edit > Preferences): dark (default), light or system UI theme, accent colour, interface size, autosave on/off, and a reset that wipes everything stored in this browser.
+- **Plain Desktop Interface**: Menu bar, toolbar, a docked toolbox (down the left or along the top, via View > Toolbar on Top), a properties panel for the current tool, selection and layers, a map settings drawer under the map (title, style, presets, walls, lighting, grid; open it with `M`), and a status bar, with your system font.
+- **Preferences** (Edit > Preferences): dark (default), light or system UI theme, accent colour, interface size, toolbar position, autosave on/off, and a reset that wipes everything stored in this browser.
 - **Pen & Parchment Aesthetic**: Five themes (Parchment, Blueprint, Slate, Monochrome, and Colour, where grass is green, planks brown and stone grey), bold, fine or rough pen walls, and pen-stroke, crosshatch, stipple or soft-shadow hatching outside them.
 - **Style Presets**: Save a map's look (style, walls, hatching, grid) under a name in the map settings drawer, apply it to any map in one click, and export or import presets as a `.json` file to share them with friends.
 - **Select & Edit**: Select doors, windows, stairs, props, labels and lights to move (drag or arrow keys), rotate, retype, duplicate, copy and paste, or delete them. Shift+click or drag a box to select several and edit them together; copies keep their layout. Right-click (or long-press) an object or an empty spot for a menu of what you can do there.
@@ -43,7 +43,7 @@
   - 💾 **Project Save/Load**: Save `.dndmap` JSON files locally and resume anytime.
   - 🔗 **Share Links**: File > Share Link puts a compressed copy of the map in a link. Friends who open it get their own copy to view, edit or save; nothing is uploaded anywhere.
 - **Navigation**: Maps open framed in the window and `Ctrl + 0` brings the whole map back into view. Pan with the arrow keys or by dragging, and zoom with the wheel or a trackpad at the speed you set in Preferences.
-- **New Maps**: File > New starts a blank map with the style, hatching and grid you pick in Preferences (or copied from the open map), and asks before discarding changes you haven't saved to a file (tick "Remember my choice", or set it in Preferences, to always rely on the in-browser copy or always download a file first).
+- **New Maps**: File > New starts a blank map (Colour style on grass with rough pen walls, unless you choose otherwise) with the style, hatching and grid you pick in Preferences (or copied from the open map), and asks before discarding changes you haven't saved to a file (tick "Remember my choice", or set it in Preferences, to always rely on the in-browser copy or always download a file first).
 - **Autosave and My Maps**: Your maps are kept in this browser, and the one you had open comes back when you reopen the page. Starting a new map or opening a file or share link keeps the previous one: get it back from File > Open Recent, or rename, duplicate and delete maps in File > My Maps. Save a `.dndmap` file to back a map up or move it to another device. With autosave off, the browser asks before you close a tab with unsaved work.
 - **Undo/Redo**: Up to 100 steps; each brush stroke or slider drag is a single step.
 - **100% Client-Side & Static**: Hosted on GitHub Pages with no tracking and no accounts.

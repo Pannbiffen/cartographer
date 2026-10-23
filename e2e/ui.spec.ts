@@ -344,3 +344,54 @@ test('a long press opens the menu on a touch screen', async ({ page }) => {
   await touch('touchEnd', []);
   await expect(page.getByRole('menu', { name: 'Object' })).toBeVisible();
 });
+
+test('the toolbar can sit along the top, and the choice is kept', async ({ page }) => {
+  await openApp(page);
+  const tools = page.getByRole('toolbar', { name: 'Tools' });
+  const canvas = page.locator('canvas');
+  await expect(tools).toHaveAttribute('aria-orientation', 'vertical');
+  let toolsBox = (await tools.boundingBox())!;
+  let canvasBox = (await canvas.boundingBox())!;
+  expect(toolsBox.x + toolsBox.width).toBeLessThanOrEqual(canvasBox.x + 1);
+  const heightBefore = canvasBox.height;
+  const widthBefore = canvasBox.width;
+
+  await page.getByRole('menuitem', { name: 'View' }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Toolbar on Top' }).click();
+  await expect(tools).toHaveAttribute('aria-orientation', 'horizontal');
+  toolsBox = (await tools.boundingBox())!;
+  canvasBox = (await canvas.boundingBox())!;
+  expect(toolsBox.y + toolsBox.height).toBeLessThanOrEqual(canvasBox.y + 1);
+  // The canvas gives up height, not width
+  expect(canvasBox.height).toBeLessThan(heightBefore);
+  expect(canvasBox.width).toBeGreaterThan(widthBefore);
+
+  // Tools still work from the row and from their keys
+  await tools.getByRole('button', { name: 'Door' }).click();
+  await expect(tools.getByRole('button', { name: 'Door' })).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('r');
+  await expect(tools.getByRole('button', { name: 'Rectangle Room' })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.reload();
+  await expect(tools).toHaveAttribute('aria-orientation', 'horizontal');
+
+  // Back to the left from Preferences
+  await page.getByRole('menuitem', { name: 'Edit' }).click();
+  await page.getByRole('menuitem', { name: /Preferences/ }).click();
+  const prefs = page.getByRole('dialog', { name: 'Preferences' });
+  await prefs.getByRole('radiogroup', { name: 'Toolbar' }).getByRole('radio', { name: 'Left' }).click();
+  await expect(tools).toHaveAttribute('aria-orientation', 'vertical');
+});
+
+test('a narrow window wraps the top toolbar instead of scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 700 });
+  await openApp(page);
+  await page.getByRole('menuitem', { name: 'View' }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Toolbar on Top' }).click();
+  const tools = page.getByRole('toolbar', { name: 'Tools' });
+  const fits = await tools.evaluate((el) => el.scrollWidth <= el.clientWidth);
+  expect(fits).toBe(true);
+  const first = (await tools.getByRole('button').first().boundingBox())!;
+  const last = (await tools.getByRole('button').last().boundingBox())!;
+  expect(last.y).toBeGreaterThan(first.y);
+});

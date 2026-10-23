@@ -983,6 +983,11 @@ export function App() {
           onSelect: () => changePreferences({ showPanel: !preferences.showPanel }),
         },
         {
+          label: 'Toolbar on Top',
+          checked: preferences.toolboxPosition === 'top',
+          onSelect: () => changePreferences({ toolboxPosition: preferences.toolboxPosition === 'top' ? 'left' : 'top' }),
+        },
+        {
           label: 'Level Below',
           checked: preferences.showLevelBelow,
           disabled: mapData.levels.length < 2,
@@ -1220,8 +1225,12 @@ export function App() {
         className="hidden"
       />
 
+      {preferences.toolboxPosition === 'top' && <Toolbox activeTool={activeTool} onSelectTool={chooseTool} position="top" />}
+
       <div className="flex flex-1 min-h-0">
-        <Toolbox activeTool={activeTool} onSelectTool={chooseTool} />
+        {preferences.toolboxPosition === 'left' && (
+          <Toolbox activeTool={activeTool} onSelectTool={chooseTool} position="left" />
+        )}
 
         <div className="flex flex-col flex-1 min-w-0">
           <main ref={mainRef} className="relative flex-1 min-h-0 overflow-hidden">
