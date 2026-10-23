@@ -8,6 +8,7 @@ import { mergeWallSegments, visibilityPolygon, wallsWithGap, type Point, type Se
 import { lavaLights, mapLights, mapWindows, type MapLight } from '../lighting';
 import { visibleLayers } from '../layers';
 import { WINDOW_PANE_LENGTH } from './propsRenderer';
+import { doorLine } from '../tools/toolGeometry';
 
 // Walls and light shapes per level drawn (the active one and the faint ones
 // below); maps are replaced on every edit, so the layer list identifies the content
@@ -45,11 +46,9 @@ function lightShape(map: LevelMap, light: MapLight): Point[] {
 
 /** The window's glass along its edge, in pixels */
 function windowEdge(w: PlacedWindow, g: number): Segment {
-  const [x, y] = [w.x * g, w.y * g];
-  const [from, to] = [((1 - WINDOW_PANE_LENGTH) / 2) * g, ((1 + WINDOW_PANE_LENGTH) / 2) * g];
-  return w.orientation === 'horizontal'
-    ? { x1: x + from, y1: y, x2: x + to, y2: y }
-    : { x1: x, y1: y + from, x2: x, y2: y + to };
+  const { cx, cy, ux, uy, length } = doorLine(w);
+  const half = (length * WINDOW_PANE_LENGTH) / 2;
+  return { x1: (cx - ux * half) * g, y1: (cy - uy * half) * g, x2: (cx + ux * half) * g, y2: (cy + uy * half) * g };
 }
 
 /**
@@ -68,7 +67,7 @@ function throughWindows(map: LevelMap, light: MapLight): { pane: PlacedWindow; s
     const [cx, cy] = [light.x * g, light.y * g];
     if (Math.max(edge.x1, edge.x2) < cx - r || Math.min(edge.x1, edge.x2) > cx + r) continue;
     if (Math.max(edge.y1, edge.y2) < cy - r || Math.min(edge.y1, edge.y2) > cy + r) continue;
-    const key = `${light.x},${light.y},${light.radius}|${pane.orientation},${pane.x},${pane.y}`;
+    const key = `${light.x},${light.y},${light.radius}|${pane.orientation},${pane.x},${pane.y},${pane.angle},${pane.length}`;
     let shape = cache.through.get(key);
     if (shape === undefined) {
       const walls = wallsWithGap(cache.walls, edge);

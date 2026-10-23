@@ -245,3 +245,21 @@ export function hexNudge(type: GridType, at: Pair, dx: number, dy: number): Pair
   }
   return hexOffset(type, hexCenter(type, h), hexCenter(type, { q: h.q + step.q, r: h.r + step.r }));
 }
+
+/** The middle of the hex side nearest a point, with the side's direction (degrees, 0 up to 180) and length */
+export function nearestHexSide(type: GridType, x: number, y: number): { x: number; y: number; angle: number; length: number } {
+  const corners = hexCorners(type, hexAt(type, x, y));
+  let best = { x, y, angle: 0, length: SIDE };
+  let bestDist = Infinity;
+  corners.forEach((a, i) => {
+    const b = corners[(i + 1) % 6];
+    const [mx, my] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const d = Math.hypot(mx - x, my - y);
+    if (d < bestDist) {
+      bestDist = d;
+      const angle = ((((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI) % 180) + 180) % 180;
+      best = { x: round6(mx), y: round6(my), angle: Math.round(angle * 100) / 100 % 180, length: Math.round(SIDE * 1e4) / 1e4 };
+    }
+  });
+  return best;
+}

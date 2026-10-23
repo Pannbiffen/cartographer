@@ -5,28 +5,23 @@ import { doorLine } from '../tools/toolGeometry';
 // How much of its cell edge a window's glass spans, centred on it; light passes only there
 export const WINDOW_PANE_LENGTH = 0.7;
 
-/** A pane across the wall line in its tint, with a line along the glass */
+/** A pane along the wall line in its tint, with a line along the glass */
 export function renderWindow(ctx: CanvasRenderingContext2D, pane: PlacedWindow, gridSize: number, inkColor: string) {
-  const length = gridSize * WINDOW_PANE_LENGTH;
-  const depth = 6;
-  const along = pane.orientation === 'horizontal';
-  const [cx, cy] = along ? [(pane.x + 0.5) * gridSize, pane.y * gridSize] : [pane.x * gridSize, (pane.y + 0.5) * gridSize];
-  const [w, h] = along ? [length, depth] : [depth, length];
+  // Drawn along the x axis of the window's own frame, turned with its wall
+  const { cx, cy, ux, uy, length } = doorLine(pane);
+  const w = gridSize * length * WINDOW_PANE_LENGTH;
+  const h = 6;
   ctx.save();
+  ctx.transform(ux, uy, -uy, ux, cx * gridSize, cy * gridSize);
   ctx.fillStyle = pane.tint;
   ctx.strokeStyle = inkColor;
   ctx.lineWidth = 2;
-  ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
-  ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
   ctx.lineWidth = 1;
   ctx.beginPath();
-  if (along) {
-    ctx.moveTo(cx - w / 2, cy);
-    ctx.lineTo(cx + w / 2, cy);
-  } else {
-    ctx.moveTo(cx, cy - h / 2);
-    ctx.lineTo(cx, cy + h / 2);
-  }
+  ctx.moveTo(-w / 2, 0);
+  ctx.lineTo(w / 2, 0);
   ctx.stroke();
   ctx.restore();
 }

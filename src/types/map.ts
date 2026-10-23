@@ -114,6 +114,10 @@ export interface PlacedWindow {
   x: number; // grid x
   y: number; // grid y
   orientation: 'horizontal' | 'vertical';
+  /** As on a door: set along a wall off the grid lines, with (x, y) its centre */
+  angle?: number;
+  /** As on a door: its span along the wall, when shorter than a cell */
+  length?: number;
   tint: string; // #rrggbb
   clarity: number; // 0 to 1: how much of a light's strength passes
 }

@@ -29,11 +29,11 @@ import {
   brushCells,
   rectCells,
   tunnelCells,
-  nearestDoorEdge,
   doorLine,
   doorTouchesCell,
   sameDoorSpot,
   snapDoor,
+  type DoorSpot,
   stairsContainCell,
   lineCells,
 } from '../core/tools/toolGeometry';
@@ -89,6 +89,7 @@ import {
   hexTunnel,
   hexesWithin,
   isHexGrid,
+  nearestHexSide,
   snapToHex,
   type Hex,
 } from '../core/geometry/hex';
@@ -280,14 +281,15 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   // Where a prop, light or stairs would go: the cell under the pointer, or the middle of the hex
   const slotAt = (hover: HoverState): Pair =>
     hexGrid ? hexSlot(hexGrid, hexAt(hexGrid, hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize)) : [hover.gx, hover.gy];
-  // Where a door would go: on a wall off the grid lines nearby, turned to match, or the nearest cell edge
+  // Where a door or window would go: on a wall off the grid lines nearby, turned to match, or
+  // else the nearest cell edge (hex side on a hex grid)
   const doorSpotAt = useCallback(
-    (hover: HoverState) =>
-      snapDoor(
-        hover.worldX / mapData.gridSize,
-        hover.worldY / mapData.gridSize,
-        doorWalls(visibleLayers(mapData), isHexGrid(mapData.gridType))
-      ),
+    (hover: HoverState): DoorSpot => {
+      const [x, y] = [hover.worldX / mapData.gridSize, hover.worldY / mapData.gridSize];
+      const hex = isHexGrid(mapData.gridType) ? mapData.gridType : null;
+      const spot = snapDoor(x, y, doorWalls(visibleLayers(mapData), hex !== null));
+      return hex && spot.angle === undefined ? { ...nearestHexSide(hex, x, y), orientation: 'horizontal' } : spot;
+    },
     [mapData]
   );
   const spaceHeldRef = useRef<boolean>(false);
@@ -440,8 +442,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         ctx.stroke();
       } else if (activeTool === 'door' || activeTool === 'window') {
         // Highlight the wall edge (or, for a door, the stretch of a wall off the grid) it will snap to
-        const spot =
-          activeTool === 'door' ? doorSpotAt(hover) : nearestDoorEdge(hover.worldX, hover.worldY, gridSize);
+        const spot = doorSpotAt(hover);
         const { cx, cy, ux, uy, length } = doorLine(spot);
         const [hx, hy] = [(ux * length) / 2, (uy * length) / 2];
         ctx.setLineDash([]);
@@ -683,7 +684,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             draft.walls = draft.walls.filter(
               (w) => Math.hypot(w.x + w.dx / 2 - cx, w.y + w.dy / 2 - cy) > 0.5 + 1e-6
             );
-            draft.doors = draft.doors.filter((d) => d.angle === undefined || Math.hypot(d.x - cx, d.y - cy) > 0.5 + 1e-3);
+            const offSides = (d: { x: number; y: number; angle?: number }) =>
+              d.angle === undefined || Math.hypot(d.x - cx, d.y - cy) > 0.5 + 1e-3;
+            draft.doors = draft.doors.filter(offSides);
+            draft.windows = draft.windows.filter(offSides);
             for (let gy = Math.floor(cy) - 1; gy <= Math.floor(cy) + 1; gy++) {
               for (let gx = Math.floor(cx) - 1; gx <= Math.floor(cx) + 1; gx++) {
                 if (hexKey(hexAt(hexGrid, gx + 0.5, gy + 0.5)) === hexKey(h)) eraseCellContents(draft, gx, gy);
@@ -829,10 +833,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
     if (drag.sel.kind === 'window') {
       const pane = findWindow(layer, drag.sel.id);
-      const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
-      const at = (w: typeof edge) => w.x === edge.x && w.y === edge.y && w.orientation === edge.orientation;
-      if (pane && !at(pane) && !layer.windows.some((w) => w.id !== pane.id && at(w))) {
-        editDragged((draft) => replaceWindow(draft, { ...pane, ...edge }));
+      const spot = doorSpotAt(hover);
+      if (!pane) return;
+      const same =
+        pane.x === spot.x && pane.y === spot.y && pane.orientation === spot.orientation && pane.angle === spot.angle && pane.length === spot.length;
+      if (!same && !layer.windows.some((w) => w.id !== pane.id && sameDoorSpot(w, spot))) {
+        editDragged((draft) => replaceWindow(draft, { ...pane, ...spot }));
       }
       return;
     }
@@ -1047,13 +1053,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       }
       if (!layerEditable) return;
       const id = newObjectId('window');
-      const edge = nearestDoorEdge(hover.worldX, hover.worldY, mapData.gridSize);
+      const spot = doorSpotAt(hover);
       editLayer((draft) => {
-        // Placing on an edge that has a window replaces it
-        draft.windows = draft.windows.filter(
-          (w) => w.x !== edge.x || w.y !== edge.y || w.orientation !== edge.orientation
-        );
-        draft.windows.push({ id, ...edge, ...DEFAULT_WINDOW });
+        // Placing on a spot that has a window replaces it
+        draft.windows = draft.windows.filter((w) => !sameDoorSpot(w, spot));
+        draft.windows.push({ id, ...spot, ...DEFAULT_WINDOW });
       });
       onSelect([{ kind: 'window', id, layerId: activeLayerId }]);
     } else if (!layerEditable) {

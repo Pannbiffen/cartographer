@@ -1,9 +1,11 @@
 // Selectable map objects (doors, windows, stairs, props, labels, lights): hit testing, bounds and edits
 import type {
+  GridType,
   LayerContent,
   LevelMap,
   MapData,
   MapLayer,
+  Pair,
   PlacedDoor,
   PlacedLabel,
   PlacedLight,
@@ -17,7 +19,7 @@ import { distanceToDoor, doorLine, nearestDoorEdge, sameDoorSpot, type DoorSpot 
 import { measureLabel } from './renderers/labelRenderer';
 import { findLayer, isLayerEditable } from './layers';
 import { distanceToWall, wallKey } from './geometry/walls';
-import { hexNudge, isHexGrid } from './geometry/hex';
+import { hexAt, hexNudge, hexOffset, hexSlot, isHexGrid, nearestHexSide } from './geometry/hex';
 
 // How close (in cells) the pointer must be to a door's wall edge to pick it
 const DOOR_HIT_DISTANCE = 0.3;
@@ -124,14 +126,16 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
   const px = worldX / gridSize;
   const py = worldY / gridSize;
 
-  // Doors turned along walls off the grid, nearest first
-  let angled: PlacedDoor | undefined;
+  // Doors and windows turned along walls off the grid, nearest first
+  let angled: Selection | null = null;
   let angledDistance = DOOR_HIT_DISTANCE;
-  for (const d of layer.doors) {
-    const distance = d.angle === undefined ? Infinity : distanceToDoor(d, px, py);
-    if (distance <= angledDistance) [angled, angledDistance] = [d, distance];
+  for (const kind of ['door', 'window'] as const) {
+    for (const d of edgeObjects(layer, kind)) {
+      const distance = d.angle === undefined ? Infinity : distanceToDoor(d, px, py);
+      if (distance <= angledDistance) [angled, angledDistance] = [{ kind, id: d.id, layerId }, distance];
+    }
   }
-  if (angled) return { kind: 'door', id: angled.id, layerId };
+  if (angled) return angled;
 
   const edge = nearestDoorEdge(worldX, worldY, gridSize);
   const edgeDistance =
@@ -144,7 +148,7 @@ function hitTestShape(layer: MapLayer, worldX: number, worldY: number, gridSize:
     );
     if (door) return { kind: 'door', id: door.id, layerId };
     const pane = layer.windows.find(
-      (w) => w.x === edge.x && w.y === edge.y && w.orientation === edge.orientation
+      (w) => w.angle === undefined && w.x === edge.x && w.y === edge.y && w.orientation === edge.orientation
     );
     if (pane) return { kind: 'window', id: pane.id, layerId };
   }
@@ -256,7 +260,13 @@ export function rotateObject(draft: MapData | LevelMap, sel: Selection) {
     );
   } else if (sel.kind === 'window') {
     const w = findWindow(layer, sel.id);
-    if (w) replaceWindow(layer, { ...w, orientation: w.orientation === 'horizontal' ? 'vertical' : 'horizontal' });
+    if (!w) return;
+    replaceWindow(
+      layer,
+      w.angle === undefined
+        ? { ...w, orientation: w.orientation === 'horizontal' ? 'vertical' : 'horizontal' }
+        : { ...w, angle: (w.angle + 90) % 180 }
+    );
   } else if (sel.kind === 'wall') {
     // A quarter turn about its first corner, which only stays on a square grid
     const w = findWall(layer, sel.id);
@@ -418,8 +428,9 @@ export function copyObjects(map: MapData | LevelMap, sels: Selection[]): Clipboa
 /**
  * The copies to paste: onto `layerId`, or each back onto its own layer. One
  * object lands as `offsetCopy` puts it. A group keeps its layout and moves
- * by whole cells: one to the right, or with its top-left corner under `at`,
- * then further right while any of its doors or windows would land on another.
+ * by whole cells (whole hexes on a hex grid): one to the right, or with its
+ * top-left corner under `at`, then further right while any of its doors or
+ * windows would land on another.
  */
 export function placeCopies(
   map: MapData | LevelMap,
@@ -430,22 +441,31 @@ export function placeCopies(
   const target = (entry: ClipboardEntry) => findLayer(map, layerId ?? entry.layerId);
   if (entries.length === 1) {
     const layer = target(entries[0]);
-    return layer ? [{ ...offsetCopy(layer, entries[0], at), layerId: layer.id }] : [];
+    return layer ? [{ ...offsetCopy(layer, entries[0], at, map.gridType), layerId: layer.id }] : [];
   }
-  let dx = 1;
-  let dy = 0;
-  if (at) {
-    dx = Math.floor(at.x) - Math.floor(Math.min(...entries.map((e) => e.object.x)));
-    dy = Math.floor(at.y) - Math.floor(Math.min(...entries.map((e) => e.object.y)));
+  const corner: Pair = [Math.min(...entries.map((e) => e.object.x)), Math.min(...entries.map((e) => e.object.y))];
+  const hex = isHexGrid(map.gridType) ? map.gridType : null;
+  // One step right of where the group would be: a cell, or a hex
+  const right = (dx: number, dy: number): Pair => {
+    if (!hex) return [dx + 1, dy];
+    const [sx, sy] = hexNudge(hex, [corner[0] + 0.5 + dx, corner[1] + 0.5 + dy], 1, 0);
+    return [dx + sx, dy + sy];
+  };
+  let [dx, dy] = right(0, 0);
+  if (at && hex) {
+    [dx, dy] = hexOffset(hex, [corner[0] + 0.5, corner[1] + 0.5], [at.x, at.y]);
+  } else if (at) {
+    dx = Math.floor(at.x) - Math.floor(corner[0]);
+    dy = Math.floor(at.y) - Math.floor(corner[1]);
   }
-  const edgeTakenAt = (offset: number) =>
+  const edgeTakenAt = (ox: number, oy: number) =>
     entries.some((e) => {
       if (e.kind !== 'door' && e.kind !== 'window') return false;
       const layer = target(e);
-      return !!layer && edgeTaken(layer, e.kind, { ...e.object, x: e.object.x + offset, y: e.object.y + dy });
+      return !!layer && edgeTaken(layer, e.kind, { ...e.object, x: e.object.x + ox, y: e.object.y + oy });
     });
   // Bounded, as every door and window stays on its own row or column
-  for (let i = 0; i < 1000 && edgeTakenAt(dx); i++) dx++;
+  for (let i = 0; i < 1000 && edgeTakenAt(dx, dy); i++) [dx, dy] = right(dx, dy);
   return entries.flatMap((e) => {
     const layer = target(e);
     if (!layer) return [];
@@ -459,10 +479,12 @@ export function placeCopies(
  * `at` (a point in grid units) snapped as the placing tools do. Doors and
  * windows move along their wall instead, or to the edge nearest `at` (a door
  * turned along a wall keeps its angle, centred on `at`), past any of their
- * kind already there.
+ * kind already there. On a hex `grid` things go a hex to the right, or into
+ * the hex under `at`, and doors and windows onto its nearest side.
  */
-export function offsetCopy(layer: LayerContent, copied: CopiedObject, at?: { x: number; y: number }): CopiedObject {
+export function offsetCopy(layer: LayerContent, copied: CopiedObject, at?: { x: number; y: number }, grid?: GridType): CopiedObject {
   const id = newObjectId(copied.kind);
+  if (isHexGrid(grid) && copied.kind !== 'label') return offsetHexCopy(layer, copied, id, grid, at);
   if (copied.kind === 'door' || copied.kind === 'window') {
     const angled = 'angle' in copied.object && copied.object.angle !== undefined;
     const d = { ...copied.object, ...(at && (angled ? at : nearestDoorEdge(at.x, at.y, 1))) };
@@ -477,6 +499,44 @@ export function offsetCopy(layer: LayerContent, copied: CopiedObject, at?: { x: 
   const [x, y] = copied.kind === 'label' ? [at.x, at.y] : [Math.floor(at.x), Math.floor(at.y)];
   return { ...copied, object: { ...copied.object, id, x, y } } as CopiedObject;
 }
+
+function offsetHexCopy(
+  layer: LayerContent,
+  copied: Exclude<CopiedObject, { kind: 'label' }>,
+  id: string,
+  grid: 'hex-pointy' | 'hex-flat',
+  at?: { x: number; y: number }
+): CopiedObject {
+  const o = copied.object;
+  // A point inside the hex the object is in (just off a door's or wall's
+  // middle, which is on a hex side), to step it from hex to hex
+  const ref: Pair =
+    copied.kind === 'door' || copied.kind === 'window'
+      ? [o.x + 0.013, o.y + 0.017]
+      : copied.kind === 'wall'
+        ? [o.x + copied.object.dx / 2 + 0.013, o.y + copied.object.dy / 2 + 0.017]
+        : [o.x + 0.5, o.y + 0.5];
+  const stepRight = (x: number, y: number): Pair => {
+    const [dx, dy] = hexNudge(grid, [ref[0] + x - o.x, ref[1] + y - o.y], 1, 0);
+    return [x + dx, y + dy];
+  };
+  if (copied.kind === 'door' || copied.kind === 'window') {
+    const d: EdgeObject = copied.object;
+    let spot = at ? { ...d, ...nearestHexSide(grid, at.x, at.y) } : { ...d, ...pairXY(stepRight(d.x, d.y)) };
+    for (let i = 0; i < 1000 && edgeTaken(layer, copied.kind, spot); i++) spot = { ...spot, ...pairXY(stepRight(spot.x, spot.y)) };
+    return { kind: copied.kind, object: { ...spot, id } } as CopiedObject;
+  }
+  let [x, y] = stepRight(o.x, o.y);
+  if (at && copied.kind === 'wall') {
+    const [dx, dy] = hexOffset(grid, ref, [at.x, at.y]);
+    [x, y] = [o.x + dx, o.y + dy];
+  } else if (at) {
+    [x, y] = hexSlot(grid, hexAt(grid, at.x, at.y));
+  }
+  return { ...copied, object: { ...o, id, x, y } } as CopiedObject;
+}
+
+const pairXY = ([x, y]: Pair) => ({ x, y });
 
 /** Adds an object (from offsetCopy) on top of a layer's others of its kind */
 export function addObject(draft: MapData | LevelMap, layerId: string, copied: CopiedObject) {
