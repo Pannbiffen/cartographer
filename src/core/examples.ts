@@ -40,7 +40,7 @@ function sunkenCrypt(): MapData {
     title: 'The Sunken Crypt',
     gridSize: 40,
     ...DEFAULT_NEW_MAP,
-    background: 'paving',
+    background: 'fitted-stone',
     lighting: false,
     darkness: 0.75,
     levels: [

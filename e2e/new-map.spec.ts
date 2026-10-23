@@ -84,7 +84,7 @@ test('the starter dungeon opens in the default look', async ({ page }) => {
   expect(await saveMap(page)).toMatchObject({
     title: 'The Sunken Crypt',
     theme: 'colour',
-    background: 'paving',
+    background: 'fitted-stone',
     wallStyle: 'rough',
     hatchLength: 12,
   });

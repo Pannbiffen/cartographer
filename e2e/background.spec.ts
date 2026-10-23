@@ -36,8 +36,8 @@ const BLOCK: [[number, number], [number, number]] = [[-15, -7], [-12, -4]];
 test('the background fills the map around the rooms, rooms on it get walls, and it is saved', async ({ page }) => {
   const errors = trackErrors(page);
   await openApp(page, { mapSettings: true });
-  // The starter crypt lies on paving stones; paper is one flat colour, give or take the grid
-  await expect(page.getByLabel('Background')).toHaveValue('paving');
+  // The starter crypt lies on fitted stone; paper is one flat colour, give or take the grid
+  await expect(page.getByLabel('Background')).toHaveValue('fitted-stone');
   await page.getByLabel('Show battle grid').uncheck();
   expect((await pixels(page, ...BLOCK)).colours).toBeGreaterThan(10);
   await page.getByLabel('Background').selectOption('paper');

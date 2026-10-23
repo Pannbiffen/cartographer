@@ -15,7 +15,7 @@ test('every example opens and renders without errors', async ({ page }) => {
   const looks: [string, string][] = [
     ['Riverside Farm', 'grass'],
     ['Ember Cavern', 'rough-stone'],
-    ['The Sunken Crypt', 'paving'],
+    ['The Sunken Crypt', 'fitted-stone'],
   ];
   for (const [title, background] of looks) {
     // An untouched example has nothing to lose, so switching doesn't ask
