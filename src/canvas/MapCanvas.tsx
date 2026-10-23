@@ -59,8 +59,11 @@ import {
   addWater,
   applyShape,
   circlePolygon,
+  addPaint,
+  erasePaint,
   eraseShapesInCells,
   eraseWater,
+  paintCells,
   paintWaterCells,
   pathPolygon,
   polygonFromPoints,
@@ -93,6 +96,8 @@ interface MapCanvasProps {
   selectedFoliageType: FoliageType;
   // Texture laid by the room tools
   floorTexture: FloorTexture;
+  // Texture the paint tool lays on the ground
+  paintTexture: FloorTexture;
   labelStyle: LabelStyle;
   // Whether the polygon, circle and path tools add floor or cut it away
   shapeMode: ShapeMode;
@@ -145,6 +150,7 @@ const PREVIEW_FILLS: Partial<Record<ToolType, string>> = {
   eraser: 'rgba(230, 80, 80, 0.2)',
   water: 'rgba(60, 140, 180, 0.25)',
   river: 'rgba(60, 140, 180, 0.35)',
+  paint: 'rgba(150, 120, 80, 0.25)',
   foliage: 'rgba(80, 150, 80, 0.25)',
 };
 const DEFAULT_PREVIEW_FILL = 'rgba(210, 180, 140, 0.25)';
@@ -158,6 +164,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedPropType,
   selectedFoliageType,
   floorTexture,
+  paintTexture,
   labelStyle,
   shapeMode,
   river,
@@ -225,7 +232,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     [onModifyMap, activeLayerId]
   );
   const hexGrid = isHexGrid(mapData.gridType) ? mapData.gridType : null;
-  const hexBrush = hexGrid !== null && (activeTool === 'room-brush' || activeTool === 'eraser');
+  const hexBrush = hexGrid !== null && (activeTool === 'room-brush' || activeTool === 'paint' || activeTool === 'eraser');
 
   // Where a shape point would go: on the nearest half cell, or hex centre or corner
   const snapPoint = useCallback(
@@ -551,6 +558,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           if (activeTool === 'room-brush') uncutCells(draft, [...cells.values()]);
           if (activeTool === 'eraser') eraseShapesInCells(draft, [...cells.values()]);
           if (activeTool === 'water') paintWaterCells(draft, [...cells.values()], waterStyle);
+          if (activeTool === 'paint') paintCells(draft, [...cells.values()], paintTexture);
           for (const { x: gx, y: gy } of cells.values()) {
             const key = `${gx},${gy}`;
 
@@ -574,10 +582,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         { coalesce: `stroke-${strokeCountRef.current}` }
       );
     },
-    [activeTool, brushSize, selectedFoliageType, floorTexture, waterStyle, editLayer]
+    [activeTool, brushSize, selectedFoliageType, floorTexture, paintTexture, waterStyle, editLayer]
   );
 
-  // On a hex grid the room brush and eraser lay or cut whole hexes
+  // On a hex grid the room brush, paint and eraser lay or cut whole hexes
   const applyHexBrush = useCallback(
     (centers: Hex[]) => {
       if (!hexGrid) return;
@@ -588,9 +596,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const shape = [...hexes.values()].map((h) => hexPolygon(hexGrid, h));
       editLayer(
         (draft) => {
+          if (activeTool === 'paint') {
+            addPaint(draft, shape, paintTexture);
+            return;
+          }
           applyShape(draft, shape, activeTool === 'eraser' ? 'cut' : 'add', floorTexture);
           if (activeTool !== 'eraser') return;
           eraseWater(draft, shape);
+          erasePaint(draft, shape);
           // Water, plants and objects go with the cells centred in the hexes,
           // and walls with the hex edges
           for (const h of hexes.values()) {
@@ -608,7 +621,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         { coalesce: `stroke-${strokeCountRef.current}` }
       );
     },
-    [hexGrid, activeTool, brushSize, floorTexture, editLayer]
+    [hexGrid, activeTool, brushSize, floorTexture, paintTexture, editLayer]
   );
 
   // Adds walls along grid edges, or erases those there
@@ -1216,11 +1229,12 @@ function carveFloor(layer: LayerContent, key: string, texture: FloorTexture) {
   else layer.floors[key] = texture;
 }
 
-/** Clears everything but floor from a cell: water, plants and objects in it */
+/** Clears everything but floor from a cell: water, paint, plants and objects in it */
 function eraseCellContents(layer: LayerContent, gx: number, gy: number) {
   const key = `${gx},${gy}`;
   delete layer.water[key];
   delete layer.clearWater[key];
+  delete layer.paint[key];
   delete layer.foliage[key];
   layer.doors = layer.doors.filter((d) => !doorTouchesCell(d, gx, gy));
   layer.walls = layer.walls.filter((w) => !wallTouchesCell(w, gx, gy));
@@ -1241,5 +1255,5 @@ function circleRadius(centre: Pair, edge: Pair, free: boolean): number {
 }
 
 function usesBrush(tool: ToolType): boolean {
-  return tool === 'room-brush' || tool === 'water' || tool === 'foliage' || tool === 'eraser';
+  return tool === 'room-brush' || tool === 'water' || tool === 'paint' || tool === 'foliage' || tool === 'eraser';
 }

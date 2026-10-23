@@ -5,7 +5,7 @@ import type { HatchStyle, LayerContent, LayerHatching, LevelMap, MapData, MapLay
 type Layered = Pick<MapLevel, 'layers'>;
 
 export function emptyContent(): LayerContent {
-  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, waterAreas: [], clearWater: {}, clearWaterAreas: [], foliage: {}, doors: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
+  return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, waterAreas: [], clearWater: {}, clearWaterAreas: [], paint: {}, paintAreas: {}, foliage: {}, doors: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
 }
 
 export function newLayer(id: string, name: string, content: Partial<LayerContent> = {}): MapLayer {
@@ -25,7 +25,7 @@ export function newLayerId(): string {
 }
 
 /** A layer's own copy of every collection, so a draft can be edited freely
- * (shapes, cuts, floor and water areas are replaced whole, so they keep being shared) */
+ * (shapes, cuts, floor, water and paint areas are replaced whole, so they keep being shared) */
 export function cloneLayer(layer: MapLayer): MapLayer {
   return {
     ...layer,
@@ -34,6 +34,7 @@ export function cloneLayer(layer: MapLayer): MapLayer {
     floorAreas: { ...layer.floorAreas },
     water: { ...layer.water },
     clearWater: { ...layer.clearWater },
+    paint: { ...layer.paint },
     foliage: { ...layer.foliage },
     doors: [...layer.doors],
     walls: [...layer.walls],
@@ -141,6 +142,8 @@ function normalizeLayer(stored: StoredLayer, index: number, takenIds: Set<string
     waterAreas: stored.waterAreas ?? [],
     clearWater: stored.clearWater ?? {},
     clearWaterAreas: stored.clearWaterAreas ?? [],
+    paint: stored.paint ?? {},
+    paintAreas: stored.paintAreas ?? {},
     foliage: stored.foliage ?? {},
     doors: stored.doors ?? [],
     walls: stored.walls ?? [],

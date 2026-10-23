@@ -9,6 +9,8 @@ export type ToolType =
   | 'fill'
   | 'water' 
   | 'river'
+  | 'paint'
+  | 'road'
   | 'foliage' 
   | 'wall'
   | 'door' 
@@ -163,6 +165,12 @@ export interface LayerContent {
   // solid water above and never overlapping it
   clearWater: { [key: string]: boolean };
   clearWaterAreas: Polygon[];
+  // Texture laid on the ground without making floor: no walls, hatching or
+  // effect on light. Cells by texture, and free-form areas by texture that
+  // never overlap one another and win over the cells beneath them (the
+  // areas are replaced on edit, never mutated)
+  paint: { [key: string]: FloorTexture }; // "x,y"
+  paintAreas: Partial<Record<FloorTexture, Polygon[]>>;
   foliage: { [key: string]: { type: FoliageType; seed: number } }; // "x,y"
   doors: PlacedDoor[];
   walls: PlacedWall[];

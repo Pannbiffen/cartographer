@@ -50,6 +50,8 @@ interface DockPanelProps {
   onFoliageTypeChange: (type: FoliageType) => void;
   floorTexture: FloorTexture;
   onFloorTextureChange: (texture: FloorTexture) => void;
+  paintTexture: FloorTexture;
+  onPaintTextureChange: (texture: FloorTexture) => void;
   labelStyle: LabelStyle;
   onLabelStyleChange: (style: LabelStyle) => void;
   shapeMode: ShapeMode;
@@ -500,6 +502,8 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onFoliageTypeChange,
   floorTexture,
   onFloorTextureChange,
+  paintTexture,
+  onPaintTextureChange,
   labelStyle,
   onLabelStyleChange,
   shapeMode,
@@ -535,11 +539,13 @@ export const DockPanel: React.FC<DockPanelProps> = ({
     activeTool === 'tunnel' ||
     activeTool === 'path' ||
     activeTool === 'water' ||
+    activeTool === 'paint' ||
     activeTool === 'foliage' ||
     activeTool === 'eraser';
 
-  // On a hex grid the room brush and eraser work in whole hexes
-  const hexBrush = isHexGrid(mapData.gridType) && (activeTool === 'room-brush' || activeTool === 'eraser');
+  // On a hex grid the room brush, paint and eraser work in whole hexes
+  const hexBrush =
+    isHexGrid(mapData.gridType) && (activeTool === 'room-brush' || activeTool === 'paint' || activeTool === 'eraser');
   const brushWidth = 2 * brushSize - 1;
   const shapeHint: Partial<Record<ToolType, string>> = {
     polygon:
@@ -673,11 +679,20 @@ export const DockPanel: React.FC<DockPanelProps> = ({
 
         {hexBrush && (
           <p className="text-ui-muted leading-snug">
-            {activeTool === 'eraser' ? 'Erases' : 'Paints floor in'} whole hexes on the hex grid.
+            {activeTool === 'eraser' ? 'Erases' : activeTool === 'paint' ? 'Paints' : 'Paints floor in'} whole hexes on the hex grid.
           </p>
         )}
         {laysFloor(activeTool, shapeMode) && (
           <Choices label="Floor" options={FLOOR_TEXTURES} value={floorTexture} columns={2} onChange={onFloorTextureChange} />
+        )}
+        {activeTool === 'paint' && (
+          <>
+            <Choices label="Texture" options={FLOOR_TEXTURES} value={paintTexture} columns={2} onChange={onPaintTextureChange} />
+            <p className="text-ui-muted leading-snug">
+              Paints the ground without making a room: no walls, hatching or shadows. For a clearing, a muddy patch
+              or a cobbled square. The eraser takes it away.
+            </p>
+          </>
         )}
         {activeTool === 'fill' && (
           <p className="text-ui-muted leading-snug">

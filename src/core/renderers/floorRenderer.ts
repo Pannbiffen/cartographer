@@ -307,13 +307,38 @@ const isPattern = (texture: FloorTexture): texture is Pattern => texture in PATT
 /** Draws each floor cell's texture, clipped to the cells that carry it, then
  * the textured areas of free-form floor over them. Only cells in view are drawn. */
 export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerContent, gridSize: number, theme: ThemeColors) {
-  const { rooms, floors, floorAreas } = layer;
+  renderTextures(ctx, layer.floors, layer.floorAreas, gridSize, theme, (key) => layer.rooms[key]);
+}
+
+/** Paint on the ground: the floor colour, hiding the ground beneath, with its textures over that */
+export function renderPaint(ctx: CanvasRenderingContext2D, layer: LayerContent, gridSize: number, theme: ThemeColors) {
+  const cells = new Path2D();
+  for (const key of Object.keys(layer.paint)) {
+    const [gx, gy] = key.split(',').map(Number);
+    cells.rect(gx * gridSize, gy * gridSize, gridSize, gridSize);
+  }
+  ctx.fillStyle = theme.floor;
+  // Apart, as cells under an area overlap it
+  ctx.fill(cells);
+  ctx.fill(floorPath(Object.values(layer.paintAreas).flat(), gridSize), 'evenodd');
+  renderTextures(ctx, layer.paint, layer.paintAreas, gridSize, theme, () => true);
+}
+
+/** Textured cells (those `include` lets through) with textured areas winning over them */
+function renderTextures(
+  ctx: CanvasRenderingContext2D,
+  textures: { [key: string]: FloorTexture },
+  textureAreas: Partial<Record<FloorTexture, Polygon[]>>,
+  gridSize: number,
+  theme: ThemeColors,
+  include: (key: string) => boolean
+) {
   const view = viewCells(ctx, gridSize);
   const inView = (gx: number, gy: number) => gx >= view.minX && gx < view.maxX && gy >= view.minY && gy < view.maxY;
   const groups = new Map<Pattern, [number, number][]>();
-  for (const key of Object.keys(floors)) {
-    const texture = floors[key];
-    if (!rooms[key] || !isPattern(texture)) continue;
+  for (const key of Object.keys(textures)) {
+    const texture = textures[key];
+    if (!include(key) || !isPattern(texture)) continue;
     const cell = key.split(',').map(Number) as [number, number];
     if (!inView(...cell)) continue;
     const cells = groups.get(texture);
@@ -321,7 +346,7 @@ export function renderFloorTextures(ctx: CanvasRenderingContext2D, layer: LayerC
     else groups.set(texture, [cell]);
   }
 
-  const areas = Object.entries(floorAreas) as [FloorTexture, Polygon[]][];
+  const areas = Object.entries(textureAreas) as [FloorTexture, Polygon[]][];
   ctx.save();
   if (areas.length > 0 && groups.size > 0) {
     // Areas win over the cells beneath them: clip those out

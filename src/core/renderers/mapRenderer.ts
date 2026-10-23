@@ -13,9 +13,9 @@ import {
 } from '../geometry/hatching';
 import { renderDoor, renderStairs, renderProp } from './propsRenderer';
 import { renderLabel } from './labelRenderer';
-import { renderFloorTextures, renderGround } from './floorRenderer';
+import { renderFloorTextures, renderGround, renderPaint } from './floorRenderer';
 import { renderLightGlow, renderLighting } from './lightingRenderer';
-import { floorPath, floorSegments, hasShapes, layerFloor, layerWater } from '../geometry/region';
+import { floorPath, floorSegments, hasPaint, hasShapes, layerFloor, layerWater } from '../geometry/region';
 import { hexGridPath, isHexGrid } from '../geometry/hex';
 import { thinWallSegments } from '../geometry/walls';
 import { layerHatching, visibleLayers } from '../layers';
@@ -112,8 +112,9 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
     ? floorSegments(layerFloor(layer), gridSize)
     : extractWallSegments(layer.rooms, gridSize);
 
-  // 1. Exterior hatching goes down first so floors cover any strokes that
-  //    stray into neighbouring rooms
+  // 1. Paint lies on the ground, under everything else. Exterior hatching
+  //    goes next so floors cover any strokes that stray into neighbouring rooms
+  if (hasPaint(layer)) renderPaint(ctx, layer, gridSize, theme);
   const hatch = layerHatching(layer, mapData);
   if (hatch.style === 'dyson') {
     renderDysonHatching(ctx, wallSegments, gridSize, hatch.length, hatch.density, theme.hatch);

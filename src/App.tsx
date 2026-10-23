@@ -309,6 +309,7 @@ export function App() {
   const [selectedPropType, setSelectedPropType] = useState<PropType>('pillar');
   const [selectedFoliageType, setSelectedFoliageType] = useState<FoliageType>('tree');
   const [floorTexture, setFloorTexture] = useState<FloorTexture>('plain');
+  const [paintTexture, setPaintTexture] = useState<FloorTexture>('dirt');
   const [labelStyle, setLabelStyle] = useState<LabelStyle>('text');
   const [shapeMode, setShapeMode] = useState<ShapeMode>('add');
   const [river, setRiver] = useState<RiverSettings>(DEFAULT_RIVER);
@@ -1122,7 +1123,7 @@ export function App() {
         'separator',
         { label: 'Delete', shortcut: 'Del', onSelect: deleteSelection },
       ];
-  const brushTool = ['room-brush', 'tunnel', 'path', 'water', 'foliage', 'eraser'].includes(activeTool);
+  const brushTool = ['room-brush', 'tunnel', 'path', 'water', 'paint', 'foliage', 'eraser'].includes(activeTool);
   const toolSettings: MenuItem[] = [
     ...(activeTool === 'door' ? [choices('Door Type', DOOR_TYPES, selectedDoorType, setSelectedDoorType)] : []),
     ...(activeTool === 'prop' ? [choices('Prop', PROP_TYPES, selectedPropType, setSelectedPropType)] : []),
@@ -1132,6 +1133,7 @@ export function App() {
     ...(activeTool === 'label' ? [choices('Label Style', LABEL_STYLES, labelStyle, setLabelStyle)] : []),
     ...(brushTool ? [choices(activeTool === 'path' ? 'Path Width' : 'Brush Size', [1, 2, 3, 4, 5], brushSize, setBrushSize)] : []),
     ...(laysFloor(activeTool, shapeMode) ? [choices('Floor', FLOOR_TEXTURES, floorTexture, setFloorTexture)] : []),
+    ...(activeTool === 'paint' ? [choices('Texture', FLOOR_TEXTURES, paintTexture, setPaintTexture)] : []),
     ...(activeTool === 'water' || activeTool === 'river' ? [choices('New Water', WATER_STYLES, waterStyle, setWaterStyle)] : []),
     ...(activeTool === 'polygon' || activeTool === 'circle' || activeTool === 'path'
       ? [choices('Mode', ['add', 'cut'] as ShapeMode[], shapeMode, setShapeMode)]
@@ -1221,6 +1223,7 @@ export function App() {
               selectedPropType={selectedPropType}
               selectedFoliageType={selectedFoliageType}
               floorTexture={floorTexture}
+              paintTexture={paintTexture}
               labelStyle={labelStyle}
               shapeMode={shapeMode}
               river={river}
@@ -1262,6 +1265,8 @@ export function App() {
             onFoliageTypeChange={setSelectedFoliageType}
             floorTexture={floorTexture}
             onFloorTextureChange={setFloorTexture}
+            paintTexture={paintTexture}
+            onPaintTextureChange={setPaintTexture}
             labelStyle={labelStyle}
             onLabelStyleChange={setLabelStyle}
             shapeMode={shapeMode}

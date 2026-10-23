@@ -229,6 +229,47 @@ export function setWaterStyleAt(layer: MapLayer, x: number, y: number, style: Wa
   }
 }
 
+/** True when a layer has paint on the ground */
+export function hasPaint(layer: LayerContent): boolean {
+  return Object.keys(layer.paint).length > 0 || Object.keys(layer.paintAreas).length > 0;
+}
+
+/** Paints ground cells with a texture; they take back any painted areas over them, so the newest paint wins */
+export function paintCells(layer: LayerContent, cells: GridCoord[], texture: FloorTexture) {
+  if (cells.length === 0) return;
+  for (const { x, y } of cells) layer.paint[`${x},${y}`] = texture;
+  erasePaint(layer, cellPolygons(cellSet(cells)));
+}
+
+/** Paints a free-form area of the ground with a texture, over any painted area there */
+export function addPaint(layer: LayerContent, area: Polygon[], texture: FloorTexture) {
+  if (area.length === 0) return;
+  const { paintAreas } = layer;
+  try {
+    erasePaint(layer, area);
+    layer.paintAreas = { ...layer.paintAreas, [texture]: union(area, ...(layer.paintAreas[texture] ?? [])) };
+  } catch (err) {
+    console.warn('Could not paint the ground', err);
+    layer.paintAreas = paintAreas;
+  }
+}
+
+/** Takes an area out of a layer's painted areas (painted cells go one by one) */
+export function erasePaint(layer: LayerContent, area: Polygon[]) {
+  if (area.length === 0 || Object.keys(layer.paintAreas).length === 0) return;
+  const areas = { ...layer.paintAreas };
+  try {
+    for (const texture of Object.keys(areas) as FloorTexture[]) {
+      const left = difference(areas[texture]!, area);
+      if (left.length > 0) areas[texture] = left;
+      else delete areas[texture];
+    }
+    layer.paintAreas = areas;
+  } catch (err) {
+    console.warn('Could not erase paint', err);
+  }
+}
+
 /** True if (x, y) in grid units lies inside the polygons (outside their holes) */
 export function pointInPolygons(polygons: Polygon[], x: number, y: number): boolean {
   return polygons.some((polygon) => pointInPolygon(polygon, x, y));
@@ -342,9 +383,9 @@ function floorWalls(layers: MapLayer[], gridSize: number): WallSegment[] {
   return floorSegments(union(floors[0], ...floors.slice(1)), gridSize);
 }
 
-/** Extent of a layer's shapes and free-form water in grid units, or null if it has none */
+/** Extent of a layer's shapes, free-form water and painted areas in grid units, or null if it has none */
 export function shapeBounds(layer: LayerContent): { minX: number; minY: number; maxX: number; maxY: number } | null {
-  const polygons = [...layer.shapes, ...layer.waterAreas, ...layer.clearWaterAreas];
+  const polygons = [...layer.shapes, ...layer.waterAreas, ...layer.clearWaterAreas, ...Object.values(layer.paintAreas).flat()];
   return polygons.length === 0 ? null : polygonBounds(polygons);
 }
 
@@ -445,10 +486,11 @@ export function uncutCells(layer: LayerContent, cells: GridCoord[]) {
   });
 }
 
-/** Erased cells take shapes, cuts, textured areas and free-form water with them */
+/** Erased cells take shapes, cuts, textured areas, free-form water and painted areas with them */
 export function eraseShapesInCells(layer: LayerContent, cells: GridCoord[]) {
   if (cells.length === 0) return;
   if (layer.waterAreas.length > 0 || layer.clearWaterAreas.length > 0) eraseWater(layer, cellPolygons(cellSet(cells)));
+  erasePaint(layer, cellPolygons(cellSet(cells)));
   if (!hasShapes(layer) && !hasFloorAreas(layer)) return;
   const squares = cellPolygons(cellSet(cells));
   guarded(layer, () => {
