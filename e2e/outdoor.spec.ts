@@ -49,7 +49,8 @@ test('an outdoor map has ground everywhere, rooms on it get walls, and it is sav
   await page.getByLabel('Ground').selectOption('grass');
   await expect.poll(() => colours(page, [-15, -7], [-12, -4])).toBeGreaterThan(10);
 
-  // A room drawn on the ground is walled
+  // A room drawn on the ground is walled; bold walls, as rough ones wobble off a sampled pixel
+  await page.getByLabel('Wall style').selectOption('bold');
   await page.keyboard.press('r');
   await dragCells(page, [-15, -7], [-12, -4]);
   expect(await brightnessAt(page, -13.5, -7)).toBeLessThan(90);
