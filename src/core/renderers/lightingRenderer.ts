@@ -1,10 +1,11 @@
 // Darkness and light: every light lifts the darkness within its radius,
 // except where walls block it, and tints what it reaches with its colour.
-// Through a window it reaches further, dimmed and tinted by the pane.
+// Through a window it reaches further, dimmed and tinted by the pane. Lava
+// glows: the darkness lifts off it, and its shores catch a dim orange light.
 import type { LevelMap, MapLayer, PlacedWindow } from '../../types/map';
-import { combinedWalls } from '../geometry/region';
+import { combinedWalls, floorPath, hasWater, layerWater } from '../geometry/region';
 import { mergeWallSegments, visibilityPolygon, wallsWithGap, type Point, type Segment } from '../geometry/visibility';
-import { mapLights, mapWindows, type MapLight } from '../lighting';
+import { lavaLights, mapLights, mapWindows, type MapLight } from '../lighting';
 import { visibleLayers } from '../layers';
 
 // Walls and light shapes per level drawn (the active one and the faint ones
@@ -112,10 +113,19 @@ function filtered(color: string, tint: string): string {
 // Scratch canvas holding the darkness while lights are cut out of it
 let darkCanvas: HTMLCanvasElement | null = null;
 
+// How much of the darkness lifts off lava itself
+const LAVA_BRIGHTNESS = 0.8;
+
+/** Placed lights, torches and the glow off lava */
+function allLights(map: LevelMap): MapLight[] {
+  const lava = lavaLights(map);
+  return lava.length > 0 ? [...mapLights(map), ...lava] : mapLights(map);
+}
+
 /** Darkens the whole canvas except where lights reach (world transform on `ctx`) */
 export function renderLighting(ctx: CanvasRenderingContext2D, map: LevelMap) {
   const g = map.gridSize;
-  const lights = mapLights(map);
+  const lights = allLights(map);
 
   darkCanvas ??= document.createElement('canvas');
   const { width, height } = ctx.canvas;
@@ -160,6 +170,11 @@ export function renderLighting(ctx: CanvasRenderingContext2D, map: LevelMap) {
       dark.restore();
     }
   }
+  // Lava shows through the dark, in its own colour
+  dark.fillStyle = `rgba(0, 0, 0, ${LAVA_BRIGHTNESS})`;
+  for (const layer of visibleLayers(map)) {
+    if (hasWater(layer, 'lava')) dark.fill(floorPath(layerWater(layer, 'lava'), g), 'evenodd');
+  }
 
   // Coloured glow first, so the darkness on top dims it near the edges too
   renderLightGlow(ctx, map);
@@ -176,13 +191,13 @@ export function renderLighting(ctx: CanvasRenderingContext2D, map: LevelMap) {
  */
 export function renderLightGlow(ctx: CanvasRenderingContext2D, map: LevelMap) {
   const g = map.gridSize;
-  for (const light of mapLights(map)) {
+  for (const light of allLights(map)) {
     const cx = light.x * g;
     const cy = light.y * g;
     const r = light.radius * g;
     const glow = (color: string, strength: number) => {
       const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      gradient.addColorStop(0, rgba(color, 0.4 * strength));
+      gradient.addColorStop(0, rgba(color, (light.glow ?? 0.4) * strength));
       gradient.addColorStop(1, rgba(color, 0));
       return gradient;
     };

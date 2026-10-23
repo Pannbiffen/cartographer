@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, clickCell, saveMap, trackErrors } from './helpers';
+import { openApp, openDarkHall, clickCell, rgbAt, saveMap, trackErrors } from './helpers';
 
 // The starter map has a torch at (-4, 2) in the Grand Hall
 
@@ -60,5 +60,25 @@ test('Universal VTT export includes placed lights and torches', async ({ page })
   expect(vtt.lights.map((l: { range: number }) => l.range).sort()).toEqual([4, 5]);
   expect(vtt.lights[0].color).toMatch(/^ff[0-9a-f]{6}$/);
   await downloadText(page, () => page.getByRole('button', { name: /PNG/ }).first().click());
+  expect(errors).toEqual([]);
+});
+
+test('lava glows in the dark, lighting its shore up to the walls', async ({ page }) => {
+  const errors = trackErrors(page);
+  await openApp(page);
+  // Two lava cells against the hall's thin wall at x = 5
+  await openDarkHall(page, { lava: { '3,2': true, '4,2': true } });
+  const brightness = async (gx: number, gy: number) => {
+    const { r, g, b } = await rgbAt(page, gx, gy);
+    return (r + g + b) / 3;
+  };
+  const far = await brightness(0.5, 0.5);
+  expect(await brightness(3.5, 2.5)).toBeGreaterThan(far + 20);
+  // The floor beside it catches an orange glow
+  const shore = await rgbAt(page, 3.5, 1.5);
+  expect((shore.r + shore.g + shore.b) / 3).toBeGreaterThan(far + 5);
+  expect(shore.r).toBeGreaterThan(shore.b + 10);
+  // ...but none reaches past the wall
+  expect(Math.abs((await brightness(5.5, 2.5)) - (await brightness(8.5, 0.5)))).toBeLessThanOrEqual(2);
   expect(errors).toEqual([]);
 });

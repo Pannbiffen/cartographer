@@ -1,70 +1,16 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openApp, gridPoint, saveMap, trackErrors } from './helpers';
-import type { MapData, PlacedWindow } from '../src/types/map';
-
-/** The canvas colour at a point in grid units */
-async function rgbAt(page: Page, gx: number, gy: number) {
-  const p = await gridPoint(page, gx, gy);
-  const box = (await page.locator('canvas').boundingBox())!;
-  return page.locator('canvas').evaluate(
-    (canvas: HTMLCanvasElement, [x, y]) => {
-      const dpr = window.devicePixelRatio || 1;
-      const [r, g, b] = canvas.getContext('2d')!.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data;
-      return { r, g, b };
-    },
-    [p.x - box.x, p.y - box.y]
-  );
-}
+import { openApp, openDarkHall, gridPoint, rgbAt, saveMap, trackErrors } from './helpers';
+import type { PlacedWindow } from '../src/types/map';
 
 async function brightnessAt(page: Page, gx: number, gy: number) {
   const { r, g, b } = await rgbAt(page, gx, gy);
   return (r + g + b) / 3;
 }
 
-/**
- * A dark hall x 0..9, y 0..4 split by a thin wall along x = 5, with a light
- * at (2, 2) on the left and, if given, windows in it
- */
+/** The dark hall, with a light at (2, 2) on the left of its thin wall, and `windows` */
 async function openHall(page: Page, windows: PlacedWindow[] = []) {
   await openApp(page);
-  const base = await saveMap(page);
-  const rooms: Record<string, boolean> = {};
-  for (let x = 0; x < 10; x++) for (let y = 0; y < 5; y++) rooms[`${x},${y}`] = true;
-  const layer = {
-    ...base.levels[0].layers[0],
-    rooms,
-    shapes: [],
-    cuts: [],
-    floors: {},
-    floorAreas: {},
-    water: {},
-    clearWater: {},
-    lava: {},
-    paint: {},
-    foliage: {},
-    doors: [],
-    stairs: [],
-    props: [],
-    labels: [],
-    walls: [0, 1, 2, 3, 4].map((y) => ({ id: `w${y}`, x: 5, y, dx: 0, dy: 1 })),
-    windows,
-    lights: [{ id: 'l1', x: 2, y: 2, color: '#ffe2a8', radius: 8, intensity: 1 }],
-  };
-  const map: MapData = {
-    ...base,
-    title: 'Hall',
-    outdoor: false,
-    showGrid: false,
-    lighting: true,
-    darkness: 0.9,
-    levels: [{ ...base.levels[0], layers: [layer] }],
-  };
-  await page.getByLabel('Open map file').setInputFiles({
-    name: 'hall.dndmap',
-    mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify(map)),
-  });
-  await expect(page.getByTestId('map-stats')).toContainText('Rooms: 50');
+  await openDarkHall(page, { windows, lights: [{ id: 'l1', x: 2, y: 2, color: '#ffe2a8', radius: 8, intensity: 1 }] });
 }
 
 const PANE: PlacedWindow = { id: 'win1', x: 5, y: 2, orientation: 'vertical', tint: '#cfe8ff', clarity: 0.8 };

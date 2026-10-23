@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import type { MapData } from '../src/types/map';
+import type { MapData, MapLayer } from '../src/types/map';
 
 /**
  * Opens the app with the starter map (each test gets fresh browser storage).
@@ -93,6 +93,66 @@ export async function saveMap(page: Page): Promise<MapData> {
   const chunks: Buffer[] = [];
   for await (const chunk of stream) chunks.push(chunk as Buffer);
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+/**
+ * Opens a hall x 0..9, y 0..4 split by a thin wall along x = 5: the starter
+ * map's settings, darkened, with no grid, and `content` on its one layer
+ */
+export async function openDarkHall(page: Page, content: Partial<MapLayer> = {}) {
+  const base = await saveMap(page);
+  const rooms: Record<string, boolean> = {};
+  for (let x = 0; x < 10; x++) for (let y = 0; y < 5; y++) rooms[`${x},${y}`] = true;
+  const layer: MapLayer = {
+    ...base.levels[0].layers[0],
+    rooms,
+    shapes: [],
+    cuts: [],
+    floors: {},
+    floorAreas: {},
+    water: {},
+    clearWater: {},
+    lava: {},
+    paint: {},
+    foliage: {},
+    doors: [],
+    windows: [],
+    stairs: [],
+    props: [],
+    labels: [],
+    lights: [],
+    walls: [0, 1, 2, 3, 4].map((y) => ({ id: `w${y}`, x: 5, y, dx: 0, dy: 1 })),
+    ...content,
+  };
+  const map: MapData = {
+    ...base,
+    title: 'Hall',
+    outdoor: false,
+    showGrid: false,
+    lighting: true,
+    darkness: 0.9,
+    levels: [{ ...base.levels[0], layers: [layer] }],
+  };
+  await page.getByLabel('Open map file').setInputFiles({
+    name: 'hall.dndmap',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(map)),
+  });
+  await expect(page.getByTestId('map-stats')).toContainText('Rooms: 50');
+}
+
+/** The canvas colour at a point in grid units */
+export async function rgbAt(page: Page, gx: number, gy: number) {
+  const p = await gridPoint(page, gx, gy);
+  const box = (await page.locator('canvas').boundingBox())!;
+  return page.locator('canvas').evaluate(
+    (canvas: HTMLCanvasElement, [x, y]) => {
+      const dpr = window.devicePixelRatio || 1;
+      const [r, g, b] = canvas.getContext('2d')!.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data;
+      return { r, g, b };
+    },
+    [p.x - box.x, p.y - box.y]
+  );
 }
 
 /** The status bar's live counters, e.g. { rooms: 194, water: 16, foliage: 4 } */
