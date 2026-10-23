@@ -33,9 +33,9 @@
 - **Lighting**: Place lights with their own colour, radius and intensity; the rest of the map goes dark and walls cast shadows. Torches give off light too. Windows (the Window tool) snap into walls like doors, diagonal, curved and hex ones included, and let light through onto the far side, dimmed by how much light the pane lets through and tinted by its colour, so stained glass casts coloured light.
 - **Walls**: Drag along the grid with the Wall tool to put thin walls inside or between rooms, such as splitting a hall in two (on hex grids they follow hex edges). Walls that close off an area make it a room, in the floor texture picked in the panel, so a building or yard can be outlined wall by wall. They're drawn in the room wall style, block light, stop the Fill tool and export as VTT walls; a door on one opens it. `Shift`+drag erases them, and they can be selected, moved and deleted like doors.
 - **Doors, Stairs & Props**: Doors snap to the nearest wall edge (standard, double, secret, portcullis, archway), or onto a diagonal, curved or hex wall nearby, turned to run along it (and exported to VTT at that angle), stairs, pillars, chests, tables, altars, torches, barrels and sarcophagi.
-- **Procedural Generators**:
-  - BSP Dungeon Generator (rooms + corridors)
-  - Cellular Automata Cave Generator (winding organic caverns)
+- **Procedural Generators**: Tools > Generate Dungeon or Generate Cave opens its settings in the panel; change them and press Generate until you like the layout (one undo brings back the layer as it was). The same settings and seed always give the same map, and Reroll tries a new seed.
+  - BSP Dungeon Generator: map size, number of rooms, smallest and largest room and corridor width, with doors where corridors meet rooms (standard, double, archway, portcullis, the odd secret door), props (pillars, chests, torches, altars...) and entrance stairs, each optional.
+  - Cellular Automata Cave Generator: winding organic caverns with their openness, smoothing and smallest cave size, plus optional pools and rocks.
 - **Export Capabilities**:
   - 🖼️ **Images**: PNG or WebP at 1x–4x resolution, with or without grid.
   - 🎲 **Universal VTT (`.dd2vtt`)**: Line-of-sight walls, door portals and lights (placed lights and torches) for Foundry VTT (via the Universal Battlemap Importer module), Fantasy Grounds Unity and other UVTT-compatible tools.

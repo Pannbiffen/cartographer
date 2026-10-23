@@ -16,6 +16,7 @@ import type {
   WaterStyle,
 } from '../types/map';
 import { SelectionInspector } from './SelectionInspector';
+import { GeneratorSection, type GeneratorSectionProps } from './GeneratorSection';
 import { Slider } from './Slider';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Dices, Eye, EyeOff, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
 import {
@@ -88,6 +89,8 @@ interface DockPanelProps {
   onAddLayer: () => void;
   onDeleteLayer: () => void;
   onMoveLayer: (delta: 1 | -1) => void;
+  // An open generator's settings, shown above the tool
+  generator: GeneratorSectionProps | null;
 }
 
 // A titled part of the panel; given `onToggle`, its header folds it away and back
@@ -542,6 +545,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
   onAddLayer,
   onDeleteLayer,
   onMoveLayer,
+  generator,
 }) => {
   const toolLabel = TOOLS.find((t) => t.id === activeTool)?.label ?? 'Tool';
   const usesBrushSize =
@@ -579,6 +583,7 @@ export const DockPanel: React.FC<DockPanelProps> = ({
 
   return (
     <aside aria-label="Properties" className="w-64 shrink-0 bg-ui border-l border-ui-border overflow-y-auto text-ui-text">
+      {generator && <GeneratorSection {...generator} />}
       <Section title={toolLabel}>
         {shapeHint[activeTool] && (
           <>

@@ -34,8 +34,13 @@ import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { MyMapsDialog } from './components/MyMapsDialog';
 import { WelcomeDialog } from './components/WelcomeDialog';
 import {
+  DEFAULT_CAVE,
+  DEFAULT_DUNGEON,
   generateBspDungeon,
   generateCaveSystem,
+  type CaveSettings,
+  type DungeonSettings,
+  type GeneratorKind,
 } from './core/generators/dungeonGenerator';
 import { triggerDownload } from './core/export/imageExporter';
 import { ARROW_DIRECTIONS, focusUsesArrows, isTypingInField } from './core/keyboard';
@@ -71,6 +76,7 @@ import {
   deleteLayer,
   emptyContent,
   findLayer,
+  hasContent,
   isLayerEditable,
   moveLayer,
   newLayer,
@@ -201,8 +207,15 @@ export function App() {
     },
     [mapData.levels, activeLevelIndex, goToLevel]
   );
+  // The generator whose settings show at the top of the panel, if any;
+  // picking a tool closes it
+  const [generator, setGenerator] = useState<GeneratorKind | null>(null);
+  const [dungeonSettings, setDungeonSettings] = useState<DungeonSettings>(DEFAULT_DUNGEON);
+  const [caveSettings, setCaveSettings] = useState<CaveSettings>(DEFAULT_CAVE);
+  const generatorSessionRef = useRef(0);
   const chooseTool = useCallback((tool: ToolType) => {
     setActiveTool(tool);
+    setGenerator(null);
     if (!keepsSelection(tool)) setSelection([]);
   }, []);
   const [brushSize, setBrushSize] = useState<number>(1);
@@ -745,28 +758,40 @@ export function App() {
     openKeyboardMenu,
   ]);
 
-  // Procedural generators replace the active layer's content
-  const handleGenerateDungeon = () => {
-    const res = generateBspDungeon(28, 20, 4);
-    requestFit();
-    modifyMap((draft) =>
-      withLayer(draft, activeLayerId, (layer) =>
-        Object.assign(layer, emptyContent(), {
-          rooms: res.rooms,
-          stairs: [{ id: 's1', x: 0, y: 0, width: 1, height: 2, direction: 'down', steps: 4 }],
-        })
-      )
-    );
+  // Procedural generators: Tools > Generate Dungeon / Cave open their settings
+  // in the panel, and each Generate replaces the active layer's content. All
+  // the layouts tried while it stays open on one layer are one undo step.
+  const openGenerator = (kind: GeneratorKind) => {
+    generatorSessionRef.current++;
+    setGenerator(kind);
+    if (!preferences.showPanel) changePreferences({ showPanel: true });
   };
-
-  const handleGenerateCave = () => {
-    const res = generateCaveSystem(32, 24, 0.45);
+  const generate = (settings?: { seed: number }) => {
+    if (!generator || !activeLayerEditable) return;
+    const coalesce = `generate-${generatorSessionRef.current}-${activeLayerId}`;
+    // Ask before wiping drawn content, but not a layout from this session
+    if (
+      lastCoalesceRef.current !== coalesce &&
+      hasContent(activeLayer) &&
+      !window.confirm(`Replace everything on the layer "${activeLayer.name}" with a generated ${generator}?`)
+    ) {
+      return;
+    }
+    let content;
+    if (generator === 'dungeon') {
+      const next = { ...dungeonSettings, ...settings };
+      setDungeonSettings(next);
+      content = generateBspDungeon(next);
+    } else {
+      const next = { ...caveSettings, ...settings };
+      setCaveSettings(next);
+      content = generateCaveSystem(next);
+    }
     requestFit();
-    modifyMap((draft) =>
-      withLayer(draft, activeLayerId, (layer) =>
-        Object.assign(layer, emptyContent(), { rooms: res.rooms, water: res.water })
-      )
-    );
+    setSelection([]);
+    modifyMap((draft) => withLayer(draft, activeLayerId, (layer) => Object.assign(layer, emptyContent(), content)), {
+      coalesce,
+    });
   };
 
   const handleClearMap = () => {
@@ -988,8 +1013,8 @@ export function App() {
           onSelect: () => chooseTool(t.id),
         })),
         'separator',
-        { label: 'Generate Dungeon', disabled: !activeLayerEditable, onSelect: handleGenerateDungeon },
-        { label: 'Generate Cave', disabled: !activeLayerEditable, onSelect: handleGenerateCave },
+        { label: 'Generate Dungeon…', disabled: !activeLayerEditable, onSelect: () => openGenerator('dungeon') },
+        { label: 'Generate Cave…', disabled: !activeLayerEditable, onSelect: () => openGenerator('cave') },
       ],
     },
     {
@@ -1246,6 +1271,19 @@ export function App() {
             onAddLayer={handleAddLayer}
             onDeleteLayer={handleDeleteLayer}
             onMoveLayer={handleMoveLayer}
+            generator={
+              generator && {
+                kind: generator,
+                dungeon: dungeonSettings,
+                onDungeonChange: setDungeonSettings,
+                cave: caveSettings,
+                onCaveChange: setCaveSettings,
+                onGenerate: () => generate(),
+                onReroll: () => generate({ seed: 1 + Math.floor(Math.random() * 99999) }),
+                onClose: () => setGenerator(null),
+                disabled: !activeLayerEditable,
+              }
+            }
           />
         )}
       </div>

@@ -8,6 +8,11 @@ export function emptyContent(): LayerContent {
   return { rooms: {}, shapes: [], cuts: [], floors: {}, floorAreas: {}, water: {}, waterAreas: [], clearWater: {}, clearWaterAreas: [], lava: {}, lavaAreas: [], paint: {}, paintAreas: {}, foliage: {}, doors: [], windows: [], walls: [], stairs: [], props: [], labels: [], lights: [] };
 }
 
+/** Whether anything is drawn on a layer */
+export function hasContent(layer: LayerContent): boolean {
+  return (Object.keys(emptyContent()) as (keyof LayerContent)[]).some((k) => Object.keys(layer[k]).length > 0);
+}
+
 export function newLayer(id: string, name: string, content: Partial<LayerContent> = {}): MapLayer {
   return {
     id,
