@@ -1,5 +1,5 @@
 // Theme palette definitions for Cartographer
-import type { FloorTexture, PropType, ThemeType } from '../types/map';
+import type { Background, BackgroundTexture, FloorTexture, PropType, ThemeType } from '../types/map';
 
 // Colour is a property of the style for now: a style may colour floors by
 // texture and props by type (#69). A later choice per map, texture or room
@@ -23,8 +23,10 @@ export interface ThemeColors {
   foliageFill: string;
   foliageInk: string;
   propFill: string; // doors
+  // Missing: no grid under the floors as well as over them
+  backgroundGrid?: string;
   // Missing: floors are `floor` with patterns in `ink`, props paper-white
-  textures?: Partial<Record<FloorTexture, TextureColors>>;
+  textures?: Partial<Record<FloorTexture | BackgroundTexture, TextureColors>>;
   props?: Partial<Record<PropType, string>>;
 }
 
@@ -109,6 +111,11 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
       carpet: { fill: '#9e3f3c', ink: '#e2b46a' },
       slabs: { fill: '#b5aea2', ink: '#4f4a42' },
       marble: { fill: '#e6e2da', ink: '#7d7870' },
+      'rough-stone': { fill: '#6f6a62', ink: '#2b2824' },
+      'fitted-stone': { fill: '#8e8b74', ink: '#3b3a2a' },
+      paving: { fill: '#878d93', ink: '#363c42' },
+      brick: { fill: '#9a6b55', ink: '#4a2a1d' },
+      'packed-earth': { fill: '#6a4f36', ink: '#2c1e12' },
     },
     props: {
       pillar: '#bdb7ab',
@@ -121,8 +128,33 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
   },
 };
 
+/** Relative brightness of a #rrggbb colour, 0 to 1 */
+const brightness = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  return (0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)) / 255;
+};
+
+const onBlack = new Map<ThemeType, ThemeColors>();
+
+/**
+ * A map's colours. On a black background the hatching and the grid outside
+ * the rooms take the style's light colour (its ink or its paper), as its dark
+ * inks would vanish; walls keep their ink, which shows on the floor side.
+ */
+export function mapTheme(map: { theme: ThemeType; background: Background }): ThemeColors {
+  const theme = THEMES[map.theme] || THEMES.parchment;
+  if (map.background !== 'black') return theme;
+  let dark = onBlack.get(map.theme);
+  if (!dark) {
+    const light = brightness(theme.ink) > brightness(theme.floor) ? theme.ink : theme.floor;
+    dark = { ...theme, bg: '#000000', hatch: light, backgroundGrid: light };
+    onBlack.set(map.theme, dark);
+  }
+  return dark;
+}
+
 /** A floor texture's fill (none: the floor shows through) and line colour in a style */
-export const textureColors = (theme: ThemeColors, texture: FloorTexture): Partial<TextureColors> & { ink: string } =>
+export const textureColors = (theme: ThemeColors, texture: FloorTexture | BackgroundTexture): Partial<TextureColors> & { ink: string } =>
   theme.textures?.[texture] ?? { ink: theme.ink };
 
 /** A prop's fill in a style */

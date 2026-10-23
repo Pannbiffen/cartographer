@@ -6,6 +6,7 @@ async function setLook(page: Page) {
   await page.getByLabel('Wall style').selectOption('rough');
   await page.getByLabel('Hatching', { exact: true }).selectOption('stipple');
   await page.getByLabel('Grid shape').selectOption('hex-flat');
+  await page.getByLabel('Background').selectOption('black');
 }
 
 async function savePreset(page: Page, name: string) {
@@ -25,13 +26,14 @@ test('a saved look can be applied to another map, undone, and survives a reload'
   await page.getByLabel('Wall style').selectOption('bold');
   await page.getByLabel('Hatching', { exact: true }).selectOption('dyson');
   await page.getByLabel('Grid shape').selectOption('square');
+  await page.getByLabel('Background').selectOption('paper');
   await page.getByRole('button', { name: 'Night plans', exact: true }).click();
   let map = await saveMap(page);
-  expect(map).toMatchObject({ theme: 'blueprint', wallStyle: 'rough', hatchStyle: 'stipple', gridType: 'hex-flat' });
+  expect(map).toMatchObject({ theme: 'blueprint', wallStyle: 'rough', hatchStyle: 'stipple', gridType: 'hex-flat', background: 'black' });
 
   await page.keyboard.press('Control+z');
   map = await saveMap(page);
-  expect(map).toMatchObject({ theme: 'parchment', wallStyle: 'bold', hatchStyle: 'dyson', gridType: 'square' });
+  expect(map).toMatchObject({ theme: 'parchment', wallStyle: 'bold', hatchStyle: 'dyson', gridType: 'square', background: 'paper' });
 
   await page.reload();
   await openApp(page);

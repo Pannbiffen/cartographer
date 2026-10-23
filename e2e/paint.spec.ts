@@ -44,7 +44,7 @@ test('paint floor lays a texture on the ground without rooms or walls, and the e
   const errors = trackErrors(page);
   await openApp(page, { mapSettings: true });
   await page.getByLabel('Show battle grid').uncheck();
-  await page.getByLabel('Ground').selectOption('grass');
+  await page.getByLabel('Background').selectOption('grass');
   const before = await topLayer(page);
   const grass = await pixels(page, [-13, -6], [-11, -4]);
 
@@ -125,7 +125,7 @@ async function clickAt(page: Page, gx: number, gy: number) {
 test('the road tool paints a winding dirt track through the clicked points, undone in one step', async ({ page }) => {
   const errors = trackErrors(page);
   await openApp(page, { mapSettings: true });
-  await page.getByLabel('Ground').selectOption('grass');
+  await page.getByLabel('Background').selectOption('grass');
   const before = await topLayer(page);
 
   await page.keyboard.press('o');

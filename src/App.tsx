@@ -161,6 +161,7 @@ function createDefaultStarterMap(): MapData {
     title: 'The Sunken Crypt',
     gridSize: 40,
     ...DEFAULT_NEW_MAP,
+    background: 'paving',
     lighting: false,
     darkness: 0.75,
     levels: [

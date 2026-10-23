@@ -1,6 +1,6 @@
 // Shared map renderer used by both the live canvas and the exporters
 import type { LevelMap, MapLayer, WaterStyle } from '../../types/map';
-import { THEMES, propColor, type ThemeColors } from '../theme';
+import { mapTheme, propColor, type ThemeColors } from '../theme';
 import {
   extractWallSegments,
   renderDysonHatching,
@@ -110,7 +110,7 @@ function drawWithOpacity(
 
 /** One layer's terrain and objects, bottom to top (labels are drawn separately) */
 function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: LevelMap) {
-  const theme = THEMES[mapData.theme] || THEMES.parchment;
+  const theme = mapTheme(mapData);
   const gridSize = mapData.gridSize;
   // Cells alone are quick to outline; free-form shapes need merging with them
   const floor = hasShapes(layer) ? floorPath(layerFloor(layer), gridSize) : null;
@@ -187,13 +187,47 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: MapLayer, mapData: Le
   }
 }
 
+/** Grid lines over `gridRange` */
+function renderGrid(ctx: CanvasRenderingContext2D, mapData: LevelMap, gridRange: GridRange, colour: string) {
+  const gridSize = mapData.gridSize;
+  ctx.save();
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = mapData.gridOpacity;
+
+  ctx.beginPath();
+  if (isHexGrid(mapData.gridType)) {
+    // Kept to the range, as exports clip to it anyway
+    ctx.rect(
+      gridRange.minX * gridSize,
+      gridRange.minY * gridSize,
+      (gridRange.maxX - gridRange.minX + 1) * gridSize,
+      (gridRange.maxY - gridRange.minY + 1) * gridSize
+    );
+    ctx.clip();
+    ctx.beginPath();
+    hexGridPath(ctx, mapData.gridType, gridSize, gridRange.minX, gridRange.minY, gridRange.maxX + 1, gridRange.maxY + 1);
+  } else {
+    for (let x = gridRange.minX; x <= gridRange.maxX + 1; x++) {
+      ctx.moveTo(x * gridSize, gridRange.minY * gridSize);
+      ctx.lineTo(x * gridSize, (gridRange.maxY + 1) * gridSize);
+    }
+    for (let y = gridRange.minY; y <= gridRange.maxY + 1; y++) {
+      ctx.moveTo(gridRange.minX * gridSize, y * gridSize);
+      ctx.lineTo((gridRange.maxX + 1) * gridSize, y * gridSize);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 /**
  * Draws all shown map layers in world coordinates (the caller sets up
  * pan/zoom and fills the background). Grid lines are drawn over `gridRange`
  * when given. Pass `lighting: false` to leave out darkness and lights even
  * when the map has them on (VTT exports light the map themselves),
- * `labels: false` to leave out the text, and `ground: false` to leave out an
- * outdoor map's ground (drawn first with `renderMapGround`). `lightsBelow`
+ * `labels: false` to leave out the text, and `ground: false` to leave out a
+ * textured background (drawn first with `renderMapGround`). `lightsBelow`
  * are the faint levels drawn underneath (`renderGhostLevel`), whose lights
  * then show where those levels do.
  */
@@ -208,11 +242,13 @@ export function renderMap(
     lightsBelow = [],
   }: { lighting?: boolean; labels?: boolean; ground?: boolean; lightsBelow?: { map: LevelMap; opacity: number }[] } = {}
 ) {
-  const theme = THEMES[mapData.theme] || THEMES.parchment;
+  const theme = mapTheme(mapData);
   const gridSize = mapData.gridSize;
   const layers = mapData.layers.filter((l) => l.visible && l.opacity > 0);
 
   if (ground) renderMapGround(ctx, mapData);
+  // On a dark background, grid lines the floors then cover, as the grid over them is too dark to show
+  if (gridRange && mapData.showGrid && theme.backgroundGrid) renderGrid(ctx, mapData, gridRange, theme.backgroundGrid);
 
   // A see-through layer is drawn whole and then blended, so its own
   // overlapping strokes don't show through each other
@@ -222,37 +258,7 @@ export function renderMap(
   }
 
   // Grid overlay
-  if (gridRange && mapData.showGrid) {
-    ctx.save();
-    ctx.strokeStyle = theme.grid;
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = mapData.gridOpacity;
-
-    ctx.beginPath();
-    if (isHexGrid(mapData.gridType)) {
-      // Kept to the range, as exports clip to it anyway
-      ctx.rect(
-        gridRange.minX * gridSize,
-        gridRange.minY * gridSize,
-        (gridRange.maxX - gridRange.minX + 1) * gridSize,
-        (gridRange.maxY - gridRange.minY + 1) * gridSize
-      );
-      ctx.clip();
-      ctx.beginPath();
-      hexGridPath(ctx, mapData.gridType, gridSize, gridRange.minX, gridRange.minY, gridRange.maxX + 1, gridRange.maxY + 1);
-    } else {
-      for (let x = gridRange.minX; x <= gridRange.maxX + 1; x++) {
-        ctx.moveTo(x * gridSize, gridRange.minY * gridSize);
-        ctx.lineTo(x * gridSize, (gridRange.maxY + 1) * gridSize);
-      }
-      for (let y = gridRange.minY; y <= gridRange.maxY + 1; y++) {
-        ctx.moveTo(gridRange.minX * gridSize, y * gridSize);
-        ctx.lineTo((gridRange.maxX + 1) * gridSize, y * gridSize);
-      }
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
+  if (gridRange && mapData.showGrid) renderGrid(ctx, mapData, gridRange, theme.grid);
 
   // Darkness covers the grid too, but labels stay readable on top
   if (lighting && mapData.lighting) {
@@ -286,11 +292,10 @@ export function renderMap(
   }
 }
 
-/** An outdoor map's ground, over everything the canvas shows; nothing indoors */
+/** A textured background, over everything the canvas shows; nothing for paper or black (the caller's `bg` fill) */
 export function renderMapGround(ctx: CanvasRenderingContext2D, mapData: LevelMap) {
-  if (!mapData.outdoor) return;
-  const theme = THEMES[mapData.theme] || THEMES.parchment;
-  renderGround(ctx, mapData.ground, mapData.gridSize, theme);
+  if (mapData.background === 'paper' || mapData.background === 'black') return;
+  renderGround(ctx, mapData.background, mapData.gridSize, mapTheme(mapData));
 }
 
 /**

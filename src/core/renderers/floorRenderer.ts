@@ -2,7 +2,7 @@
 // in world coordinates, so neighbouring cells continue each other seamlessly,
 // and repeats after a whole number of cells, so it can be drawn once into a
 // tile and filled in from that (#59).
-import type { FloorTexture, LayerContent, Polygon } from '../../types/map';
+import type { BackgroundTexture, FloorTexture, LayerContent, Polygon } from '../../types/map';
 import { floorPath, polygonBounds } from '../geometry/region';
 import { pseudoRandom } from '../geometry/hatching';
 import { tilePattern, viewRect, wrap } from './patternTiles';
@@ -262,7 +262,173 @@ const marble: PatternFn = (ctx, gx, gy, g) => {
   }
 };
 
-type Pattern = Exclude<FloorTexture, 'plain'>;
+/** Specks of radius `min` to `max` scattered over a cell (to be filled) */
+function specks(ctx: CanvasRenderingContext2D, gx: number, gy: number, g: number, count: number, min: number, max: number, seed: number) {
+  const wx = wrap(gx, PERIOD);
+  const wy = wrap(gy, PERIOD);
+  for (let n = 0; n < count; n++) {
+    const px = (gx + pseudoRandom(wx, wy, seed + n)) * g;
+    const py = (gy + pseudoRandom(wx, wy, seed + 100 + n)) * g;
+    const r = min + pseudoRandom(wx, wy, seed + 200 + n) * (max - min);
+    ctx.moveTo(px + r, py);
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+  }
+}
+
+/** A jagged line of `steps` from (x, y), drifting along `angle` */
+function crack(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, step: number, steps: number, rand: (n: number) => number) {
+  ctx.moveTo(x, y);
+  for (let n = 0; n < steps; n++) {
+    const a = angle + (rand(n) - 0.5) * 1.6;
+    x += Math.cos(a) * step;
+    y += Math.sin(a) * step;
+    ctx.lineTo(x, y);
+  }
+}
+
+// Rough stone: uneven rock, split by jagged cracks and pocked with chips
+const roughStone: PatternFn = (ctx, gx, gy, g) => {
+  const wx = wrap(gx, PERIOD);
+  const wy = wrap(gy, PERIOD);
+  const rand = (n: number) => pseudoRandom(wx, wy, 400 + n);
+  for (let c = 0; c < 2; c++) {
+    const r = (n: number) => rand(10 + c * 10 + n);
+    crack(ctx, (gx + r(0)) * g, (gy + r(1)) * g, r(2) * Math.PI * 2, g * (0.1 + r(3) * 0.06), 3 + Math.floor(r(4) * 3), (n) => r(5 + n));
+  }
+  // Chips: small three- or four-sided flakes
+  for (let c = 0; c < 3; c++) {
+    const r = (n: number) => rand(40 + c * 10 + n);
+    const cx = (gx + r(0)) * g;
+    const cy = (gy + r(1)) * g;
+    const sides = r(2) < 0.5 ? 3 : 4;
+    const size = g * (0.04 + r(3) * 0.05);
+    for (let n = 0; n < sides; n++) {
+      const a = (n / sides) * Math.PI * 2 + r(4) * 2;
+      const d = size * (0.6 + r(5 + n) * 0.6);
+      if (n === 0) ctx.moveTo(cx + Math.cos(a) * d, cy + Math.sin(a) * d);
+      else ctx.lineTo(cx + Math.cos(a) * d, cy + Math.sin(a) * d);
+    }
+    ctx.closePath();
+  }
+};
+const roughStoneSpecks: PatternFn = (ctx, gx, gy, g) => specks(ctx, gx, gy, g, 10, 0.5, 1.2, 500);
+
+// Stones are half a cell (2½ ft) across: SUB to a cell edge, set a quarter cell off the grid
+const SUB = 2;
+const SUB_PERIOD = PERIOD * SUB;
+/** Calls `fn` for each stone whose corner lies in the cell, with its index and wrapped index */
+function eachStone(gx: number, gy: number, fn: (i: number, j: number, rand: (n: number) => number) => void) {
+  for (let j = gy * SUB; j < (gy + 1) * SUB; j++) {
+    for (let i = gx * SUB; i < (gx + 1) * SUB; i++) {
+      const wi = wrap(i, SUB_PERIOD);
+      const wj = wrap(j, SUB_PERIOD);
+      fn(i, j, (n) => pseudoRandom(wi, wj, 1000 + n));
+    }
+  }
+}
+type Pt = [number, number];
+/** A four-sided stone (corners in cells), shrunk towards its middle for the joint and its corners rounded */
+function roundQuad(ctx: CanvasRenderingContext2D, pts: Pt[], g: number, k: number) {
+  const cx = pts.reduce((a, p) => a + p[0], 0) / 4;
+  const cy = pts.reduce((a, p) => a + p[1], 0) / 4;
+  const q = pts.map(([x, y]) => [(cx + (x - cx) * k) * g, (cy + (y - cy) * k) * g]);
+  // Straight sides, the corners worn round over a fifth of each side
+  const toward = (a: number[], b: number[]) => [a[0] + (b[0] - a[0]) * 0.2, a[1] + (b[1] - a[1]) * 0.2];
+  for (let n = 0; n < 4; n++) {
+    const before = toward(q[n], q[(n + 3) % 4]);
+    const after = toward(q[n], q[(n + 1) % 4]);
+    if (n === 0) ctx.moveTo(before[0], before[1]);
+    else ctx.lineTo(before[0], before[1]);
+    ctx.quadraticCurveTo(q[n][0], q[n][1], after[0], after[1]);
+  }
+  ctx.closePath();
+}
+const lerp = (a: Pt, b: Pt, t: number): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+/** A stone, or a third of the time two halves of it split across one way or the other */
+function splitQuad(ctx: CanvasRenderingContext2D, [p0, p1, p2, p3]: Pt[], g: number, k: number, rand: (n: number) => number) {
+  if (rand(90) > 0.33) return roundQuad(ctx, [p0, p1, p2, p3], g, k);
+  const t = 0.4 + rand(91) * 0.2;
+  if (rand(92) < 0.5) {
+    const a = lerp(p0, p1, t);
+    const b = lerp(p3, p2, t);
+    roundQuad(ctx, [p0, a, b, p3], g, k);
+    roundQuad(ctx, [a, p1, p2, b], g, k);
+  } else {
+    const a = lerp(p0, p3, t);
+    const b = lerp(p1, p2, t);
+    roundQuad(ctx, [p0, p1, b, a], g, k);
+    roundQuad(ctx, [a, b, p2, p3], g, k);
+  }
+}
+const OFF = 0.25; // cells off the grid
+const rect = (x: number, y: number, w: number, h: number): Pt[] => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+
+// Fitted stone: irregular stones fitted together, from a jittered lattice
+const latticePoint = (i: number, j: number): Pt => {
+  const wi = wrap(i, SUB_PERIOD);
+  const wj = wrap(j, SUB_PERIOD);
+  return [(i + (pseudoRandom(wi, wj, 1001) - 0.5) * 0.55) / SUB + OFF, (j + (pseudoRandom(wi, wj, 1002) - 0.5) * 0.55) / SUB + OFF];
+};
+const fittedStone: PatternFn = (ctx, gx, gy, g) =>
+  eachStone(gx, gy, (i, j, rand) =>
+    splitQuad(ctx, [latticePoint(i, j), latticePoint(i + 1, j), latticePoint(i + 1, j + 1), latticePoint(i, j + 1)], g, 0.86, rand)
+  );
+
+// Paving stones: square slabs in a running bond, some split, the odd corner chipped
+const paving: PatternFn = (ctx, gx, gy, g) =>
+  eachStone(gx, gy, (i, j, rand) => {
+    const shift = wrap(j, 2) === 1 ? 0.5 : 0;
+    const x = (i + shift) / SUB + OFF;
+    const y = j / SUB + OFF;
+    splitQuad(ctx, rect(x, y, 1 / SUB, 1 / SUB), g, 0.88, rand);
+    if (rand(4) < 0.12) {
+      const d = g * 0.08;
+      const cx = (x + 0.46) * g;
+      const cy = (y + 0.46) * g;
+      ctx.moveTo(cx - d, cy);
+      ctx.lineTo(cx - d * 0.4, cy - d * 0.6);
+      ctx.lineTo(cx, cy - d);
+    }
+  });
+
+// Brick: basket weave, squares of two bricks turned a quarter in alternate squares; some bricks split
+const brick: PatternFn = (ctx, gx, gy, g) =>
+  eachStone(gx, gy, (i, j, rand) => {
+    const x = i / SUB + OFF;
+    const y = j / SUB + OFF;
+    const s = 1 / SUB;
+    const bricks = wrap(i + j, 2) === 0 ? [rect(x, y, s, s / 2), rect(x, y + s / 2, s, s / 2)] : [rect(x, y, s / 2, s), rect(x + s / 2, y, s / 2, s)];
+    bricks.forEach((brick, n) => splitQuad(ctx, brick, g, 0.84, (m) => rand(m + n * 7)));
+  });
+
+// Packed earth: dense fine grit with small pebbles, and here and there a root or a dry crack
+const packedEarth: PatternFn = (ctx, gx, gy, g) => {
+  const wx = wrap(gx, PERIOD);
+  const wy = wrap(gy, PERIOD);
+  const rand = (n: number) => pseudoRandom(wx, wy, 800 + n);
+  for (let p = 0; p < 2; p++) {
+    const r = (n: number) => rand(p * 10 + n);
+    const cx = (gx + 0.1 + r(0) * 0.8) * g;
+    const cy = (gy + 0.1 + r(1) * 0.8) * g;
+    const rx = g * (0.035 + r(2) * 0.03);
+    ctx.moveTo(cx + rx, cy);
+    ctx.ellipse(cx, cy, rx, rx * (0.6 + r(3) * 0.3), r(4) * Math.PI, 0, Math.PI * 2);
+  }
+  if (rand(30) < 0.15) {
+    // A root curling across the cell
+    const x = (gx + rand(31) * 0.4) * g;
+    const y = (gy + 0.2 + rand(32) * 0.6) * g;
+    ctx.moveTo(x, y);
+    ctx.bezierCurveTo(x + g * 0.2, y - g * 0.15, x + g * 0.35, y + g * 0.15, x + g * (0.5 + rand(33) * 0.2), y + (rand(34) - 0.5) * g * 0.2);
+  } else if (rand(30) < 0.25) {
+    crack(ctx, (gx + rand(35)) * g, (gy + rand(36)) * g, rand(37) * Math.PI * 2, g * 0.08, 3, (n) => rand(40 + n));
+  }
+};
+const packedEarthSpecks: PatternFn = (ctx, gx, gy, g) => specks(ctx, gx, gy, g, 30, 0.4, 0.9, 900);
+// Grime on the stones
+const stoneSpecks: PatternFn = (ctx, gx, gy, g) => specks(ctx, gx, gy, g, 5, 0.4, 0.9, 1400);
+
+type Pattern = Exclude<FloorTexture, 'plain'> | BackgroundTexture;
 const PATTERNS: Record<Pattern, PatternFn> = {
   tiles,
   planks,
@@ -274,6 +440,18 @@ const PATTERNS: Record<Pattern, PatternFn> = {
   carpet,
   slabs,
   marble,
+  'rough-stone': roughStone,
+  'fitted-stone': fittedStone,
+  paving,
+  brick,
+  'packed-earth': packedEarth,
+};
+// Filled specks drawn after a pattern's lines
+const SPECKS: Partial<Record<Pattern, PatternFn>> = {
+  'rough-stone': roughStoneSpecks,
+  'fitted-stone': stoneSpecks,
+  paving: stoneSpecks,
+  'packed-earth': packedEarthSpecks,
 };
 const PATTERN_PERIOD: Record<Pattern, number> = {
   tiles: PERIOD,
@@ -286,10 +464,15 @@ const PATTERN_PERIOD: Record<Pattern, number> = {
   carpet: PERIOD,
   slabs: PERIOD,
   marble: PERIOD,
+  'rough-stone': PERIOD,
+  'fitted-stone': PERIOD,
+  paving: PERIOD,
+  brick: PERIOD,
+  'packed-earth': PERIOD,
 };
 
 // Fainter for busy patterns, stronger for sparse ones
-const TEXTURE_ALPHA: Partial<Record<FloorTexture, number>> = {
+const TEXTURE_ALPHA: Partial<Record<Pattern, number>> = {
   dirt: 0.35,
   cobbles: 0.55,
   flagstones: 0.5,
@@ -298,11 +481,16 @@ const TEXTURE_ALPHA: Partial<Record<FloorTexture, number>> = {
   carpet: 0.3,
   slabs: 0.5,
   marble: 0.45,
+  'rough-stone': 0.55,
+  'fitted-stone': 0.55,
+  paving: 0.55,
+  brick: 0.5,
+  'packed-earth': 0.5,
 };
 // Patterns of specks, filled rather than stroked
 const FILLED = new Set<Pattern>(['dirt', 'sand']);
 
-const isPattern = (texture: FloorTexture): texture is Pattern => texture in PATTERNS;
+const isPattern = (texture: FloorTexture | BackgroundTexture): texture is Pattern => texture in PATTERNS;
 
 /** Draws each floor cell's texture, clipped to the cells that carry it, then
  * the textured areas of free-form floor over them. Only cells in view are drawn. */
@@ -385,8 +573,8 @@ function renderTextures(
   }
 }
 
-/** Lays a texture over everything the canvas shows: an outdoor map's ground */
-export function renderGround(ctx: CanvasRenderingContext2D, texture: FloorTexture, gridSize: number, theme: ThemeColors) {
+/** Lays a texture over everything the canvas shows: a map's background */
+export function renderGround(ctx: CanvasRenderingContext2D, texture: BackgroundTexture, gridSize: number, theme: ThemeColors) {
   if (!isPattern(texture)) return;
   const view = viewCells(ctx, gridSize);
   const clip = new Path2D();
@@ -431,10 +619,10 @@ function drawTexture(
   }
   const n = PATTERN_PERIOD[texture];
   const pattern = tilePattern(ctx, `${texture}|${gridSize}|${inkColor}`, n * gridSize, (tctx) => {
-    // A ring of cells around the period too: their shapes cross its edges and
-    // wrap round to the far side
+    // Two rings of cells around the period too: their shapes (some two cells
+    // across) cross its edges and wrap round to the far side
     const ring: [number, number][] = [];
-    for (let gy = -1; gy <= n; gy++) for (let gx = -1; gx <= n; gx++) ring.push([gx, gy]);
+    for (let gy = -2; gy <= n + 1; gy++) for (let gx = -2; gx <= n + 1; gx++) ring.push([gx, gy]);
     strokeCells(tctx, texture, ring, gridSize, inkColor);
   });
   if (!pattern) {
@@ -463,11 +651,18 @@ function strokeCells(ctx: CanvasRenderingContext2D, texture: Pattern, cells: [nu
   const draw = PATTERNS[texture];
   const seen = new Set<number>();
   const perPath = cellsPerPath(texture);
+  const drawSpecks = SPECKS[texture];
   for (let start = 0; start < cells.length; start += perPath) {
+    const batch = cells.slice(start, start + perPath);
     ctx.beginPath();
-    for (const [gx, gy] of cells.slice(start, start + perPath)) draw(ctx, gx, gy, gridSize, seen);
+    for (const [gx, gy] of batch) draw(ctx, gx, gy, gridSize, seen);
     if (FILLED.has(texture)) ctx.fill();
     else ctx.stroke();
+    if (drawSpecks) {
+      ctx.beginPath();
+      for (const [gx, gy] of batch) drawSpecks(ctx, gx, gy, gridSize, seen);
+      ctx.fill();
+    }
   }
 }
 

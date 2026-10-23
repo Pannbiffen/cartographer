@@ -114,7 +114,7 @@ test('a layer can override the map hatching, and keeps it after a reload', async
   const errors = trackErrors(page);
   await openApp(page, { mapSettings: true });
   // Ink outside the rooms is only measurable on blank paper
-  await page.getByLabel('Ground').selectOption('indoor');
+  await page.getByLabel('Background').selectOption('paper');
   // A room on the starter layer, then one on a new layer three cells along
   await page.keyboard.press('r');
   await dragCells(page, [-15, 8], [-13, 10]);
@@ -183,7 +183,7 @@ test('stipple hatching on a large map draws from a tile, zoomed out and back in'
     }
   }
   map.levels[0].layers = [{ ...map.levels[0].layers[0], rooms, floors: {}, doors: [], stairs: [], props: [], labels: [] }];
-  Object.assign(map, { theme: 'parchment', outdoor: false, hatchStyle: 'stipple', hatchDensity: 5, hatchLength: 24 });
+  Object.assign(map, { theme: 'parchment', background: 'paper', hatchStyle: 'stipple', hatchDensity: 5, hatchLength: 24 });
   await page.getByLabel('Open map file').setInputFiles({
     name: 'large.dndmap',
     mimeType: 'application/json',

@@ -46,6 +46,11 @@ export type FloorTexture =
   | 'slabs'
   | 'marble';
 
+// What fills the map behind and around the rooms: blank paper, black, or a
+// dungeon or outdoor texture laid everywhere, with rooms drawn on it
+export type Background = 'paper' | 'black' | 'rough-stone' | 'fitted-stone' | 'paving' | 'brick' | 'packed-earth' | 'dirt' | 'grass' | 'sand';
+export type BackgroundTexture = Exclude<Background, 'paper' | 'black'>;
+
 // How the rock outside the walls is shaded
 export type HatchStyle = 'dyson' | 'crosshatch' | 'stipple' | 'shadow' | 'none';
 
@@ -236,10 +241,7 @@ export interface MapSettings {
   hatchLength: number; // pixels
   hatchStyle: HatchStyle;
   wallStyle: WallStyle;
-  // Outdoor maps are ground everywhere, in the `ground` texture, with rooms
-  // drawn on it; indoor maps are blank paper that rooms are dug out of
-  outdoor: boolean;
-  ground: FloorTexture;
+  background: Background;
   lighting: boolean; // darken the map so lights and torches show
   darkness: number; // 0 to 1, away from any light
 }

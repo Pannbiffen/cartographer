@@ -12,8 +12,7 @@ export type NewMapDefaults = Pick<
   | 'gridType'
   | 'showGrid'
   | 'gridOpacity'
-  | 'outdoor'
-  | 'ground'
+  | 'background'
 >;
 
 export const NEW_MAP_KEYS: (keyof NewMapDefaults)[] = [
@@ -25,8 +24,7 @@ export const NEW_MAP_KEYS: (keyof NewMapDefaults)[] = [
   'gridType',
   'showGrid',
   'gridOpacity',
-  'outdoor',
-  'ground',
+  'background',
 ];
 
 export const DEFAULT_NEW_MAP: NewMapDefaults = {
@@ -38,8 +36,7 @@ export const DEFAULT_NEW_MAP: NewMapDefaults = {
   gridType: 'square',
   showGrid: true,
   gridOpacity: 0.22,
-  outdoor: true,
-  ground: 'grass',
+  background: 'grass',
 };
 
 /** The new-map settings of an existing map, e.g. to reuse its look */

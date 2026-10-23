@@ -52,7 +52,7 @@ test('solid water hides the ground, and right-clicking makes it see-through', as
   const errors = trackErrors(page);
   await openApp(page, { mapSettings: true });
   await page.getByLabel('Show battle grid').uncheck();
-  await page.getByLabel('Ground').selectOption('grass');
+  await page.getByLabel('Background').selectOption('grass');
 
   // A straight river, at least two cells wide, along y = -3.5
   await page.keyboard.press('y');

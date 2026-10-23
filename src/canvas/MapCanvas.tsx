@@ -17,7 +17,7 @@ import type {
   ShapeMode,
   ViewportTransform,
 } from '../types/map';
-import { THEMES } from '../core/theme';
+import { mapTheme } from '../core/theme';
 import { wheelZoomFactor, zoomAbout, type ZoomSpeed } from '../core/viewport';
 import { useKeyboardPan } from './useKeyboardPan';
 import { keepsSelection, laysFloor } from '../components/options';
@@ -320,7 +320,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const dpr = window.devicePixelRatio || 1;
     const width = canvas.width / dpr;
     const height = canvas.height / dpr;
-    const theme = THEMES[mapData.theme] || THEMES.parchment;
+    const theme = mapTheme(mapData);
     const gridSize = mapData.gridSize;
 
     // The map itself only changes with an edit, pan, zoom or resize, so it is

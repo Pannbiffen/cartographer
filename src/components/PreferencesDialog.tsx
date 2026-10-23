@@ -5,12 +5,10 @@ import { DEFAULT_NEW_MAP, type NewMapDefaults } from '../core/newMap';
 import { Dialog, DialogGroup } from './Dialog';
 import { Slider } from './Slider';
 import {
+  BACKGROUND_GROUPS,
   BUTTON_CLASS,
   FIELD_CLASS,
   GRID_TYPES,
-  GROUND_CHOICES,
-  groundChoice,
-  groundSettings,
   HATCH_STYLES,
   THEME_NAMES,
   WALL_STYLES,
@@ -91,12 +89,14 @@ function Choice<T extends string>({
 
 function Select<T extends string>({
   label,
-  options,
+  options = [],
+  groups = [],
   value,
   onChange,
 }: {
   label: string;
-  options: [T, string][];
+  options?: [T, string][];
+  groups?: [string, [T, string][]][];
   value: T;
   onChange: (value: T) => void;
 }) {
@@ -108,6 +108,15 @@ function Select<T extends string>({
           <option key={id} value={id}>
             {name}
           </option>
+        ))}
+        {groups.map(([group, items]) => (
+          <optgroup key={group} label={group}>
+            {items.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
     </label>
@@ -238,10 +247,10 @@ export const PreferencesDialog: React.FC<PreferencesDialogProps> = ({
           onChange={(gridType) => changeNewMap({ gridType })}
         />
         <Select
-          label="Ground"
-          options={GROUND_CHOICES}
-          value={groundChoice(newMap)}
-          onChange={(v) => changeNewMap(groundSettings(v))}
+          label="Background"
+          groups={BACKGROUND_GROUPS}
+          value={newMap.background}
+          onChange={(background) => changeNewMap({ background })}
         />
         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
           <Slider

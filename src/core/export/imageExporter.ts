@@ -1,6 +1,6 @@
 // High-resolution image and Universal VTT exporters, and the bounding box they share
 import type { LevelMap } from '../../types/map';
-import { THEMES } from '../theme';
+import { mapTheme } from '../theme';
 import { renderMap } from '../renderers/mapRenderer';
 import { exportUniversalVtt } from './vttExporter';
 import { visibleLayers } from '../layers';
@@ -100,7 +100,7 @@ export function renderOffscreenMap(
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
 
-  const theme = THEMES[mapData.theme] || THEMES.parchment;
+  const theme = mapTheme(mapData);
 
   // Background
   ctx.fillStyle = theme.bg;

@@ -4,7 +4,7 @@ import type { GridType, MapData, ThemeType } from '../types/map';
 import type { ModifyMap } from '../App';
 import { StylePresets } from './StylePresets';
 import { Slider } from './Slider';
-import { FIELD_CLASS, GRID_TYPES, GROUND_CHOICES, groundChoice, groundSettings, HATCH_STYLES, THEME_NAMES, WALL_STYLES } from './options';
+import { BACKGROUND_GROUPS, FIELD_CLASS, GRID_TYPES, HATCH_STYLES, THEME_NAMES, WALL_STYLES } from './options';
 
 interface MapSettingsDrawerProps {
   open: boolean;
@@ -33,12 +33,14 @@ const Column: React.FC<{ title: string; wide?: boolean; minWidth?: string; child
 // A labelled drop-down of [value, name] pairs
 const Picker = <T extends string>({
   label,
-  options,
+  options = [],
+  groups = [],
   value,
   onChange,
 }: {
   label: string;
-  options: [T, string][];
+  options?: [T, string][];
+  groups?: [string, [T, string][]][];
   value: T;
   onChange: (value: T) => void;
 }) => (
@@ -47,6 +49,13 @@ const Picker = <T extends string>({
     <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value as T)} className={FIELD_CLASS}>
       {options.map(([id, name]) => (
         <option key={id} value={id}>{name}</option>
+      ))}
+      {groups.map(([group, items]) => (
+        <optgroup key={group} label={group}>
+          {items.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </optgroup>
       ))}
     </select>
   </label>
@@ -94,10 +103,10 @@ export const MapSettingsDrawer: React.FC<MapSettingsDrawerProps> = ({ open, onTo
             </select>
           </label>
           <Picker
-            label="Ground"
-            options={GROUND_CHOICES}
-            value={groundChoice(mapData)}
-            onChange={(v) => onModifyMap((draft) => { Object.assign(draft, groundSettings(v)); })}
+            label="Background"
+            groups={BACKGROUND_GROUPS}
+            value={mapData.background}
+            onChange={(v) => onModifyMap((draft) => { draft.background = v; })}
           />
         </Column>
 

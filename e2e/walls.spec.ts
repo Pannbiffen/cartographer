@@ -163,7 +163,7 @@ const roomCells = async (page: Page) => Object.keys((await layer(page)).rooms).f
 test('walls that close off ground make it a room with the chosen floor, undone with the stroke', async ({ page }) => {
   const errors = trackErrors(page);
   await openApp(page, { mapSettings: true });
-  await page.getByLabel('Ground').selectOption('grass');
+  await page.getByLabel('Background').selectOption('grass');
   await page.keyboard.press('a');
   await page.getByRole('button', { name: 'cobbles' }).click();
 

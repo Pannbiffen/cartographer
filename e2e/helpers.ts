@@ -135,7 +135,7 @@ export async function openDarkHall(page: Page, content: Partial<MapLayer> = {}) 
   const map: MapData = {
     ...base,
     title: 'Hall',
-    outdoor: false,
+    background: 'paper',
     showGrid: false,
     lighting: true,
     darkness: 0.9,
