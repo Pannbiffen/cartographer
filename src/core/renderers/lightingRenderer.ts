@@ -7,6 +7,7 @@ import { combinedWalls, floorPath, hasWater, layerWater } from '../geometry/regi
 import { mergeWallSegments, visibilityPolygon, wallsWithGap, type Point, type Segment } from '../geometry/visibility';
 import { lavaLights, mapLights, mapWindows, type MapLight } from '../lighting';
 import { visibleLayers } from '../layers';
+import { WINDOW_PANE_LENGTH } from './propsRenderer';
 
 // Walls and light shapes per level drawn (the active one and the faint ones
 // below); maps are replaced on every edit, so the layer list identifies the content
@@ -42,10 +43,13 @@ function lightShape(map: LevelMap, light: MapLight): Point[] {
   return shape;
 }
 
-/** The window's edge in pixels */
+/** The window's glass along its edge, in pixels */
 function windowEdge(w: PlacedWindow, g: number): Segment {
   const [x, y] = [w.x * g, w.y * g];
-  return w.orientation === 'horizontal' ? { x1: x, y1: y, x2: x + g, y2: y } : { x1: x, y1: y, x2: x, y2: y + g };
+  const [from, to] = [((1 - WINDOW_PANE_LENGTH) / 2) * g, ((1 + WINDOW_PANE_LENGTH) / 2) * g];
+  return w.orientation === 'horizontal'
+    ? { x1: x + from, y1: y, x2: x + to, y2: y }
+    : { x1: x, y1: y + from, x2: x, y2: y + to };
 }
 
 /**

@@ -36,6 +36,8 @@ test('a window lets light through its wall, dimmed and tinted', async ({ page })
   const behind = await brightnessAt(page, 6.5, 0.5);
   expect(through).toBeGreaterThan(behind + 10);
   expect(inside).toBeGreaterThan(through + 5);
+  // Only through the glass, not past its ends: beside the beam it stays dark
+  expect(Math.abs((await brightnessAt(page, 7, 1.72)) - behind)).toBeLessThanOrEqual(2);
 
   // A green pane casts greener light
   const before = await rgbAt(page, 6.5, 2.5);

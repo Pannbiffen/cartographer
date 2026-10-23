@@ -1,9 +1,12 @@
 // Renderer for doors, windows, stairs, and dungeon props
 import type { PlacedDoor, PlacedStairs, PlacedProp, PlacedWindow } from '../../types/map';
 
+// How much of its cell edge a window's glass spans, centred on it; light passes only there
+export const WINDOW_PANE_LENGTH = 0.7;
+
 /** A pane across the wall line in its tint, with a line along the glass */
 export function renderWindow(ctx: CanvasRenderingContext2D, pane: PlacedWindow, gridSize: number, inkColor: string) {
-  const length = gridSize * 0.7;
+  const length = gridSize * WINDOW_PANE_LENGTH;
   const depth = 6;
   const along = pane.orientation === 'horizontal';
   const [cx, cy] = along ? [(pane.x + 0.5) * gridSize, pane.y * gridSize] : [pane.x * gridSize, (pane.y + 0.5) * gridSize];
